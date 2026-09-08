@@ -1,0 +1,633 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingTop="5dp"
+    android:paddingStart="5dp"
+    android:paddingEnd="5dp"
+    android:paddingBottom="5dp"
+    android:id="@+id/containerLinearLayout"
+    android:background="#FFFFFF">
+
+    <!-- 顶部环形速度显示栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="8dp">
+
+        <!-- 左边圆圈 -->
+        <LinearLayout
+            android:id="@+id/speed_left"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="@drawable/ring_green"
+            android:layout_marginEnd="8dp">  <!-- 左边圆圈与中间区域间距 -->
+
+            <TextView
+                android:id="@+id/tvSpeedLeft"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#00C853"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 中间区域 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvNavInfo"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="#666666"
+                android:text="导航信息"
+                android:textColor="#FFFFFF"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="6dp"
+                android:textSize="15sp"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <!-- 两个文本框之间间距 -->
+            <Space
+                android:layout_width="8dp"
+                android:layout_height="wrap_content" />
+
+            <TextView
+                android:id="@+id/tvDistance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="#666666"
+                android:text="000 m"
+                android:textColor="#FFFFFF"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="6dp"
+                android:textSize="15sp"
+                android:gravity="center"/>
+        </LinearLayout>
+
+        <!-- 右边圆圈 -->
+        <LinearLayout
+            android:id="@+id/speed_right"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="@drawable/ring_red"
+            android:layout_marginStart="8dp">  <!-- 右边圆圈与中间区域间距 -->
+
+            <TextView
+                android:id="@+id/tvSpeedRight"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#FF0000"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="2dp">
+
+        <TextView
+            android:id="@+id/tvUdpStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="导航: 需要导航功能请打开高德车机版并开启导航"
+            android:textSize="12sp"
+            android:textColor="#0000FF"/>
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1"/>
+
+        <TextView
+            android:id="@+id/tvVersion"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="12sp"
+            android:textColor="#0000FF"/>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="2dp">
+
+        <TextView
+            android:id="@+id/tvDevicID"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ID: "
+            android:textSize="12sp"
+            android:textColor="#0000FF"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/vLaneTextViewLayout"
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:visibility="gone"
+        android:layout_marginBottom="2dp">
+
+        <TextView
+            android:id="@+id/driveWayTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="12sp"
+            android:textColor="#0000FF"/>
+
+        <Space
+            android:id="@+id/driveWaySpacer"
+            android:layout_width="12dp"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/vLaneTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="12sp"
+            android:textColor="#0000FF"/>
+    </LinearLayout>
+
+    <!-- 三按钮独立一行：设置 / 超车 / 设备 -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/layoutThreeButtons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
+
+        <Button
+            android:id="@+id/btnAppOverTake"
+            android:layout_width="0dp"
+            android:layout_height="30dp"
+            android:text="超车"
+            android:textSize="14sp"
+            android:background="@drawable/btn_blue"
+            android:textColor="#FFFFFF"
+            android:layout_marginEnd="6dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/btnSetting"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintHorizontal_weight="1" />
+
+        <Button
+            android:id="@+id/btnSetting"
+            android:layout_width="0dp"
+            android:layout_height="30dp"
+            android:text="设置"
+            android:textSize="14sp"
+            android:background="@drawable/btn_green"
+            android:textColor="#FFFFFF"
+            android:layout_marginEnd="6dp"
+            app:layout_constraintStart_toEndOf="@id/btnAppOverTake"
+            app:layout_constraintEnd_toStartOf="@id/btnNavSetting"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintHorizontal_weight="1" />
+
+        <Button
+            android:id="@+id/btnNavSetting"
+            android:layout_width="0dp"
+            android:layout_height="30dp"
+            android:text="OP参数"
+            android:textSize="14sp"
+            android:background="@drawable/btn_blue"
+            android:textColor="#FFFFFF"
+            android:layout_marginEnd="6dp"
+            app:layout_constraintStart_toEndOf="@id/btnSetting"
+            app:layout_constraintEnd_toStartOf="@id/btnScanDevice"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintHorizontal_weight="1" />
+
+        <Button
+            android:id="@+id/btnScanDevice"
+            android:layout_width="0dp"
+            android:layout_height="30dp"
+            android:text="设备"
+            android:textSize="14sp"
+            android:background="@drawable/btn_yellow"
+            android:textColor="#000000"
+            android:layout_marginEnd="6dp"
+            app:layout_constraintStart_toEndOf="@id/btnNavSetting"
+            app:layout_constraintEnd_toStartOf="@id/btnPay"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintHorizontal_weight="1" />
+
+        <Button
+            android:id="@+id/btnPay"
+            android:layout_width="0dp"
+            android:layout_height="30dp"
+            android:text="赞助"
+            android:textSize="14sp"
+            android:background="@drawable/btn_red"
+            android:textColor="#FFFFFF"
+            android:layout_marginEnd="6dp"
+            app:layout_constraintStart_toEndOf="@id/btnScanDevice"
+            app:layout_constraintEnd_toStartOf="@id/btnMoreButton"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintHorizontal_weight="1" />
+
+        <!-- 最右侧：紧凑 >> 按钮 -->
+        <Button
+            android:id="@+id/btnMoreButton"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:minHeight="30dp"
+            android:minWidth="0dp"
+            android:text=">>"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
+            android:background="@drawable/btn_blue"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        android:id="@+id/layoutSystemButtons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
+
+        <!-- 限速 + -->
+        <Button
+            android:id="@+id/btnIncRoadLimit"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:minHeight="30dp"
+            android:minWidth="70dp"
+            android:text="限速+5"
+            android:textSize="14sp"
+            android:includeFontPadding="false"
+            android:gravity="center"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:background="@drawable/btn_blue"
+            android:textColor="#FFFFFF"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"/>
+
+        <!-- 重置 -->
+        <Button
+            android:id="@+id/btnResetRoadLimit"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:minHeight="30dp"
+            android:minWidth="50dp"
+            android:text="重置"
+            android:textSize="14sp"
+            android:includeFontPadding="false"
+            android:gravity="center"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/btn_red"
+            android:textColor="#FFFFFF"
+            app:layout_constraintStart_toEndOf="@id/btnIncRoadLimit"
+            app:layout_constraintTop_toTopOf="parent"/>
+
+        <!-- 限速 - -->
+        <Button
+            android:id="@+id/btnDecRoadLimit"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:minHeight="30dp"
+            android:minWidth="70dp"
+            android:text="限速-5"
+            android:textSize="14sp"
+            android:includeFontPadding="false"
+            android:gravity="center"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/btn_blue"
+            android:textColor="#FFFFFF"
+            app:layout_constraintStart_toEndOf="@id/btnResetRoadLimit"
+            app:layout_constraintTop_toTopOf="parent"/>
+
+        <!-- Flask -->
+        <Button
+            android:id="@+id/btnInstallFlask"
+            android:layout_width="0dp"
+            android:layout_height="30dp"
+            android:minHeight="30dp"
+            android:minWidth="0dp"
+            android:text="安装Flask"
+            android:textSize="14sp"
+            android:includeFontPadding="false"
+            android:gravity="center"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:background="@drawable/btn_green"
+            android:textColor="#FFFFFF"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="6dp"
+            app:layout_constraintStart_toEndOf="@id/btnDecRoadLimit"
+            app:layout_constraintEnd_toStartOf="@id/btnInstallOpencv"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintHorizontal_weight="2"/>
+
+        <!-- OpenCV -->
+        <Button
+            android:id="@+id/btnInstallOpencv"
+            android:layout_width="0dp"
+            android:layout_height="30dp"
+            android:minHeight="30dp"
+            android:minWidth="56dp"
+            android:text="CV2"
+            android:textSize="14sp"
+            android:includeFontPadding="false"
+            android:gravity="center"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:background="@drawable/btn_green"
+            android:textColor="#FFFFFF"
+            android:layout_marginStart="6dp"
+            app:layout_constraintStart_toEndOf="@id/btnInstallFlask"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintHorizontal_weight="1"/>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- android:visibility="gone" -->
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:visibility="gone"
+        android:layout_marginTop="8dp">
+
+
+        <Button
+            android:id="@+id/btnTbtTest"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:text="导航引导测试"/>
+    </LinearLayout>
+
+    <!--
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="2dp">
+
+        <TextView
+            android:id="@+id/tvCameraInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="相机信息: "
+            android:textSize="12sp"
+            android:textColor="#0000FF"/>
+
+        <TextureView
+            android:id="@+id/texture"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </LinearLayout>
+    -->
+
+    <LinearLayout
+        android:id="@+id/imageViewLinear"
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="2dp">
+
+        <ImageView
+            android:id="@+id/imageView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:adjustViewBounds="true"
+            android:scaleType="fitCenter" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="4dp">
+
+        <TextView
+            android:id="@+id/tvServerData"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="设备: "
+            android:textSize="12sp"
+            android:textColor="#0000FF"/>
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1"/>
+
+        <Button
+            android:id="@+id/btnShowLog"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="日志"
+            android:textSize="12sp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
+            android:background="?android:attr/selectableItemBackground" />
+
+        <Button
+            android:id="@+id/btnExportLog"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="导出"
+            android:textSize="12sp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
+            android:layout_marginStart="8dp"
+            android:background="?android:attr/selectableItemBackground" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="4dp">
+
+        <TextView
+            android:id="@+id/tvNavData"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="导航: "
+            android:textSize="12sp"
+            android:textColor="#0000FF"/>
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1"/>
+
+        <Button
+            android:id="@+id/btnNavState"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="概览"
+            android:textSize="12sp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
+            android:background="?android:attr/selectableItemBackground" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="4dp">
+
+        <TextView
+            android:id="@+id/tvCpData"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="状态: "
+            android:textSize="12sp"
+            android:textColor="#0000FF"/>
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1"/>
+
+        <Button
+            android:id="@+id/btnClearLog"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="清空"
+            android:textSize="12sp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
+            android:background="?android:attr/selectableItemBackground" />
+
+        <Button
+            android:id="@+id/btnCopyLog"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="复制"
+            android:textSize="12sp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
+            android:layout_marginStart="8dp"
+            android:background="?android:attr/selectableItemBackground" />
+
+
+    </LinearLayout>
+
+    <!-- 导航日志 -->
+    <ScrollView
+        android:id="@+id/scrollRawLogNav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fillViewport="true"
+        android:scrollbars="vertical"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
+
+        <TextView
+            android:id="@+id/rawLogNav"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="10sp"
+            android:textColor="#000000"
+            android:scrollbars="vertical" />
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/webLinearLayout"
+        android:orientation="vertical">
+
+        <!-- WebView，初始隐藏 -->
+        <WebView
+            android:id="@+id/webViewSection"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:visibility="gone"
+            android:background="#EEEEEE" />
+
+        <!-- 日志区域 -->
+        <ScrollView
+            android:id="@+id/scrollRawLog"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true"
+            android:visibility="gone"
+            android:scrollbars="vertical">
+
+            <TextView
+                android:id="@+id/rawLog"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="10sp"
+                android:textColor="#000000"
+                android:scrollbars="vertical" />
+        </ScrollView>
+    </LinearLayout>
+
+</LinearLayout>

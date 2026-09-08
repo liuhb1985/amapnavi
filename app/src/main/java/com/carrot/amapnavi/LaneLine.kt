@@ -1,0 +1,411 @@
+package com.carrot.amapnavi
+
+import android.app.Activity
+import android.content.Context
+import android.graphics.*
+import android.util.Log
+import android.widget.ImageView
+import android.widget.TextView
+import com.carrot.lane.LaneDetect
+import com.carrot.lane.SegResult
+import com.carrot.lane.protoSize
+import kotlinx.coroutines.*
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import java.lang.ref.WeakReference
+
+private var imageViewRef: WeakReference<ImageView>? = null
+private var tvDevicIDRef: WeakReference<TextView>? = null
+private var mainActivityRef: WeakReference<Activity>? = null
+
+var left_lane_safe_cnt = 0
+var right_lane_safe_cnt = 0
+var left_lane_type = -1
+var right_lane_type = -1
+var laneDetectCnt = 0
+var laneSendCnt = 0
+var lane_detect_valid = false
+
+@Volatile
+var sendLaneResultFlag = false
+
+private var laneDetectJob: Job? = null
+
+// ===============================
+// 性能测试配置（原样）
+// ===============================
+private val ENABLE_BENCHMARK = false
+private val BENCHMARK_FRAMES = 100
+private val BENCHMARK_INTERVAL_MS = 0L
+private val INFER_INTERVAL_MS = 200L
+
+data class LaneUiInfo(
+        val leftTypeCn: String,
+        val rightTypeCn: String
+)
+
+fun setlaneDetectActivity(_imageView: ImageView, _tvDevicID: TextView) {
+    imageViewRef = WeakReference(_imageView)
+    tvDevicIDRef = WeakReference(_tvDevicID)
+}
+
+private fun laneDetectResultSend(){
+    sendLaneResultFlag = true
+    /*
+    mainActivityRef?.get()?.let {
+        (it as? MainActivity)
+                ?.keepAliveService
+                ?.sendLaneType(left_lane_type, right_lane_type)
+    }
+     */
+}
+
+/**
+ * 由 KeepAliveService 调用
+ */
+fun startLaneDetectInternal(
+        context: Context,
+        activity: Activity,
+        serviceScope: CoroutineScope
+) {
+    mainActivityRef = WeakReference(activity)
+
+    // 防止重复启动（原样）
+    if (laneDetectJob?.isActive == true) return
+
+    val yolo = LaneDetect(context)
+    val client = OkHttpClient()
+
+    laneDetectJob = serviceScope.launch(Dispatchers.IO) {
+
+        var frameCount = 0
+        var totalTimeMs = 0L
+        var minTimeMs = Long.MAX_VALUE
+        var maxTimeMs = 0L
+        var inferPrevTimeMs = 0L
+        var inferTimeMs = 0L
+        var results: List<SegResult> = emptyList()
+        var infer_flag = false
+
+        while (isActive) {
+
+            // -------------------------
+            // server IP 选择（原样）
+            // -------------------------
+            val serverIp = when {
+                !laneSrvIp.isNullOrEmpty() -> laneSrvIp
+                !carrotManIp.isNullOrEmpty() -> carrotManIp
+                else -> {
+                    delay(500)
+                    lane_detect_valid = false
+                    continue
+                }
+            }
+
+            // -------------------------
+            // 车道检测开关（原样）
+            // -------------------------
+            if (!lane_detect || lane_detect_enable <= 0) {
+                if (left_lane_type > -1 || right_lane_type > -1) {
+                    if (left_lane_type > -1) left_lane_type--
+                    if (right_lane_type > -1) right_lane_type--
+                    laneDetectResultSend()
+                }
+                results = emptyList()
+            }
+
+            if ((!lane_detect || lane_detect_enable <= 0) &&
+                    (!video_show || lane_show_enable <= 0)
+            ) {
+                delay(500)
+                lane_detect_valid = false
+                continue
+            }
+
+            val url = if (lane_color)
+                "http://$serverIp:8888/roadrgb.jpg"
+            else
+                "http://$serverIp:8888/roadgray.jpg"
+
+            val t0 = System.currentTimeMillis()
+
+            try {
+                val request = Request.Builder().url(url).get().build()
+
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use
+
+                    val bytes = response.body?.bytes() ?: return@use
+                    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                            ?: return@use
+
+                    infer_flag = false
+                    val infer_gap = System.currentTimeMillis() - inferPrevTimeMs
+
+                    // ======================
+                    // 推理 → Default
+                    // ======================
+                    if ((lane_detect && lane_detect_enable > 0) &&
+                            (infer_gap > lane_detect_interval || !video_show_fast)
+                    ) {
+                        try {
+                            results = withContext(Dispatchers.Default) {
+                                yolo.infer(bitmap)
+                            }
+                            inferTimeMs = System.currentTimeMillis() - t0
+                            inferPrevTimeMs = System.currentTimeMillis()
+                            infer_flag = true
+                            laneDetectCnt++
+                            if(laneDetectCnt >= 100) laneDetectCnt = 1
+                            lane_detect_valid = true
+                        } catch (e: Exception) {
+                            Log.e("LaneDetect", "infer error", e)
+                        }
+                    }
+
+                    //val outBitmap = drawResultsWithLaneType(bitmap, results, inferTimeMs, activity, infer_flag)
+                    val (outBitmap, uiInfo) = drawResultsWithLaneType(bitmap, results, inferTimeMs)
+
+                    // ======================
+                    // UI → Main
+                    // ======================
+                    withContext(Dispatchers.Main) {
+                        // 显示画面
+                        if (video_show && lane_show_enable > 0) {
+                            imageViewRef?.get()?.setImageBitmap(outBitmap)
+                        }
+                        // 更新文字
+                        if (infer_flag) {
+                            tvDevicIDRef?.get()?.let { tv ->
+                                val deviceId = Global.deviceId
+                                tv.text =
+                                        if (lane_detect && lane_detect_enable > 0)
+                                            "ID:$deviceId 左->${uiInfo.leftTypeCn} 右->${uiInfo.rightTypeCn} 时间:${inferTimeMs}ms 次数:${laneDetectCnt}/${laneSendCnt}"
+                                        else
+                                            "软件ID:$deviceId"
+                            }
+                        }
+                    }
+                }
+
+            } catch (e: Exception) {
+                Log.e("LaneDetect", "fetch snapshot error", e)
+                lane_detect_valid = false
+            }
+
+            val frameTime = System.currentTimeMillis() - t0
+            if (!infer_flag) {
+                laneDetectResultSend()
+            }
+
+            // -------------------------
+            // Benchmark（原样）
+            // -------------------------
+            if (ENABLE_BENCHMARK) {
+                frameCount++
+                totalTimeMs += frameTime
+                minTimeMs = minOf(minTimeMs, frameTime)
+                maxTimeMs = maxOf(maxTimeMs, frameTime)
+                if (frameCount >= BENCHMARK_FRAMES) cancel()
+            }
+
+            var sleepMs = lane_detect_interval.toLong() / 2
+            if (video_show_fast) sleepMs = 50L
+            if (!ENABLE_BENCHMARK) sleepMs -= frameTime
+            if (sleepMs > 0) delay(sleepMs)
+        }
+    }
+}
+
+// ===============================
+// 车道类型映射（只初始化一次）
+// ===============================
+private val CLASS_TO_TYPE = mapOf(
+        0 to "solid",
+        1 to "dashed",
+        2 to "solid",
+        5 to "solid"
+)
+
+private val CLASS_TO_TYPE_CN = mapOf(
+        0 to "实线",
+        1 to "虚线",
+        2 to "实线",
+        5 to "实线"
+)
+
+private val CLASS_TO_TYPE_CN_LITE = mapOf(
+        0 to "实",
+        1 to "虚",
+        2 to "实",
+        5 to "实"
+)
+
+private val IGNORE_CLASSES = setOf(
+        3, // random-line
+        4  // road-sign-line
+)
+
+// --------------------
+// Paint 对象复用
+// --------------------
+private val maskPaint = Paint().apply { style = Paint.Style.FILL; alpha = 120 }
+private val leftTextPaint = Paint().apply { textSize = 20f; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.LEFT }
+private val rightTextPaint = Paint().apply { textSize = 20f; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.RIGHT }
+private val framePaint = Paint().apply { color = Color.YELLOW; textSize = 15f; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER }
+
+// --------------------
+// mask 临时像素缓存（复用）
+// --------------------
+private val maskPixels = IntArray(protoSize * protoSize)
+private val maskBitmap = Bitmap.createBitmap(protoSize, protoSize, Bitmap.Config.ARGB_8888)
+
+private fun drawResultsWithLaneType(
+        bitmap: Bitmap,
+        results: List<SegResult>,
+        infer_time: Long
+): Pair<Bitmap, LaneUiInfo> {
+
+    val centerX = protoSize / 2f
+
+    // =====================
+    // Step 1：一次扫描 mask，缓存 bottom / cx
+    // =====================
+    data class LaneInfo(val res: SegResult, val bottom: Int, val cxBottom: Float)
+    val leftLines = mutableListOf<LaneInfo>()
+    val rightLines = mutableListOf<LaneInfo>()
+
+    for (res in results) {
+        if (IGNORE_CLASSES.contains(res.classId)) continue
+
+        val mask = res.mask
+        var bottom = -1
+        var cxBottom = 0f
+
+        for (y in protoSize - 1 downTo 0) {
+            var sumX = 0
+            var count = 0
+            val rowOffset = y * protoSize
+            for (x in 0 until protoSize) {
+                if (mask[rowOffset + x] > 0) {
+                    sumX += x
+                    count++
+                }
+            }
+            if (count > 0) {
+                bottom = y
+                cxBottom = sumX.toFloat() / count
+                break
+            }
+        }
+        if (bottom < protoSize / 2) continue
+
+        val info = LaneInfo(res, bottom, cxBottom)
+        if (cxBottom < centerX) leftLines.add(info) else rightLines.add(info)
+    }
+
+    // =====================
+    // Step 2：选择最近的左右线
+    // =====================
+    fun selectNearest(lines: List<LaneInfo>): LaneInfo? =
+            lines.minByOrNull {
+                val dx = it.cxBottom - centerX
+                val dy = it.bottom - (protoSize - 1)
+                dx * dx + 2 * dy * dy
+            }
+
+    val leftRes = selectNearest(leftLines)
+    val rightRes = selectNearest(rightLines)
+
+    // =====================
+    // Step 3：线型判断
+    // =====================
+    val leftType = leftRes?.let { CLASS_TO_TYPE[it.res.classId] } ?: "none"
+    val rightType = rightRes?.let { CLASS_TO_TYPE[it.res.classId] } ?: "none"
+    val leftTypeCn = leftRes?.let { CLASS_TO_TYPE_CN[it.res.classId] } ?: "无线"
+    val rightTypeCn = rightRes?.let { CLASS_TO_TYPE_CN[it.res.classId] } ?: "无线"
+    val leftTypeCnLite = leftRes?.let { CLASS_TO_TYPE_CN_LITE[it.res.classId] } ?: "无"
+    val rightTypeCnLite = rightRes?.let { CLASS_TO_TYPE_CN_LITE[it.res.classId] } ?: "无"
+
+    val frameTime = infer_time
+
+    fun getLaneType(type: String) = when (type) {
+        "solid" -> 1
+        "dashed" -> 0
+        else -> -1
+    }
+
+    left_lane_type = getLaneType(leftType)
+    right_lane_type = getLaneType(rightType)
+    if (lane_detect && lane_detect_enable > 0) {
+        laneDetectResultSend()
+    }
+
+    // =====================
+    // Step 4：不显示直接返回
+    // =====================
+    if (!video_show || lane_show_enable <= 0){
+        return bitmap to LaneUiInfo(
+                leftTypeCnLite,
+                rightTypeCnLite
+        )
+    }else {
+        // =====================
+        // Step 5：绘制 mask（复用 maskBitmap）
+        // =====================
+        val outBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = Canvas(outBitmap)
+
+        fun drawMask(info: LaneInfo) {
+            val color = when (CLASS_TO_TYPE[info.res.classId]) {
+                "solid" -> Color.RED
+                "dashed" -> Color.GREEN
+                else -> Color.BLUE
+            }
+            maskPaint.color = color
+
+            val mask = info.res.mask
+            // 填充 maskPixels
+            for (i in mask.indices) maskPixels[i] = if (mask[i] > 0) color else 0
+            maskBitmap.setPixels(maskPixels, 0, protoSize, 0, 0, protoSize, protoSize)
+
+            val destRect = Rect(0, 0, bitmap.width, bitmap.height)
+            canvas.drawBitmap(maskBitmap, null, destRect, maskPaint)
+        }
+
+        if (lane_show && lane_detect && lane_detect_enable > 0) {
+            // 遍历所有有效 lane
+            for (res in results) {
+                if (IGNORE_CLASSES.contains(res.classId)) continue
+                drawMask(LaneInfo(res, 0, 0f)) // bottom/cx 在这里用不到，只用于绘制
+            }
+            //leftRes?.let { drawMask(it) }
+            //rightRes?.let { drawMask(it) }
+        }
+
+        // =====================
+        // Step 6：绘制文字
+        // =====================
+        fun getColorForType(type: String) = when (type) {
+            "solid" -> Color.RED
+            "dashed" -> Color.GREEN
+            else -> Color.YELLOW
+        }
+
+        leftTextPaint.color = getColorForType(leftType)
+        rightTextPaint.color = getColorForType(rightType)
+
+        val margin = 10f
+        val yText = 60f
+        canvas.drawText("左侧: $leftTypeCn", margin, yText, leftTextPaint)
+        canvas.drawText("右侧: $rightTypeCn", bitmap.width - margin, yText, rightTextPaint)
+        canvas.drawText("Time: $frameTime ms", bitmap.width / 2f, 30f, framePaint)
+
+        return outBitmap to LaneUiInfo(
+                leftTypeCnLite,
+                rightTypeCnLite
+        )
+    }
+}
+

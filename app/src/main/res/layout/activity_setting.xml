@@ -1,0 +1,1571 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingTop="5dp"
+    android:paddingStart="5dp"
+    android:paddingEnd="5dp"
+    android:paddingBottom="5dp"
+    android:id="@+id/settingScrollView"
+    android:background="#FFFFFF">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <!-- 1. 导航红灯辅助停车 -->
+        <com.google.android.flexbox.FlexboxLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:flexDirection="row"
+            app:flexWrap="wrap">
+
+            <CheckBox
+                android:id="@+id/cbNaviTrafficAssist"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="APP辅助停车("
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbCpTrafficAssist"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="OP视觉辅助"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbRedLightTrafficAssist"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="导航红灯辅助)"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+        </com.google.android.flexbox.FlexboxLayout>
+
+        <LinearLayout
+            android:id="@+id/cbLayoutCpMinSpeedLimt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="视觉辅助目标速度: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etCpMinSpeedLimt"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="km/h"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusCpMinSpeedLimt"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusCpMinSpeedLimt"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <!-- 红灯减速最低速度 -->
+        <LinearLayout
+            android:id="@+id/cbLayoutRedLightMinSpeedLimt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="红灯辅助目标速度: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etRedLightMinSpeedLimt"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="km/h"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusRedLightMinSpeedLimt"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusRedLightMinSpeedLimt"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <!-- 红灯减速维持时间 -->
+        <LinearLayout
+            android:id="@+id/cbLayoutNaviTrafficAssistTime"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="辅助降速维持时间: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etNaviTrafficAssistTime"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="秒"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusNaviTrafficAssistTime"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusNaviTrafficAssistTime"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <!-- 车道线检测 -->
+        <com.google.android.flexbox.FlexboxLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:flexDirection="row"
+            app:flexWrap="wrap">
+
+            <CheckBox
+                android:id="@+id/cbLaneDetect"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="车道线检测("
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbVideoShow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="显示视频画面"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbLaneShow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="显示车道线)"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbVideoShowFast"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:text="高帧率显示"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbLaneColor"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:text="彩色画面"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+        </com.google.android.flexbox.FlexboxLayout>
+
+        <!-- 车道线检测周期 -->
+        <LinearLayout
+            android:id="@+id/etLayoutLaneDetectInterval"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="车道线检测周期: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etLaneDetectInterval"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="500"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="毫秒"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusLaneDetectInterval"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusLaneDetectInterval"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <com.google.android.flexbox.FlexboxLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:flexDirection="row"
+            app:flexWrap="wrap">
+            <CheckBox
+                android:id="@+id/cbAppLog"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="APP日志"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbAppSpeak"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="APP播报"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbTunnelDecSpeed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="隧道强制减速"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbSmoothSpeedLimit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="平滑道路限速"
+                android:visibility="gone"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+        </com.google.android.flexbox.FlexboxLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#DDDDDD"/>
+
+        <com.google.android.flexbox.FlexboxLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:flexDirection="row"
+            app:flexWrap="wrap">
+
+            <CheckBox
+                android:id="@+id/cbAppNavi"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="车道领航(高速)"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbAppRoadNavi"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="车道领航(公路)"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbNaviSpeak"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="领航播报"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbNaviSpeakFirst"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="先播报后变道"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbNaviBlindDecSpeed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="盲区有车时减速"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbSuggestLaneEn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="走推荐车道"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbDisLaneEn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="避开禁行车道"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbKeepLeftEn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="提前靠左"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbKeepRightEn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="提前靠右"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbVisionKeepRight"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="纯视觉提前靠右"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbNavTurn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:text="领航转弯"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbLaneProb"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="使用车道置信度"
+                android:visibility="gone"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbRoadMeidan"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="有隔离带(公路)"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbRoadRightFirst"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="优先从右计算车道(公路)"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+        </com.google.android.flexbox.FlexboxLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:id="@+id/cbLayoutNaviMode"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="领航模式: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <RadioGroup
+                android:id="@+id/rgNavMode"
+                android:orientation="horizontal"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content">
+
+                <RadioButton
+                    android:id="@+id/rbNavFastMode"
+                    android:text="激进"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <RadioButton
+                    android:id="@+id/rbNavNormalMode"
+                    android:text="标准"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true" />
+
+                <RadioButton
+                    android:id="@+id/rbNavSlowMode"
+                    android:text="保守"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </RadioGroup>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/etLayoutNaviMinSpeed"
+            android:visibility="gone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="车道领航最低车速: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etNaviMinSpeed"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="km/h"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusNaviMinSpeed"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusNaviMinSpeed"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/etLayoutAtcDistH"
+            android:visibility="gone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="高速提前靠边距离: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etAtcDistH"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="米"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusAtcDistH"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusAtcDistH"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/etLayoutForkDistH"
+            android:visibility="gone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="高速进匝道距离: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etForkDistH"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="米"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusForkDistH"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusForkDistH"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/etLayoutAtcDistL"
+            android:visibility="gone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="公路提前靠边距离: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etAtcDistL"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="米"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusAtcDistL"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusAtcDistL"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/etLayoutForkDistL"
+            android:visibility="gone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="公路进匝道距离: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etForkDistL"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="米"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusForkDistL"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusForkDistL"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#DDDDDD"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:id="@+id/cbLayoutVisionLaneMode"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="视觉车道识别: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <RadioGroup
+                android:id="@+id/rgVisionLaneMode"
+                android:orientation="horizontal"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content">
+
+                <RadioButton
+                    android:id="@+id/rbVisionLaneFastMode"
+                    android:text="快速"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <RadioButton
+                    android:id="@+id/rbVisionLaneNormalMode"
+                    android:text="标准"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true" />
+
+                <RadioButton
+                    android:id="@+id/rbVisionLaneSlowMode"
+                    android:text="保守"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </RadioGroup>
+
+        </LinearLayout>
+
+        <com.google.android.flexbox.FlexboxLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:flexDirection="row"
+            app:flexWrap="wrap">
+
+            <CheckBox
+                android:id="@+id/cbAppOvertake"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="高速超车"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:visibility="gone"
+                android:enabled="false"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbAppRoadOvertake"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="公路超车"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:visibility="gone"
+                android:enabled="false"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbLaneOvertake"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="超车融合导航"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+        </com.google.android.flexbox.FlexboxLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:id="@+id/cbLayoutOvertakeMode"
+            android:visibility="gone"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="超车模式: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <RadioGroup
+                android:id="@+id/rgOvertakeMode"
+                android:orientation="horizontal"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content">
+
+                <RadioButton
+                    android:id="@+id/rbOvertakeFastMode"
+                    android:text="激进"
+                    android:enabled="false"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <RadioButton
+                    android:id="@+id/rbOvertakeNormalMode"
+                    android:text="标准"
+                    android:enabled="false"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true" />
+
+                <RadioButton
+                    android:id="@+id/rbOvertakeSlowMode"
+                    android:text="保守"
+                    android:enabled="false"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </RadioGroup>
+
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#DDDDDD"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="收费站限速: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etStationSpeed"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="km/h"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusStationSpeed"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusStationSpeed"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="收费站提前减速距离: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etStationDistOffset"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="米"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusStationDistOffset"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusStationDistOffset"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="过收费站后限速维持时间: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etStationKeepTime"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="秒"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusStationKeepTime"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusStationKeepTime"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#DDDDDD"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="最低道路限速: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etMinSpeedLimit"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="km/h"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusMinSpeedLimit"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusMinSpeedLimit"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="最高道路限速: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etMaxSpeedLimit"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="130"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="km/h"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusMaxSpeedLimit"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusMaxSpeedLimit"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="提高道路限速百分比: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etRoadSpeedLimitPercent"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="%"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusRoadSpeedLimitPercent"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusRoadSpeedLimitPercent"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="提高道路限速: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etRoadSpeedLimitKph"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="km/h"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusRoadSpeedLimitKph"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusRoadSpeedLimitKph"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <!-- 2. 高速偏移 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="限速低于60时提速(高速): "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etOffsetHighway"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="km/h"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusHighway"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusHighway"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <!-- 3. 公路偏移 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="限速低于60时提速(公路): "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etOffsetRoad"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="km/h"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusRoad"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusRoad"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="0dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="APP顶部留空: "
+                android:textSize="13sp"
+                android:textColor="#000000"/>
+
+            <EditText
+                android:id="@+id/etTopPad"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="0"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="dp"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:layout_marginStart="8dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <Button
+                android:id="@+id/btnMinusTopPad"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:layout_marginStart="8dp"/>
+
+            <Button
+                android:id="@+id/btnPlusTopPad"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <!-- 底部按钮 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:layout_marginTop="4dp">
+
+            <Button
+                android:id="@+id/btnSaveSetting"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="保存"
+                android:layout_marginRight="16dp"/>
+
+            <Button
+                android:id="@+id/btnCancelSetting"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="取消"/>
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>
