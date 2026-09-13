@@ -284,6 +284,8 @@ class MainActivity : AppCompatActivity() {
     internal val USER_CALCEL_OVERTAKE_DELAY = 5000L
     internal val OVERTAKE_FINISH_TIMEOUT = 10000L   // 10秒超时保护，可调整
 
+    // 超车决策参数已按“超车模式(激进/常规/保守)”分级，见 OvertakeParams 与 currentOvertakeParams()
+
     var laneAction: LaneChangeAction = LaneChangeAction.KEEP
     var curLaneAction: LaneChangeAction = LaneChangeAction.KEEP
     var lastValidLaneAction: LaneChangeAction = LaneChangeAction.KEEP

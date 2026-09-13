@@ -711,94 +711,37 @@ fun MainActivity.AmapNavi(lane_line_valid: Boolean): Boolean {
 fun MainActivity.autoOvertake(naviFlag: Boolean) {
     val now = System.currentTimeMillis()
     val nowTime = nowTimeStr()
-    var action = LaneChangeAction.KEEP
+    val s = opStateManager.state
+    val p = currentOvertakeParams()
 
     var overtakeMinSpeed = 30
     if (bHighWay) {
         overtakeMinSpeed = 60
     }
 
-    //导航处理
-    if (opStateManager.state.lidar_l && opStateManager.state.lidar_r //激光雷达在线
-        && opStateManager.state.engaged && !naviFlag //开启了op定速并且领航未控制
-        && ((!bHighWay && app_road_overtake) || (bHighWay && app_overtake))
-    ) { //开启了超车功能
-
-        if (carState.vEgo > (overtakeMinSpeed / 3.6)) { //车辆速度允许超车
-            if (app_overtake_valid != 1) {
-                app_overtake_valid = 1
-                val msg = "${nowTime} 超车功能正常工作中"
-                Log.d("Overtake", msg)
-                showLaneDebug(msg)
-            }
-
-            //超车未暂停
-            if (!overtakeActionPause) {
-                overtakeActionPausePrev = false
-
-                //检查左右两侧是否安全
-                val left_safe = LaneChangeSafetyCheck(LaneChangeAction.LEFT)
-                val right_safe = LaneChangeSafetyCheck(LaneChangeAction.RIGHT)
-
-                //有前车并且左右盲区无车
-                if (opStateManager.state.lead1 && (left_safe >= 0 || right_safe >= 0)) {
-                    //左右两侧盲区安全
-                    if (left_safe >= 0 && right_safe >= 0) {
-                        //左前方无车
-                        if (opStateManager.state.lf_drel == null && !opStateManager.state.l_lead) {
-                            //车道决策(targetIdx从0开始，从左往右，visualIdx从0开始，从右往左)
-                            var (_targetIdx, _action, _visualIdx) = decideOvertakeLane(vLaneResult, navLane, LaneChangeAction.LEFT, bHighWay, road_median)
-                            if (_action == LaneChangeAction.LEFT) {
-                                doOvertakeAction(_action)
-                            }
-                        }
-                    }
-                }
-
-            } else if (!overtakeActionPausePrev) {
-                overtakeActionPausePrev = true
-
-                val msg = "${nowTime} 超车正在冷却中"
-                Log.d("Overtake", msg)
-                showLaneDebug(msg)
-            }
-
-        } else {
-            if (app_overtake_valid != 0) {
-                app_overtake_valid = 0
-                val speedKph = carState.vEgo * 3.6
-                val msg = "${nowTime} 车速过低(${speedKph.toInt()}km/h), 小于${overtakeMinSpeed}km/h，暂停超车功能"
-                Log.d("Overtake", msg)
-                showLaneDebug(msg)
-
-                //重置变道状态
-                resetOvertakeAction()
-                validLaneActionDbTime = now
-            }
+    // KT超车开关已打开时，接管并关闭Python侧超车控制器，避免两套逻辑同时下发变道命令
+    if ((!bHighWay && app_road_overtake) || (bHighWay && app_overtake)) {
+        if (!py_overtake_disable) {
+            py_overtake_disable = true
+            py_overtake_disable_reason = "KT超车已接管"
         }
-    } else {
-        //领航条件失效
+    }
+
+    // ============ 1. 基础条件判断(激光雷达在线/OP定速/超车开关/领航未接管) ============
+    if (!(s.lidar_l && s.lidar_r                       //激光雷达在线
+                && s.engaged && !naviFlag              //开启了op定速并且领航未控制
+                && ((!bHighWay && app_road_overtake) || (bHighWay && app_overtake)))) {
+
         if (app_overtake_valid != -1) {
             app_overtake_valid = -1
             var msg = "${nowTime} 条件不符合("
-            if (!opStateManager.state.lidar_l) {
-                msg += "左侧激光雷达不在线，"
-            }
-            if (!opStateManager.state.lidar_r) {
-                msg += "右侧激光雷达不在线，"
-            }
-            if (!opStateManager.state.engaged) {
-                msg += "OP未定速，"
-            }
-            if (!bHighWay && !app_road_overtake) {
-                msg += "公路超车未打开，"
-            }
-            if (bHighWay && !app_overtake) {
-                msg += "高速超车未打开，"
-            }
-            if (naviFlag) {
-                msg += "领航控制中，"
-            }
+            if (!s.lidar_l) msg += "左侧激光雷达不在线，"
+            if (!s.lidar_r) msg += "右侧激光雷达不在线，"
+            if (!s.engaged) msg += "OP未定速，"
+            if (!bHighWay && !app_road_overtake) msg += "公路超车未打开，"
+            if (bHighWay && !app_overtake) msg += "高速超车未打开，"
+            if (naviFlag) msg += "领航控制中，"
+            msg += ")"
 
             Log.d("Overtake", msg)
             showLaneDebug(msg)
@@ -806,8 +749,99 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
             //重置超车状态
             resetOvertakeAction()
         }
+        clearOvertakeRuntime()
+        return
     }
+
+    // ============ 2. 处理超车变道状态机(每周期调用：检测变道完成/驾驶员干预/超时) ============
+    processOvertakeLaneChangeState(s.atc_state)
+
+    // ============ 3. 车速门限 ============
+    val vEgo = s.vEgo ?: 0
+    if (vEgo < overtakeMinSpeed) { //车辆速度允许超车
+        if (app_overtake_valid != 0) {
+            app_overtake_valid = 0
+            val msg = "${nowTime} 车速过低(${vEgo}km/h), 小于${overtakeMinSpeed}km/h，暂停超车功能"
+            Log.d("Overtake", msg)
+            showLaneDebug(msg)
+
+            //重置变道状态
+            resetOvertakeAction()
+            validLaneActionDbTime = now
+        }
+        clearOvertakeRuntime()
+        return
+    }
+
+    if (app_overtake_valid != 1) {
+        app_overtake_valid = 1
+        val msg = "${nowTime} 超车功能正常工作中"
+        Log.d("Overtake", msg)
+        showLaneDebug(msg)
+    }
+
+    // ============ 4. 变道命令已发送或正在收尾，等待状态机完成 ============
+    if (overtakeCmdSent || overtakeActionPause) {
+        overtakeInProgress = true
+        return
+    }
+    overtakeInProgress = false
+
+    // ============ 5. 超车冷却 ============
+    if (now < overtakeCooldownUntil) {
+        overtakeTriggerStableTime = 0L
+        logOvertakeReason("${nowTime} 超车冷却中(${p.modeName})")
+        return
+    }
+
+    // ============ 6. 超车触发条件评估 ============
+    val (trigger, triggerReason) = evaluateOvertakeTrigger()
+    if (!trigger) {
+        overtakeTriggerStableTime = 0L
+        logOvertakeReason("${nowTime} 不超车：$triggerReason")
+        return
+    }
+    //要求触发条件稳定一段时间，避免雷达数据抖动导致误触发
+    if (overtakeTriggerStableTime == 0L) {
+        overtakeTriggerStableTime = now
+        return
+    }
+    if (now - overtakeTriggerStableTime < p.stableTime) {
+        return
+    }
+
+    // ============ 7. 左右两侧安全性评估(毫米波雷达 + 激光雷达侧向数据) ============
+    val leftEval = evaluateOvertakeSide(LaneChangeAction.LEFT)
+    val rightEval = evaluateOvertakeSide(LaneChangeAction.RIGHT)
+
+    //收集可用方向：保守模式仅允许左侧超车，常规/激进允许左右两侧
+    val candidates = ArrayList<OvertakeSideEval>(2)
+    if (leftEval.safe) candidates.add(leftEval)
+    if (rightEval.safe && p.allowRightOvertake) candidates.add(rightEval)
+    if (candidates.isEmpty()) {
+        logOvertakeReason("${nowTime} 不超车：两侧均不安全(左:${leftEval.reason}; 右:${rightEval.reason})")
+        return
+    }
+
+    //激进模式取评分更高的方向；常规/保守优先左侧超车
+    val ordered = if (p.preferLeftFirst) {
+        candidates.sortedBy { if (it.side == LaneChangeAction.LEFT) 0 else 1 }
+    } else {
+        candidates.sortedByDescending { it.score }
+    }
+
+    // ============ 8. 导航车道校验并执行 ============
+    for (c in ordered) {
+        if (decideOvertakeLane(vLaneResult, navLane, c.side, bHighWay, road_median).second == c.side) {
+            logOvertakeReason("${nowTime} 超车(${c.side}/${p.modeName}): ${c.reason} | $triggerReason")
+            doOvertakeAction(c.side)
+            return
+        }
+    }
+
+    logOvertakeReason("${nowTime} 不超车：导航车道不允许(${ordered[0].reason})")
 }
+
 
 //导航处理
 fun MainActivity.naviProcess() {

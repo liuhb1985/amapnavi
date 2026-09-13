@@ -351,11 +351,14 @@ fun MainActivity.decideLaneWithAction(
 
 // -----------------------------
 // 超车变道决策函数
+//   edgeType: 期望的超车方向(LEFT / RIGHT)
+//   返回: Triple<目标导航车道索引, 实际动作(LEFT/RIGHT/KEEP), 目标视觉车道号>
+//         返回动作与 edgeType 一致时表示该方向允许超车，否则为 KEEP(不允许)
 // -----------------------------
 fun MainActivity.decideOvertakeLane(
     vLaneResult: LaneCalcResult,
     _navLane: NavLane,
-    edgeType: LaneChangeAction,   // LEFT / RIGHT / KEEP
+    edgeType: LaneChangeAction,   // 期望的超车方向 LEFT / RIGHT
     highWay: Boolean,             // 高速公路
     roadMedian: Boolean           // 道路中间有隔离带
 ): Triple<Int, LaneChangeAction, Int> {
@@ -366,74 +369,33 @@ fun MainActivity.decideOvertakeLane(
         return (count - 1 - targetIdx).coerceIn(0, count - 1)
     }
 
-    val nowTime = nowTimeStr()
+    if (edgeType != LaneChangeAction.LEFT && edgeType != LaneChangeAction.RIGHT) {
+        return Triple(-1, LaneChangeAction.KEEP, -1)
+    }
+
+    //该方向在视觉车道上是否确实存在可行驶车道
+    val sideLaneOk = if (edgeType == LaneChangeAction.LEFT) {
+        //车辆不在最左侧
+        vLaneResult.leftLaneId > 1
+    } else {
+        //高速最右侧为应急车道，rightLaneId > 2 才表示右侧存在可用的正常车道
+        val needLaneId = if (highWay) 2 else 1
+        vLaneResult.rightLaneId > needLaneId
+    }
+    if (!sideLaneOk) {
+        return Triple(-1, LaneChangeAction.KEEP, -1)
+    }
+
     val lanes = _navLane.laneStrArray
     val count = _navLane.validCount
 
-    //导航引导车道是否变化? 导航引导有变化?
-    if(!isSameNavLane(_navLane, lastOvertakeNavLane) || resetOvertakeSuggestLaneTimer){
-        //重置推荐车道计时和禁止推荐车道的标志
-        inOvertakeSuggestLaneTime = System.currentTimeMillis() //重置在推荐车道的计时
-        if (disableOvertakeSuggestLane) {
-            disableOvertakeSuggestLane = false
-
-            if(suggest_lane_en) {
-                val msg = "${nowTime} 导航车道或引导发行变化，恢复推荐车道变道功能"
-                Log.w("LaneDecision", msg)
-                showLaneDebug(msg)
-            }
-        }
-
-        if (!overtakeNavLaneChange) {
-            //...
-        }
-        overtakeNavLaneChange = true
-        resetOvertakeSuggestLaneTimer = false
-    }else{
-        overtakeNavLaneChange = false
-    }
-    lastOvertakeNavLane = _navLane
-
-    // 导航未给车道引导数据 或者 推荐车道/禁行车道功能关闭
+    //导航未给车道引导数据 或者 推荐车道/禁行车道功能关闭 → 仅凭视觉车道允许变道
     if (count <= 0 || lanes.isEmpty() || (!suggest_lane_en && !dis_lane_en)) {
-        inOvertakeSuggestLaneTime = System.currentTimeMillis()
-
-        //检测左侧是否允许行驶
-        if(edgeType == LaneChangeAction.LEFT && vLaneResult.leftLaneId > 1){ //车辆不在最左侧
-            val rightLaneId = vLaneResult.rightLaneId
-            if(highWay){
-                if(rightLaneId > 2){ //车辆不在最右车道(应急车道除外)
-                    return Triple(-1, LaneChangeAction.RIGHT, 1)
-                }
-            }else{
-                if(rightLaneId > 1){ //车辆不在最右车道
-                    return Triple(-1, LaneChangeAction.RIGHT, 0)
-                }
-            }
+        return if (edgeType == LaneChangeAction.LEFT) {
+            Triple(-1, LaneChangeAction.LEFT, (vLaneResult.leftLaneId - 1).coerceAtLeast(0))
+        } else {
+            Triple(-1, LaneChangeAction.RIGHT, 0)
         }
-        //检测右侧是否允许行驶
-        else if(edgeType == LaneChangeAction.RIGHT){
-            val rightLaneId = vLaneResult.rightLaneId
-            if(highWay){
-                if(rightLaneId > 2){ //车辆不在最右车道(应急车道除外)
-                    return Triple(-1, LaneChangeAction.RIGHT, 1)
-                }else{
-                    if(vLaneResult.leftLaneId > 1){ //左侧有车道
-                        return Triple(-1, LaneChangeAction.LEFT, vLaneResult.leftLaneId-1)
-                    }
-                }
-            }else{
-                if(rightLaneId > 1){ //车辆不在最右车道
-                    return Triple(-1, LaneChangeAction.RIGHT, 0)
-                }else{
-                    if(vLaneResult.leftLaneId > 1){ //左侧有车道
-                        return Triple(-1, LaneChangeAction.LEFT, vLaneResult.leftLaneId-1)
-                    }
-                }
-            }
-        }
-
-        return Triple(-1, LaneChangeAction.KEEP, -1)
     }
 
     // ---------- leftLaneId（从1开始，从左往右数的车辆所在视觉车道）视觉车道整合导航车道 ----------
@@ -483,95 +445,295 @@ fun MainActivity.decideOvertakeLane(
     currentIdx = currentIdx.coerceIn(0, count - 1)
 
     fun isBlocked(s: String): Boolean = s.contains("X")
-    fun isSuggested(s: String): Boolean = s.contains("*")
 
-    //车辆是否已在推荐车道上？
-    if (isSuggested(lanes[currentIdx])) {
-        //在推荐车道上的时间超过5秒后则临时禁用超车功能（直到导航车道信息有变或者导航引导信息有变）
-        if((System.currentTimeMillis() - inSuggestLaneTime) > 5000L){
-            if(!disableOvertakeSuggestLane) {
-                disableOvertakeSuggestLane = true
-
-                if(suggest_lane_en) {
-                    val msg = "${nowTime} 行驶在推荐车道已超过5秒，当前路段暂停超车"
-                    Log.w("LaneDecision", msg)
-                    showLaneDebug(msg)
-                }
-            }
+    // ---------- 校验目标导航车道 ----------
+    val targetIdx: Int
+    if (edgeType == LaneChangeAction.LEFT) {
+        if (currentIdx <= 0) {
+            return Triple(-1, LaneChangeAction.KEEP, -1)  // 已在最左侧导航车道
         }
+        targetIdx = currentIdx - 1
+    } else {
+        if (currentIdx >= count - 1) {
+            return Triple(-1, LaneChangeAction.KEEP, -1)  // 已在最右侧导航车道
+        }
+        targetIdx = currentIdx + 1
+    }
+
+    //目标车道为禁行车道，不允许超车
+    if (dis_lane_en && isBlocked(lanes[targetIdx])) {
         return Triple(-1, LaneChangeAction.KEEP, -1)
-    }else{
-        if(!disableOvertakeSuggestLane) {
-            inOvertakeSuggestLaneTime = System.currentTimeMillis()
-        }else{
-            //当前路段已禁止超车
-            return Triple(-1, LaneChangeAction.KEEP, -1)
+    }
+
+    val visualLaneId = targetIdxToRightBased(targetIdx, count)
+    return Triple(targetIdx, edgeType, visualLaneId)
+}
+
+
+// -----------------------------
+// 传感器探测能力限制(重要)
+//   毫米波雷达：前向 + 左右前角，最大探测约100m
+//   激光雷达：左右前后角，最大探测约40~50m(50m左右时有时可探测到) —— 侧后方只有激光雷达可用
+//   传感器数据不做噪声/可信度二次过滤，只要给出数据即视为有效；
+//   "未探测到目标"只代表量程内无车，量程之外属于未知区域。
+// -----------------------------
+private const val OVERTAKE_RADAR_MAX_RANGE = 100f     // 毫米波雷达最大探测距离(m)
+private const val OVERTAKE_LIDAR_MAX_RANGE = 50f      // 激光雷达最大探测距离(m)，40m稳定/50m左右有时可达
+
+// -----------------------------
+// 超车模式参数集：1=激进 2=常规 3=保守
+//   overtake_mode 由设置界面写入(SettingActivity: rbOvertakeFast/Normal/SlowMode)
+//   triggerMaxDist 不得超过毫米波雷达量程 OVERTAKE_RADAR_MAX_RANGE
+//   sideFrontMinDist / rearMinDist 应小于激光雷达量程 OVERTAKE_LIDAR_MAX_RANGE
+// -----------------------------
+private val OVERTAKE_PARAMS_AGGRESSIVE = OvertakeParams(
+    mode = 1, modeName = "激进",
+    triggerMaxDist = 100f, triggerMinDist = 8f,
+    vrelThreshold = -1, timeGapMax = 4.0f, cruiseRatio = 0.95f,
+    leadMinSpeedHighWay = 25, leadMinSpeedRoad = 15,
+    stableTime = 400L,
+    minLaneWidth = 2.0f, sideMinScore = 45, sideVrelThreshold = 5,
+    sideSafetyMargin = 3f, rearMinDist = 8f, sideFrontMinDist = 15f,
+    allowRightOvertake = true, preferLeftFirst = false,
+    cooldownSuccess = 6000L, cooldownFailed = 3000L
+)
+
+private val OVERTAKE_PARAMS_NORMAL = OvertakeParams(
+    mode = 2, modeName = "常规",
+    triggerMaxDist = 80f, triggerMinDist = 12f,
+    vrelThreshold = -3, timeGapMax = 3.0f, cruiseRatio = 0.90f,
+    leadMinSpeedHighWay = 35, leadMinSpeedRoad = 20,
+    stableTime = 800L,
+    minLaneWidth = 2.3f, sideMinScore = 60, sideVrelThreshold = 10,
+    sideSafetyMargin = 5f, rearMinDist = 12f, sideFrontMinDist = 20f,
+    allowRightOvertake = true, preferLeftFirst = true,
+    cooldownSuccess = 10000L, cooldownFailed = 4000L
+)
+
+private val OVERTAKE_PARAMS_CONSERVATIVE = OvertakeParams(
+    mode = 3, modeName = "保守",
+    triggerMaxDist = 60f, triggerMinDist = 20f,
+    vrelThreshold = -8, timeGapMax = 2.0f, cruiseRatio = 0.80f,
+    leadMinSpeedHighWay = 45, leadMinSpeedRoad = 30,
+    stableTime = 1200L,
+    minLaneWidth = 2.6f, sideMinScore = 75, sideVrelThreshold = 15,
+    sideSafetyMargin = 8f, rearMinDist = 20f, sideFrontMinDist = 25f,
+    allowRightOvertake = false, preferLeftFirst = true,
+    cooldownSuccess = 15000L, cooldownFailed = 6000L
+)
+
+// 当前超车模式对应的参数
+fun MainActivity.currentOvertakeParams(): OvertakeParams = when (overtake_mode) {
+    1 -> OVERTAKE_PARAMS_AGGRESSIVE      // 激进
+    3 -> OVERTAKE_PARAMS_CONSERVATIVE    // 保守
+    else -> OVERTAKE_PARAMS_NORMAL       // 常规
+}
+
+
+// -----------------------------
+// 超车触发条件评估(前车慢/跟车近/未达巡航 → 有超车需求)
+//   返回: Pair<是否满足触发条件, 原因说明>
+// -----------------------------
+fun MainActivity.evaluateOvertakeTrigger(): Pair<Boolean, String> {
+    val s = opStateManager.state
+    val p = currentOvertakeParams()
+    val vEgo = s.vEgo ?: 0
+    val vCruise = s.vCruise ?: 0
+
+    //前方必须有车且距离有效
+    if (!s.lead1) return false to "前方无车"
+    val drel = s.drel
+    if (drel == null || drel <= 0) return false to "无有效前车距离"
+
+    //前车过慢(疑似拥堵)不超车
+    val leadMinSpeed = if (bHighWay) p.leadMinSpeedHighWay else p.leadMinSpeedRoad
+    val vlead = s.vlead
+    if (vlead != null && vlead < leadMinSpeed) {
+        return false to "前车速度${vlead}km/h低于${leadMinSpeed}km/h疑似拥堵"
+    }
+
+    //距离过远暂不超车，过近先拉开距离
+    if (drel.toFloat() > p.triggerMaxDist) {
+        return false to "前车距离${drel}m过远(>${p.triggerMaxDist.toInt()}m)"
+    }
+    if (drel.toFloat() < p.triggerMinDist) {
+        return false to "前车距离${drel}m过近等待拉开(<${p.triggerMinDist.toInt()}m)"
+    }
+
+    //是否被前车压速
+    val reasons = mutableListOf<String>()
+    val vrel = s.vrel
+    if (vrel != null && vrel < p.vrelThreshold) {
+        reasons.add("前车较慢${vrel}km/h")
+    }
+    val timeGap = if (vEgo > 0) drel / (vEgo / 3.6f) else 0f
+    if (timeGap > 0f && timeGap <= p.timeGapMax) {
+        reasons.add("跟车时距${"%.1f".format(timeGap)}s")
+    }
+    if (vCruise > 0 && vEgo < vCruise * p.cruiseRatio) {
+        reasons.add("速度比${vEgo * 100 / vCruise}%")
+    }
+
+    if (reasons.isEmpty()) return false to "未满足超车触发条件"
+    return true to reasons.joinToString(",")
+}
+
+
+// -----------------------------
+// 单侧车道超车评估(综合毫米波雷达 + 激光雷达侧向数据)
+// -----------------------------
+fun MainActivity.evaluateOvertakeSide(side: LaneChangeAction): OvertakeSideEval {
+    val s = opStateManager.state
+    val p = currentOvertakeParams()
+    val sideStr = if (side == LaneChangeAction.LEFT) "左" else "右"
+
+    //1) 目标方向是否存在可行驶车道
+    if (side == LaneChangeAction.LEFT) {
+        if (vLaneResult.leftLaneId <= 1 && vLaneResult.leftLaneCnt <= 0) {
+            return OvertakeSideEval(side, false, 0, "${sideStr}侧无车道")
+        }
+    } else {
+        val needLaneId = if (bHighWay) 2 else 1
+        if (vLaneResult.rightLaneId <= needLaneId && vLaneResult.rightLaneCnt <= 0) {
+            return OvertakeSideEval(side, false, 0, "${sideStr}侧无可用车道")
         }
     }
 
-    //currentIdx为车辆所在的导航车道数组的索引
-    var targetIdx = currentIdx
+    //2) 盲区/实线安全门(原车毫米波盲区 + 激光雷达盲区 + 车道线类型)
+    val safeRet = LaneChangeSafetyCheck(side)
+    if (safeRet < 0) {
+        val r = when (safeRet) {
+            -1 -> "${sideStr}侧实线阻挡"
+            -2 -> "${sideStr}前盲区有车"
+            -4 -> "${sideStr}后盲区有车"
+            -8 -> "${sideStr}激光雷达盲区有车"
+            else -> "${sideStr}侧盲区不安全"
+        }
+        return OvertakeSideEval(side, false, 0, r)
+    }
 
-    // =====================================================
-    // 左右侧是否允许通行检测
-    // =====================================================
-    //检测左边车道是否允许通行
-    if (edgeType == LaneChangeAction.LEFT) {
-        //车辆不在最左侧车道
-        if(currentIdx > 0){
-            if(isBlocked(lanes[currentIdx-1]) && dis_lane_en){
-                //左边车道为禁行车道，则需要判断右侧车道是否可以通行
-            }else {
-                //允许向左变道
-                targetIdx = currentIdx - 1
-                val visualLaneId = targetIdxToRightBased(targetIdx, _navLane.validCount)
-                return Triple(targetIdx, LaneChangeAction.LEFT, visualLaneId)
-            }
-        }
+    //3) 目标车道宽度
+    val laneWidth = if (side == LaneChangeAction.LEFT) s.l_lane_width else s.r_lane_width
+    if (laneWidth != null && laneWidth > 0f && laneWidth < p.minLaneWidth) {
+        return OvertakeSideEval(side, false, 0, "${sideStr}侧车道过窄${"%.1f".format(laneWidth)}m")
+    }
 
-        //导航车道数量大于当前车道所在车道
-        if(count > (currentIdx+1) && (isBlocked(lanes[currentIdx+1]) && dis_lane_en)){ //右边车道为禁行车道
-            return Triple(-1, LaneChangeAction.KEEP, -1)
-        }
-        //从视觉车道上继续判断右侧车道是否可以通行
-        val rightLaneId = vLaneResult.rightLaneId
-        if(highWay){
-            if(rightLaneId > 2){ //车辆不在最右车道(应急车道除外)
-                return Triple(-1, LaneChangeAction.RIGHT, 1)
-            }
-        }else{
-            if(rightLaneId > 1){ //车辆不在最右车道
-                return Triple(-1, LaneChangeAction.RIGHT, 0)
-            }
-        }
+    //4) 侧向车辆距离/速度评估
+    //   注意：毫米波雷达(左右前角)约100m量程，激光雷达(左右前后角)约40~50m量程；
+    //        侧后方只有激光雷达可用，"未探测到"仅代表量程内无车。
+    var score = 100
+    val reasons = mutableListOf<String>()
 
-        return Triple(-1, LaneChangeAction.KEEP, -1)
-    } else if (edgeType == LaneChangeAction.RIGHT) {
-        //车辆不在最右侧车道
-        if((currentIdx+1) < count){
-            if(isBlocked(lanes[currentIdx-1]) && dis_lane_en){
-                //右边车道为禁行车道，则需要判断左侧车道是否可以通行
-            }else {
-                //允许向右变道
-                targetIdx = currentIdx + 1
-                val visualLaneId = targetIdxToRightBased(targetIdx, _navLane.validCount)
-                return Triple(targetIdx, LaneChangeAction.RIGHT, visualLaneId)
-            }
-        }else if(currentIdx == 0){
-            return Triple(-1, LaneChangeAction.KEEP, -1)
-        }
+    val frontDist = currentLeadDistance()          // 本车道前车距离(m)
+    val sideFrontDist = sideFrontDistance(side)    // 目标车道前方最近车辆距离(m)
+    val sideRearDist = sideRearDistance(side)      // 目标车道后方最近车辆距离(m)
+    val sideVrel = sideFrontVrel(side)             // 目标车道前方车辆相对速度(km/h)
 
-        //导航车道数量大于当前车道所在车道
-        if(isBlocked(lanes[currentIdx-1]) && dis_lane_en){ //左边车道为禁行车道
-            return Triple(-1, LaneChangeAction.KEEP, -1)
-        }
-        //从视觉车道上继续判断左侧车道是否可以通行
-        if(vLaneResult.leftLaneId > 1){ //车辆不在最左车道
-            return Triple(-1, LaneChangeAction.LEFT, vLaneResult.leftLaneId - 1)
-        }
+    //4.1 该侧激光雷达必须在线，否则侧后方没有数据来源，无法确认安全
+    if (!sideSensorOk(side)) {
+        return OvertakeSideEval(side, false, 0, "${sideStr}侧激光雷达不在线，后方无法确认")
+    }
 
-        return Triple(-1, LaneChangeAction.KEEP, -1)
+    //4.2 侧后方净空：所需距离随车速增大；若所需净空超出激光雷达量程，则量程内已无法确认安全
+    val needRearDist = overtakeRequiredRearDist()
+    if (needRearDist > OVERTAKE_LIDAR_MAX_RANGE) {
+        return OvertakeSideEval(side, false, 0,
+            "${sideStr}侧车速${s.vEgo ?: 0}km/h所需后方净空${"%.1f".format(needRearDist)}m超出激光雷达量程")
+    }
+    if (sideRearDist != null && sideRearDist < needRearDist) {
+        return OvertakeSideEval(side, false, 0,
+            "${sideStr}侧后方车辆过近${"%.1f".format(sideRearDist)}m(<${"%.1f".format(needRearDist)}m)")
+    }
+    if (sideRearDist == null) {
+        reasons.add("侧后方无车(激光${OVERTAKE_LIDAR_MAX_RANGE.toInt()}m内)")
     } else {
-        return Triple(-1, LaneChangeAction.KEEP, -1)
+        reasons.add("侧后车${"%.1f".format(sideRearDist)}m")
+    }
+
+    //4.3 侧前方车辆：毫米波雷达约100m量程内是否有车、是否比本车道前车更近
+    if (sideFrontDist != null) {
+        if (frontDist != null && sideFrontDist < frontDist - p.sideSafetyMargin) {
+            //目标车道前车比本车道前车更近，变过去没有意义且风险更高
+            score -= 50
+            reasons.add("侧前车${sideFrontDist.toInt()}m比前车${frontDist.toInt()}m更近")
+        } else {
+            reasons.add("侧前车${sideFrontDist.toInt()}m")
+        }
+        if (sideFrontDist < p.sideFrontMinDist) {
+            score -= ((p.sideFrontMinDist - sideFrontDist) * 2f).toInt()
+            reasons.add("侧前车过近(${sideFrontDist.toInt()}m<${p.sideFrontMinDist.toInt()}m)")
+        }
+    } else {
+        reasons.add("侧前方无车(雷达${OVERTAKE_RADAR_MAX_RANGE.toInt()}m内)")
+    }
+
+    if (sideVrel != null && sideVrel < -p.sideVrelThreshold) {
+        score -= 20
+        reasons.add("侧前车较慢${sideVrel}km/h")
+    }
+
+    score = score.coerceIn(0, 100)
+    val safe = score >= p.sideMinScore
+    val reason = "${sideStr}侧" + (if (reasons.isEmpty()) "畅通" else reasons.joinToString(",")) + "评分$score"
+    return OvertakeSideEval(side, safe, score, reason)
+}
+
+
+// 本车道前车距离(m)，无有效前车返回 null
+fun MainActivity.currentLeadDistance(): Float? {
+    val s = opStateManager.state
+    val d = s.drel
+    return if (s.lead1 && d != null && d > 0) d.toFloat() else null
+}
+
+// 该侧激光雷达是否在线(侧后方只有激光雷达可用，离线则后方不可信)
+fun MainActivity.sideSensorOk(side: LaneChangeAction): Boolean {
+    val s = opStateManager.state
+    return if (side == LaneChangeAction.LEFT) s.lidar_l else s.lidar_r
+}
+
+// 当前车速下侧后方需要的最小净空(m)：取模式参数与约0.8s时距的较大值
+//   车速越高所需净空越大，一旦超过激光雷达量程就不允许超车
+fun MainActivity.overtakeRequiredRearDist(): Float {
+    val s = opStateManager.state
+    val p = currentOvertakeParams()
+    val vEgo = (s.vEgo ?: 0).toFloat()
+    return maxOf(p.rearMinDist, vEgo / 3.6f * 0.8f)
+}
+
+// 目标车道前方最近车辆距离(m) —— 毫米波雷达(前角) + 激光雷达(前角)取更近者
+//   传感器只要给出数据即视为有效，不做额外噪声/量程过滤
+fun MainActivity.sideFrontDistance(side: LaneChangeAction): Float? {
+    val s = opStateManager.state
+    return if (side == LaneChangeAction.LEFT) {
+        val radar = if (s.l_lead) s.l_drel?.takeIf { it > 0 }?.toFloat() else null   // m
+        val lidar = s.lf_drel?.takeIf { it > 0 }?.let { it / 1000f }                 // mm → m
+        listOfNotNull(radar, lidar).minOrNull()
+    } else {
+        val radar = if (s.r_lead) s.r_drel?.takeIf { it > 0 }?.toFloat() else null   // m
+        val lidar = s.rf_drel?.takeIf { it > 0 }?.let { it / 1000f }                 // mm → m
+        listOfNotNull(radar, lidar).minOrNull()
     }
 }
+
+// 目标车道后方最近车辆距离(m) —— 仅激光雷达左右后角(约40~50m量程，drel<0 表示在后方)
+fun MainActivity.sideRearDistance(side: LaneChangeAction): Float? {
+    val s = opStateManager.state
+    return if (side == LaneChangeAction.LEFT) {
+        s.lb_drel?.takeIf { it < 0 }?.let { -it / 1000f }
+    } else {
+        s.rb_drel?.takeIf { it < 0 }?.let { -it / 1000f }
+    }
+}
+
+// 目标车道前方车辆相对速度(km/h)
+fun MainActivity.sideFrontVrel(side: LaneChangeAction): Int? {
+    val s = opStateManager.state
+    return if (side == LaneChangeAction.LEFT) {
+        s.l_vrel ?: s.lf_vrel
+    } else {
+        s.r_vrel ?: s.rf_vrel
+    }
+}
+
+

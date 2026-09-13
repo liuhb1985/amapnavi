@@ -200,6 +200,9 @@ fun MainActivity.processOvertakeLaneChangeState(atcState: Int?) {
     val now = System.currentTimeMillis()
     val nowTime = nowTimeStr()
 
+    //控制转向灯
+    SendBlinkerControl(overtakeAction)
+
     //变道状态转文字
     val stateStr = atcStateName(atcState)
 
@@ -231,10 +234,11 @@ fun MainActivity.processOvertakeLaneChangeState(atcState: Int?) {
         Log.d("Overtake", msg)
         showLaneDebug(msg)
 
-        val lane_change_end_delay = when (nav_mode) {
+        finishOvertake(true)
+        val lane_change_end_delay = when (overtake_mode) {
             1 -> 0
             3 -> OVERTAKE_END_DELAY
-            else -> OVERTAKE_END_DELAY / 2   // nav_mode == 2
+            else -> OVERTAKE_END_DELAY / 2   // overtake_mode == 2
         }
         completeOvertake(lane_change_end_delay)
     }
@@ -253,6 +257,7 @@ fun MainActivity.processOvertakeLaneChangeState(atcState: Int?) {
             showLaneDebug(msg)
 
             appSpeakFile = "audio_lane_change_cancel"
+            finishOvertake(false)
             completeOvertake(USER_CALCEL_OVERTAKE_DELAY)
         } else {
             //如果状态有变化，说明命令执行了
@@ -277,6 +282,7 @@ fun MainActivity.processOvertakeLaneChangeState(atcState: Int?) {
 
         appSpeakFile = "audio_lane_change_cancel"
 
+        finishOvertake(false)
         val lane_change_end_delay = when (overtake_mode) {
             1 -> 0
             3 -> LANE_CHANGE_END_DELAY
@@ -284,4 +290,42 @@ fun MainActivity.processOvertakeLaneChangeState(atcState: Int?) {
         }
         completeOvertake(lane_change_end_delay)
     }
+}
+
+// 超车结束时的收尾处理：记录方向、按当前超车模式更新冷却时间
+fun MainActivity.finishOvertake(success: Boolean) {
+    val now = System.currentTimeMillis()
+    val p = currentOvertakeParams()
+
+    if (success) {
+        //超车变道完成
+        overtakeLastDirection = overtakeAction
+        overtakeCooldownDuration = p.cooldownSuccess
+    } else {
+        //超车失败或被驾驶员取消
+        overtakeLastDirection = LaneChangeAction.KEEP
+        overtakeCooldownDuration = p.cooldownFailed
+    }
+
+    overtakeCooldownUntil = now + overtakeCooldownDuration
+    overtakeTriggerStableTime = 0L
+    overtakeInProgress = false
+}
+
+// 清空超车运行态(基础条件失效时调用)
+fun MainActivity.clearOvertakeRuntime() {
+    overtakeTriggerStableTime = 0L
+    overtakeInProgress = false
+}
+
+// 超车决策原因日志去重与限频
+fun MainActivity.logOvertakeReason(reason: String) {
+    val now = System.currentTimeMillis()
+    val changed = reason != overtakeLastReason
+    overtakeLastReason = reason
+    if (!changed) return
+    if (now - overtakeLastLogTime < 1000L) return    //最多每秒记录一次
+    overtakeLastLogTime = now
+    Log.d("Overtake", reason)
+    showLaneDebug(reason)
 }

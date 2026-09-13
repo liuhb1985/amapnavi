@@ -10,6 +10,41 @@ data class LaneCalcResult(
         val rightLaneId: Int = 0
 )
 
+// 超车单侧车道评估结果(基于毫米波雷达 + 激光雷达侧向数据)
+data class OvertakeSideEval(
+        val side: LaneChangeAction = LaneChangeAction.KEEP,
+        val safe: Boolean = false,     // 该方向是否安全可超车
+        val score: Int = 0,            // 0~100，越大越适合超车
+        val reason: String = ""        // 评估说明
+)
+
+// 超车模式参数集(1=激进 2=常规 3=保守)
+data class OvertakeParams(
+        val mode: Int = 2,
+        val modeName: String = "常规",
+        // -------- 触发条件 --------
+        val triggerMaxDist: Float = 80f,        // 触发超车的前车最大距离(m)，受毫米波雷达约100m量程限制
+        val triggerMinDist: Float = 12f,        // 触发超车的前车最小距离(m)，过近先拉开
+        val vrelThreshold: Int = -3,            // 前车相对速度阈值(km/h)，负值表示前车更慢
+        val timeGapMax: Float = 3.0f,           // 跟车时距阈值(s)
+        val cruiseRatio: Float = 0.90f,         // 巡航速度比例阈值
+        val leadMinSpeedHighWay: Int = 35,      // 高速前车最低速度(km/h)，低于视为拥堵不超车
+        val leadMinSpeedRoad: Int = 20,         // 普通道路前车最低速度(km/h)
+        val stableTime: Long = 800L,            // 触发条件需要连续满足的时间(ms)
+        // -------- 单侧安全评估 --------
+        val minLaneWidth: Float = 2.3f,         // 目标车道最小宽度(m)
+        val sideMinScore: Int = 60,             // 单侧可用最低评分
+        val sideVrelThreshold: Int = 10,        // 侧前方车辆更慢阈值(km/h)
+        val sideSafetyMargin: Float = 5f,       // 侧前车与本车道前车距离安全裕度(m)
+        val rearMinDist: Float = 12f,           // 目标车道后方车辆最小安全距离(m)，实际还会叠加约0.8s时距
+        val sideFrontMinDist: Float = 20f,      // 目标车道前方车辆最小距离(m)，需小于激光雷达约50m量程
+        val allowRightOvertake: Boolean = true, // 是否允许右侧超车
+        val preferLeftFirst: Boolean = true,    // 是否优先选择左侧超车
+        // -------- 冷却 --------
+        val cooldownSuccess: Long = 10000L,     // 成功超车后冷却时间(ms)
+        val cooldownFailed: Long = 4000L        // 超车失败/取消后冷却时间(ms)
+)
+
 data class CarState(
         var isOnroad: Boolean = false,
         var vCruise: Int = 0,
