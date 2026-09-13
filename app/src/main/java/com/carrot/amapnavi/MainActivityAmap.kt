@@ -105,6 +105,11 @@ fun MainActivity.updateNaviState(extras: Map<String, Any?>): Pair<Boolean, Strin
         nRoadLimitSpeed = limitedSpeed //当前路段限速
         val lastSpeed = nRoadLimitSpeedLast  // 局部不可变变量，避免 Smart cast 问题
 
+        //本次"限速"是否来自驾驶员定速(没有可用道路限速时的兜底)
+        //CP 侧是"道路限速一变就把定速改成这个值"，所以定速来源的值一旦再叠加偏移,
+        //就会变成 限速=定速+偏移 -> CP把定速改成限速 -> 限速再+偏移 的自激增长,必须禁止后续叠加
+        var bLimitFromVCruise = false
+
         var computedSpeed = when {
             // 1) 本次限速有效并且大于0
             limitedSpeed != null && limitedSpeed > 0 -> {
@@ -163,6 +168,7 @@ fun MainActivity.updateNaviState(extras: Map<String, Any?>): Pair<Boolean, Strin
             // 2) 本次限速无效并且上一次限速也无效或者上次限速<=0
             lastSpeed == null || lastSpeed <= 0 -> {
                 nRoadLimitSpeedLast = limitedSpeed ?: -1
+                bLimitFromVCruise = true //没有道路限速，以定速为限速
                 var _limit_speed = 60
                 if(carState.vCruise > 0 && carState.vCruise <= 140){
                     _limit_speed = carState.vCruise
@@ -171,37 +177,28 @@ fun MainActivity.updateNaviState(extras: Map<String, Any?>): Pair<Boolean, Strin
             }
             // 3)本次限速无效但是上一次限速有效
             else -> {
-                var _limit_speed = lastSpeed
-                if (bHighWay) { //高速或快速
-                    //用户调节了定速
-                    if((nRoadLimitvCruiseLast != carState.vCruise) && (carState.vCruise > 0 && carState.vCruise <= 140)){
-                        nRoadLimitvCruiseLast = carState.vCruise
-                        _limit_speed = carState.vCruise
-                        nRoadLimitSpeedLast = _limit_speed
-                    }
-                }else{ //公路
+                //本次没有道路限速,一律以定速为准(否则 CP 会把定速改成上一次的限速值/60,导致怎么调定速速度都上不去)
+                if(carState.vCruise > 0 && carState.vCruise <= 140){
+                    bLimitFromVCruise = true //以定速为限速
+                    nRoadLimitSpeedLast = carState.vCruise
+                    carState.vCruise
+                } else {
+                    //定速未设定或不合法,退回原逻辑:保持上次限速
+                    var _limit_speed = lastSpeed
                     //道路类型从高速变为低速，限速变为60
-                    if((nRoadCateLast != naviState.roadcate) && isHighway(nRoadCateLast) && !bHighWay){
+                    if((!bHighWay) && (nRoadCateLast != naviState.roadcate) && isHighway(nRoadCateLast)){
                         _limit_speed = 60
                         nRoadLimitSpeedLast = _limit_speed
-                        nRoadLimitvCruiseLast = carState.vCruise
                     }
-                    //用户调节了定速
-                    else if((nRoadLimitvCruiseLast != carState.vCruise) && (carState.vCruise > 0 && carState.vCruise <= 140)){
-                        nRoadLimitvCruiseLast = carState.vCruise
-                        _limit_speed = carState.vCruise
-                        nRoadLimitSpeedLast = _limit_speed
-                    }
-                    //_limit_speed = (lastSpeed * 0.8).toInt().coerceAtLeast(45)
+                    _limit_speed
                 }
-                _limit_speed
             }
         }
         nRoadLimitvCruiseLast = carState.vCruise
         nRoadCateLast = naviState.roadcate?:-1
 
-        //临时提速处理
-        if(computedSpeed < 60) {
+        //临时提速处理(限速来自定速时不叠加偏移，否则每发一次就会被 CP 累加一次偏移)
+        if(computedSpeed < 60 && !bLimitFromVCruise) {
             if (bHighWay){ //高速或快速，用户设置了提速
                 if(offset_highway > 0){
                     if(computedSpeed == null || computedSpeed <= 0){
@@ -233,7 +230,7 @@ fun MainActivity.updateNaviState(extras: Map<String, Any?>): Pair<Boolean, Strin
         val highway = isHighway(naviState.roadcate?:-1)
 
         //摄像头限速融合道路限速
-        if(sdi_speed_limit > 60 && !bHighWay) { //有摄像头限速并且限速大于60
+        if(sdi_speed_limit > 60 && !bHighWay && !bLimitFromVCruise) { //有摄像头限速并且限速大于60(限速来自定速时不用摄像头值改写定速)
             if (limitedSpeed == null || limitedSpeed <= 0) { //无道路限速
                 if((computedSpeed < sdi_speed_limit*0.8) //计算后的限速比摄像头小
                         && (nRoadLimitSpeedLast > 0)) {  //上次获取过道路限速
@@ -255,14 +252,14 @@ fun MainActivity.updateNaviState(extras: Map<String, Any?>): Pair<Boolean, Strin
             }
         }
 
-        if(bRoadLimitIncDec){
+        if(bRoadLimitIncDec && !bLimitFromVCruise){ //限速±5 按钮：限速来自定速时不能叠加，否则每次发送都会 +5 自激
             computedSpeed = computedSpeed + nRoadLimitOffset
         }
-        if(road_speed_limit_percent > 0 && enable_speed_limit_up){
+        if(road_speed_limit_percent > 0 && enable_speed_limit_up && !bLimitFromVCruise){
             val speedUp = computedSpeed.toFloat()*(1.0+(road_speed_limit_percent.toFloat()/100.0))
             computedSpeed = speedUp.toInt()
         }
-        if(road_speed_limit_kph > 0 && enable_speed_limit_up){
+        if(road_speed_limit_kph > 0 && enable_speed_limit_up && !bLimitFromVCruise){
             computedSpeed = computedSpeed + road_speed_limit_kph
         }
 
