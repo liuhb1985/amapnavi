@@ -3,13 +3,11 @@ package com.carrot.amapnavi
 import android.content.Context
 import android.util.Log
 import android.widget.LinearLayout
-import com.chaquo.python.Python
-import com.chaquo.python.android.AndroidPlatform
 
 /* =========================================================
  * 参数设置 / 环境初始化模块
  *   - 用户设置加载（loadUserSettings）
- *   - Python 环境初始化（PythonEnvInit）
+ *   - 声音轮询与播放（pollSound / SoundCenter）
  *   - 语音轮询（pollSound / startSoundPolling）
  * 说明：本文件中的函数均为 MainActivity 的扩展函数。
  * ========================================================= */
@@ -373,12 +371,7 @@ fun MainActivity.loadUserSettings() {
     val container = findViewById<LinearLayout>(R.id.containerLinearLayout)
     setTopPaddingDp(container, top_pad_dp)
 
-    //参数应用
-    PythonEnvInit()
-
-    //val py = Python.getInstance()
-    //val module = py.getModule("auto_overtake_controller")
-    //module.callAttr("set_app_navi", app_navi || app_road_navi || app_overtake || app_road_overtake)
+    //参数应用（Python 版已移除，参数由 Kotlin 侧直接使用）
 }
 
 fun MainActivity.pollSound() {
@@ -391,25 +384,10 @@ fun MainActivity.pollSound() {
             return
         }
 
-        //Log.d("SoundPoll", "pollSound running")
-        //val py = Python.getInstance()
-        //val module = py.getModule("sound_center")
-
-        if(isSoundCenterReady()) {
-            val result = sound_centerModule.callAttr("get_requested_sound")
-
-            if (result == null) {
-                //Log.d("SoundPoll", "get_requested_sound() result is null")
-                return  // 安全退出
-            }
-
-            val sound = result.toString()
-            //Log.d("SoundPoll", "sound: ${sound}")
-            //Log.d("SoundPoll", "sound raw bytes = " + sound.toByteArray().joinToString(","))
-
-            if (sound.isNotEmpty() && app_speak) {
-                SoundPlayer.play(this, sound)
-            }
+        //声音请求（原 Python sound_center 轮询，现由 SoundCenter 直接提供）
+        val sound = SoundCenter.take()
+        if (sound.isNotEmpty() && app_speak) {
+            SoundPlayer.play(this, sound)
         }
 
     } catch (e: Exception) {
@@ -430,17 +408,3 @@ fun MainActivity.startSoundPolling() {
     sound_handler.post(pollRunnable!!)
 }
 
-fun MainActivity.PythonEnvInit(){
-    if (!Python.isStarted()) {
-        //Python.start(AndroidPlatform(this))
-        Python.start(AndroidPlatform(this))
-    }
-
-    if (!isPyReady()) {
-        py = Python.getInstance()
-        overtake_controllerModule = py.getModule("auto_overtake_controller")
-        overtakeModule = py.getModule("auto_overtake")
-        sound_centerModule = py.getModule("sound_center")
-        configModule = py.getModule("config")
-    }
-}

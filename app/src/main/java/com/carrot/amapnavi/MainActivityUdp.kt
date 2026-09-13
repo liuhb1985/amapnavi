@@ -34,6 +34,10 @@ fun MainActivity.handleNaviUdpJson(json: JSONObject, packetAddress: String, pack
         opStateManager.updateFromJson(json)
         //视觉车道检测
         vLaneResult = opStateManager.visionLaneCalc(vision_lane_mode, navi_lane_cnt, bHighWay || road_median)
+        //声音请求（原 Python sound_center：报文里的 sound 索引 → 播报）
+        if (json.has("sound")) {
+            SoundCenter.requestIndex(json.optInt("sound", 0))
+        }
     }
 }
 

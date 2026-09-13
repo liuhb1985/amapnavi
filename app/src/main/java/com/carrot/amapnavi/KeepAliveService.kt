@@ -41,8 +41,18 @@ class KeepAliveService : Service() {
 
     // ===================== UDP 实例 =====================
     lateinit var cmUdpService: UdpService
+    /** 4210：CP 的 overtake 通道，只做兼容握手（回响应 + 记录 CP 地址），业务数据走 cmUdpService(7705) */
+    lateinit var opUdpService: UdpService
     //lateinit var laneUdpService: UdpService
     //lateinit var naviUdpService: UdpService
+
+    /** 本机 IP（广播循环每 60 秒刷新，回包时用） */
+    @Volatile
+    var localIp: String = ""
+        private set
+
+    private fun currentLocalIp(): String =
+        if (localIp.isNotEmpty()) localIp else (getAllLocalIpAddresses().firstOrNull() ?: "")
 
     // ===================== Job =====================
     private var broadcastJob: Job? = null
@@ -62,10 +72,19 @@ class KeepAliveService : Service() {
 
         // --- UDP ---
         cmUdpService = UdpService(carrotManAppPort, carrotManOpPort, serviceScope)
+        // 4210：CP 的 overtake 通道（原 Python auto_overtake_controller 的网络部分）
+        opUdpService = UdpService(overtakeAppPort, naviOpPort, serviceScope)
         //laneUdpService = UdpService(laneAppPort, laneOpPort, serviceScope)
         //naviUdpService = UdpService(naviAppPort, naviOpPort, serviceScope)
 
         cmUdpService.start()
+        // CP 的上报包带 ip/port，回一条 resp=overtake（节流 1 秒，CP 是 10Hz 单播）
+        opUdpService.onReceiveData = { json, _ ->
+            OvertakeCompat.responseFor(json, currentLocalIp())?.let { resp ->
+                opUdpService.send(resp, OvertakeCompat.opIp, OvertakeCompat.opPort)
+            }
+        }
+        opUdpService.start()
         //laneUdpService.start()
         //naviUdpService.start()
 
@@ -255,6 +274,7 @@ class KeepAliveService : Service() {
                         }
                         broadcast?.let { ipStr to it }
                     }
+                    localIp = ipBroadcastPairs.firstOrNull()?.first ?: ""
                     lastGetLocalIpAddrTime = now
                 }
 

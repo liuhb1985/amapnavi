@@ -15,7 +15,7 @@ import org.json.JSONObject
  * 高德导航数据解析 / 车道级引导模块
  *   - 导航状态解析（updateNaviState / updateTrafficState）
  *   - 车道级引导解析（parseDriveWay）
- *   - 车道数据下发 Python / UDP（sendLaneToPython*）
+ *   - 车道数据 UDP 广播（sendLaneToPythonIO）
  *   - 日志格式化（formatAmapData）与模拟数据
  * 说明：本文件中的函数均为 MainActivity 的扩展函数。
  * ========================================================= */
@@ -553,25 +553,9 @@ fun MainActivity.simulateDriveWayBroadcast(rawData: Map<String, Any?>) {
     parseDriveWay(extras)
 }
 
-fun MainActivity.sendLaneToPython(arr: Array<String>, validCount: Int) {
-    PythonEnvInit()
-
-    //val py = Python.getInstance()
-    //val module = py.getModule("config")
-
-    // 调用 Python 函数：process_lane_array(arr, validCount)
-    if(isConfigModuleReady()) {
-        val result = configModule.callAttr("process_lane_array", arr, validCount)
-
-        // 如果 Python 有返回值
-        val retStr = result?.toString()
-        Log.d("PYTHON", "Python返回: $retStr")
-    }
-}
-
 fun MainActivity.sendLaneToPythonIO(arr: Array<String>, validCount: Int) {
     CoroutineScope(Dispatchers.IO).launch {
-        //数据通过广播发送
+        //数据通过广播发送（原 Python auto_overtake_controller 监听 4210 接收，Python 版已删除）
         val validArr = arr.take(validCount).toTypedArray() //取有效部分
         val json = JSONObject() //组JSON
         if(validCount > 0) {
@@ -580,36 +564,6 @@ fun MainActivity.sendLaneToPythonIO(arr: Array<String>, validCount: Int) {
         json.put("laneValidCount", validCount)
         val jsonStr = json.toString()
         cmUdpServiceSend(jsonStr, host="255.255.255.255", port = overtakeAppPort)
-
-        //数据传递给python
-        PythonEnvInit()
-        /*
-        if (!Python.isStarted()) {
-            Python.start(AndroidPlatform(this@MainActivity))
-
-            if (!::py.isInitialized) {
-                py = Python.getInstance()
-                overtake_controllerModule = py.getModule("auto_overtake_controller")
-                overtakeModule = py.getModule("auto_overtake")
-                sound_centerModule = py.getModule("sound_center")
-                configModule = py.getModule("config")
-            }
-        }
-         */
-
-        //val py = Python.getInstance()
-        //val module = py.getModule("auto_overtake_controller")
-
-        if(isOvertakeControllerReady()) {
-            val result = overtake_controllerModule.callAttr("process_lane_array", validArr, validCount)
-
-            val retStr = result?.toString()
-
-            // 如果需要回 UI
-            withContext(Dispatchers.Main) {
-                Log.d("PYTHON", "Python返回: $retStr")
-            }
-        }
     }
 }
 

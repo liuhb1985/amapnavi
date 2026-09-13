@@ -24,8 +24,6 @@ import android.view.ViewGroup
 import java.security.MessageDigest
 import android.provider.Settings
 import java.util.Locale
-import com.chaquo.python.Python
-import com.chaquo.python.android.AndroidPlatform
 import com.carrot.amapnavi.UdpDeviceActivity
 import java.net.BindException
 import androidx.appcompat.app.AlertDialog
@@ -59,7 +57,6 @@ import android.hardware.camera2.CaptureRequest
 import android.os.*
 import android.widget.*
 import androidx.lifecycle.Lifecycle
-import com.chaquo.python.PyObject
 import org.json.JSONArray
 import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
@@ -69,7 +66,7 @@ import java.util.Date
  * 主页面类（仅保留：控件/状态字段、生命周期、Service 绑定）
  *
  * 其它功能模块已按功能拆分到以下文件（均为 MainActivity 的扩展函数）：
- *   - MainActivitySettings.kt     参数设置 / Python 环境 / 语音轮询
+ *   - MainActivitySettings.kt     参数设置 / 语音轮询
  *   - MainActivityUi.kt           UI 显示 / 控件交互 / 原始日志
  *   - MainActivityLaneDecision.kt 车道决策 / 超车决策
  *   - MainActivityLaneControl.kt  变道控制
@@ -268,12 +265,6 @@ class MainActivity : AppCompatActivity() {
     // 保存上一次的车道类型文本
     internal var lastDriveWayText: String = ""
 
-    internal lateinit var py: Python
-    internal lateinit var overtakeModule: PyObject
-    internal lateinit var configModule: PyObject
-    internal lateinit var sound_centerModule: PyObject
-    internal lateinit var overtake_controllerModule: PyObject
-
     internal val uiHandler = Handler(Looper.getMainLooper())
     internal val hideRawLogRunnable = Runnable {
         setRawLogVisible(false)
@@ -381,12 +372,6 @@ class MainActivity : AppCompatActivity() {
     internal var recvTimeoutCnt = 0
 
     internal val RAW_LOG_MAX_LINES = 500
-
-    // -------- lateinit 初始化状态检查（供其它文件的扩展函数调用） --------
-    internal fun isPyReady() = ::py.isInitialized
-    internal fun isConfigModuleReady() = ::configModule.isInitialized
-    internal fun isOvertakeControllerReady() = ::overtake_controllerModule.isInitialized
-    internal fun isSoundCenterReady() = ::sound_centerModule.isInitialized
 
     // ICON → 方向集合映射（单字母表示）
     internal val driveWayIconMap: Map<Int, Set<String>> = mapOf(
@@ -562,42 +547,7 @@ class MainActivity : AppCompatActivity() {
             .versionName
         tvVersion.text = "V" + versionName
 
-        // python启动
-        PythonEnvInit()
-        /*
-        if (!Python.isStarted()) {
-            Python.start(AndroidPlatform(this))
-
-            if (!::py.isInitialized) {
-                py = Python.getInstance()
-                overtake_controllerModule = py.getModule("auto_overtake_controller")
-                overtakeModule = py.getModule("auto_overtake")
-                sound_centerModule = py.getModule("sound_center")
-                configModule = py.getModule("config")
-            }
-        }
-         */
-        //val py = Python.getInstance()
-        //val module = py.getModule("config")
-        if(::configModule.isInitialized) {
-            val path = this.filesDir.absolutePath //设置 Python 的配置目录
-            configModule.callAttr("set_config_dir", path)
-        }
-
-        //val auto_overtake_controller = py.getModule("auto_overtake_controller")
-        if(::overtake_controllerModule.isInitialized) {
-            overtake_controllerModule.callAttr("stop_python_heart")
-        }
-
         startSoundPolling() // 启动声音轮询
-
-        //val pyModule = py.getModule("auto_overtake")
-        CoroutineScope(Dispatchers.IO).launch {
-            if(::overtakeModule.isInitialized) {
-                val result = overtakeModule.callAttr("main")
-                Log.d("RunPython", result.toString())
-            }
-        }
 
         // 保存第1行之外控件的原始可见性
         val viewVisibilityMap = mutableMapOf<View, Int>()

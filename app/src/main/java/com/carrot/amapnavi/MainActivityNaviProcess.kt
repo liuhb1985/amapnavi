@@ -875,26 +875,19 @@ fun MainActivity.naviProcess() {
     //超车功能
     autoOvertake(naviFlag)
 
-    //是否关闭超车功能
-    //val py = Python.getInstance()
-    //val module = py.getModule("auto_overtake_controller")
-    //module.callAttr("set_app_navi", py_overtake_disable)
+    //是否关闭超车功能（Python 版已移除，这里只在状态变化时打日志）
+    if (py_overtake_disable_prev != py_overtake_disable) {
+        py_overtake_disable_prev = py_overtake_disable
 
-    if (isOvertakeControllerReady()) {
-        if (py_overtake_disable_prev != py_overtake_disable) {
-            py_overtake_disable_prev = py_overtake_disable
-            overtake_controllerModule.callAttr("set_app_navi", py_overtake_disable)
-
-            val now = System.currentTimeMillis()
-            val nowTime = nowTimeStr()
-            val msg = if (py_overtake_disable) {
-                "$nowTime ${py_overtake_disable_reason},超车功能关闭"
-            } else {
-                "$nowTime 超车功能打开"
-            }
-            Log.d("LaneState", msg)
-            showLaneDebug(msg)
+        val now = System.currentTimeMillis()
+        val nowTime = nowTimeStr()
+        val msg = if (py_overtake_disable) {
+            "$nowTime ${py_overtake_disable_reason},超车功能关闭"
+        } else {
+            "$nowTime 超车功能打开"
         }
+        Log.d("LaneState", msg)
+        showLaneDebug(msg)
     }
 }
 

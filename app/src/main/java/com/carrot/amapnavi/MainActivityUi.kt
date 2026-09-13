@@ -50,8 +50,9 @@ fun MainActivity.setupWebView() {
             web_container.visibility = View.VISIBLE
             webView.visibility = View.VISIBLE
 
-            // 如果需要重新加载网页
-            webView.loadUrl("http://127.0.0.1:8088")
+            // 原为本机 Python 的 8088 超车设置页(web_interface)，Python 版已删除，
+            // 这里不再加载页面（该按钮在布局里已按需求隐藏）
+            android.widget.Toast.makeText(activity, "超车设置页已随 Python 版本移除", android.widget.Toast.LENGTH_SHORT).show()
 
             //btnAppOverTake.text = "隐藏超车"
             //btnNavSetting.text = "导航设置"
