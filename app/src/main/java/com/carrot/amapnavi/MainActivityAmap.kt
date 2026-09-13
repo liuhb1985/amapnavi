@@ -102,6 +102,14 @@ fun MainActivity.updateNaviState(extras: Map<String, Any?>): Pair<Boolean, Strin
         //有限速数据并且大于0，允许用户设定的提高限速功能
         enable_speed_limit_up = limitedSpeed != null && limitedSpeed > 0
 
+        //高德限速发生变化 → 自动重置用户手动设置的限速偏移。
+        //放在计算限速之前：本次就直接按新限速算，不会再用旧偏移多发一帧错误限速给 CP。
+        //只比较「有效限速(>0)」：限速数据瞬时丢失(隧道/无数据)不算变化，避免误清用户设置
+        if (limitedSpeed != null && limitedSpeed > 0 && limitedSpeed != nAmapLimitSpeedLast) {
+            nAmapLimitSpeedLast = limitedSpeed
+            resetRoadLimitOffsetByAmap(limitedSpeed)
+        }
+
         nRoadLimitSpeed = limitedSpeed //当前路段限速
         val lastSpeed = nRoadLimitSpeedLast  // 局部不可变变量，避免 Smart cast 问题
 

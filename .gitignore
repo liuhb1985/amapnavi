@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+#签名配置(含密码)，不要入库
+keystore.properties

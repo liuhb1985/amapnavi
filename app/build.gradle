@@ -1,6 +1,17 @@
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
+// 正式签名配置：keystore.properties 不入库(见 .gitignore)，内容示例：
+//   storeFile=amapnavi.jks
+//   storePassword=xxx
+//   keyAlias=xxx
+//   keyPassword=xxx
+def keystorePropsFile = rootProject.file("keystore.properties")
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
 
 android {
     compileSdkVersion 28
@@ -11,7 +22,7 @@ android {
         minSdkVersion 21
         targetSdkVersion 28
         versionCode 1
-        versionName "1.3.2.9"
+        versionName "1.3.3.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -19,6 +30,19 @@ android {
         ndk {
             abiFilters "arm64-v8a", "armeabi-v7a"
             // 若设备全是 64 位（如车机），可只保留 "arm64-v8a"，再多省约 8MB
+        }
+    }
+
+    signingConfigs {
+        release {
+            if (keystorePropsFile.exists()) {
+                storeFile rootProject.file(keystoreProps.getProperty("storeFile", "amapnavi.jks"))
+                storePassword keystoreProps.getProperty("storePassword")
+                keyAlias keystoreProps.getProperty("keyAlias")
+                keyPassword keystoreProps.getProperty("keyPassword")
+                //amapnavi.jks 是 JKS 格式，JDK 9+ 默认按 PKCS12 读取会报"密码错误"，必须显式指定
+                storeType keystoreProps.getProperty("storeType", "jks")
+            }
         }
     }
 
@@ -31,6 +55,9 @@ android {
             minifyEnabled false
             //minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            //未签名的 APK 在 Android 7.0+ 无法安装(解析软件包失败)，所以默认用 debug 签名保证能装；
+            //若存在 keystore.properties 则改用 amapnavi.jks 正式签名(可覆盖安装正式签名版本)
+            signingConfig keystorePropsFile.exists() ? signingConfigs.release : signingConfigs.debug
         }
     }
 
@@ -45,6 +72,27 @@ android {
 
     aaptOptions {
         noCompress "onnx"
+    }
+}
+
+// release 产物归档：app/release/AmapNavi-V{versionName}.apk（与历史发布包命名一致）
+def releaseArchiveDir = file("$projectDir/release")
+android.applicationVariants.all { variant ->
+    if (variant.buildType.name == 'release') {
+        variant.outputs.all { output ->
+            outputFileName = "AmapNavi-V${variant.versionName}.apk"
+        }
+    }
+}
+tasks.whenTaskAdded { task ->
+    if (task.name == 'assembleRelease') {
+        task.doLast {
+            copy {
+                from "$buildDir/outputs/apk/release"
+                into releaseArchiveDir
+                include "*.apk"
+            }
+        }
     }
 }
 

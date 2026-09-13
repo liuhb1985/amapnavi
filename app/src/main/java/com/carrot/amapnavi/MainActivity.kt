@@ -132,6 +132,12 @@ class MainActivity : AppCompatActivity() {
     internal lateinit var btnLaneTest: Button
     internal lateinit var btnInstallFlask: Button
     internal lateinit var btnInstallOpencv: Button
+
+    //限速偏移按钮是否已完成绑定：refreshRoadLimitBtnUi() 可能在 onCreate 早期或被广播触发
+    internal fun roadLimitBtnsBound(): Boolean =
+        ::btnIncRoadLimit.isInitialized &&
+                ::btnResetRoadLimit.isInitialized &&
+                ::btnDecRoadLimit.isInitialized
     //private lateinit var rawLogCam: TextView
     internal lateinit var scrollRawLog: ScrollView
     internal lateinit var scrollRawLogNav: ScrollView
@@ -230,6 +236,8 @@ class MainActivity : AppCompatActivity() {
     internal var bRoadLimitTest = false
     internal var bRoadLimitIncDec = false
     internal var nRoadLimitOffset = 0
+    //上一次收到的高德有效道路限速(>0)：用于判断「高德限速变化」并自动重置手动偏移
+    internal var nAmapLimitSpeedLast: Int = -1
     internal var nRoadLimitvCruiseLast: Int = -1
     internal var nRoadCateLast: Int = -1
     internal var bHighWay = false
@@ -540,6 +548,9 @@ class MainActivity : AppCompatActivity() {
         btnTbtTest = findViewById(R.id.btnTbtTest)
         btnLaneTest = findViewById(R.id.btnLaneTest)
 
+        //限速偏移按钮：初始化「重置」按钮上显示的当前偏移量
+        refreshRoadLimitBtnUi()
+
         val container = findViewById<LinearLayout>(R.id.containerLinearLayout)
         web_container = findViewById<LinearLayout>(R.id.webLinearLayout)
 
@@ -726,6 +737,7 @@ class MainActivity : AppCompatActivity() {
                     updateRawLogUI("限速已加至最大${nRoadLimitOffset} km/h", true)
                 }
             }
+            refreshRoadLimitBtnUi()
             if(!bShowRawLog) {
                 // 取消上一次再重新计时
                 uiHandler.removeCallbacks(hideRawLogRunnable)
@@ -739,6 +751,7 @@ class MainActivity : AppCompatActivity() {
             clearRawLogUI()
             setRawLogUIVisible(true)
             updateRawLogUI("重置限速偏移成功", true)
+            refreshRoadLimitBtnUi()
             if(!bShowRawLog) {
                 // 取消上一次再重新计时
                 uiHandler.removeCallbacks(hideRawLogRunnable)
@@ -770,6 +783,7 @@ class MainActivity : AppCompatActivity() {
                     updateRawLogUI("限速已减至最小${nRoadLimitOffset} km/h", true)
                 }
             }
+            refreshRoadLimitBtnUi()
             if(!bShowRawLog) {
                 // 取消上一次再重新计时
                 uiHandler.removeCallbacks(hideRawLogRunnable)
@@ -849,6 +863,8 @@ class MainActivity : AppCompatActivity() {
                 layoutSystemButtons.visibility = View.GONE
             }else{
                 layoutSystemButtons.visibility = View.VISIBLE
+                refreshRoadLimitBtnUi()     //展开前先同步一次「重置」按钮上的当前偏移
+                applyRoadLimitPanelHeight() //三个限速大按钮铺满剩余空间，底部留约20%
             }
         }
 

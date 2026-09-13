@@ -1,6 +1,7 @@
 package com.carrot.amapnavi
 
 import android.graphics.Color
+import android.os.Looper
 import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebViewClient
@@ -8,8 +9,10 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Space
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.children
+import androidx.core.view.doOnLayout
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -241,6 +244,76 @@ fun MainActivity.updateRawLogNav(text: String) {
         rawLogNav.text = text
         scrollRawLogNav.post { scrollRawLogNav.fullScroll(ScrollView.FOCUS_DOWN) }
     }
+}
+
+// -----------------------------
+// 限速偏移按钮（>> 面板：上=限速+5 / 中=重置 / 下=限速-5）
+//   中间按钮上直接显示当前实际偏移量；偏移变化、高德限速变化都统一走这里刷新
+// -----------------------------
+fun MainActivity.refreshRoadLimitBtnUi() {
+    //按钮点击(主线程)与高德广播(主线程)都会调用，仍统一兜底切主线程
+    if (Looper.myLooper() != Looper.getMainLooper()) {
+        uiHandler.post { refreshRoadLimitBtnUi() }
+        return
+    }
+    //onCreate 早期(按钮还没绑定时)直接返回，避免 lateinit 未初始化崩溃
+    if (!roadLimitBtnsBound()) return
+
+    val offsetText = when {
+        nRoadLimitOffset > 0 -> "+$nRoadLimitOffset"
+        nRoadLimitOffset < 0 -> "$nRoadLimitOffset"
+        else -> "0"
+    }
+    btnIncRoadLimit.text = "限速 +5"
+    btnResetRoadLimit.text = "重置（当前偏移 $offsetText）"
+    btnDecRoadLimit.text = "限速 -5"
+}
+
+// >> 面板底边落在内容区高度的 80% 处(底部留约20%给视频预览/日志区)
+private const val ROAD_LIMIT_PANEL_BOTTOM_RATIO = 0.8f
+
+// 面板保底高度(dp)：屏幕很矮时不能让按钮小到按不准
+private const val ROAD_LIMIT_PANEL_MIN_HEIGHT_DP = 250f
+
+// >> 面板高度：把面板撑到「内容区高度80%」的位置，
+//   面板内第一行安装/测试按钮保持原高，下面三个限速大按钮用 weight 平分剩余高度
+fun MainActivity.applyRoadLimitPanelHeight() {
+    if (!roadLimitBtnsBound()) return
+
+    //必须等这一次布局走完再量位置：面板刚从 GONE 变 VISIBLE 时 top 还是旧值(0)，
+    //直接用 post 有可能跑在 layout 之前，算出来的高度会溢出屏幕底部
+    layoutSystemButtons.doOnLayout {
+        val container = layoutSystemButtons.parent as? View ?: return@doOnLayout
+        //坐标以父容器(内容区)为基准，和 layoutSystemButtons.top 同一坐标系
+        val baseH = if (container.height > 0) container.height else resources.displayMetrics.heightPixels
+
+        val target = (baseH * ROAD_LIMIT_PANEL_BOTTOM_RATIO).toInt() - layoutSystemButtons.top
+        val minH = (resources.displayMetrics.density * ROAD_LIMIT_PANEL_MIN_HEIGHT_DP).toInt()
+        val newH = target.coerceAtLeast(minH)
+
+        if (layoutSystemButtons.layoutParams.height != newH) {
+            layoutSystemButtons.layoutParams = layoutSystemButtons.layoutParams.apply { height = newH }
+        }
+    }
+}
+
+// 高德限速发生变化：自动清除用户手动设置的限速偏移，并同步按钮显示
+fun MainActivity.resetRoadLimitOffsetByAmap(newLimitSpeed: Int) {
+    if (nRoadLimitOffset == 0 && !bRoadLimitIncDec) return //本来就没有偏移，不打扰用户
+
+    if (Looper.myLooper() != Looper.getMainLooper()) {
+        uiHandler.post { resetRoadLimitOffsetByAmap(newLimitSpeed) }
+        return
+    }
+
+    val oldOffset = nRoadLimitOffset
+    nRoadLimitOffset = 0
+    bRoadLimitIncDec = false
+    refreshRoadLimitBtnUi()
+
+    val oldOffsetText = if (oldOffset > 0) "+$oldOffset" else "$oldOffset"
+    updateRawLog("高德限速变为 ${newLimitSpeed} km/h，已自动重置限速偏移(原 $oldOffsetText)", bShowRawLog)
+    Toast.makeText(this, "高德限速变化，已自动重置限速偏移", Toast.LENGTH_SHORT).show()
 }
 
 // -----------------------------

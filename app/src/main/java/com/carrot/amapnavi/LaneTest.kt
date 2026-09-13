@@ -104,7 +104,7 @@ private fun releaseTestDetector() {
 }
 
 // =========================================================
-// 入口：由 MainActivity 的「AI测试」按钮调用
+// 入口：由 MainActivity 的「车道线测试」按钮调用
 // =========================================================
 fun MainActivity.showLaneTestPage() {
     val activity = this
