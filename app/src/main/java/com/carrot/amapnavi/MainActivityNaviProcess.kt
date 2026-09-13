@@ -714,6 +714,8 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
     val s = opStateManager.state
     val p = currentOvertakeParams()
 
+    overtakeDebugNaviFlag = naviFlag        //供诊断面板显示"领航"状态
+
     var overtakeMinSpeed = 30
     if (bHighWay) {
         overtakeMinSpeed = 60
@@ -732,16 +734,18 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
                 && s.engaged && !naviFlag              //开启了op定速并且领航未控制
                 && ((!bHighWay && app_road_overtake) || (bHighWay && app_overtake)))) {
 
+        //条件原因(同时用于日志与诊断面板)
+        var condReason = ""
+        if (!s.lidar_l) condReason += "左侧激光雷达不在线，"
+        if (!s.lidar_r) condReason += "右侧激光雷达不在线，"
+        if (!s.engaged) condReason += "OP未定速，"
+        if (!bHighWay && !app_road_overtake) condReason += "公路超车未打开，"
+        if (bHighWay && !app_overtake) condReason += "高速超车未打开，"
+        if (naviFlag) condReason += "领航控制中，"
+
         if (app_overtake_valid != -1) {
             app_overtake_valid = -1
-            var msg = "${nowTime} 条件不符合("
-            if (!s.lidar_l) msg += "左侧激光雷达不在线，"
-            if (!s.lidar_r) msg += "右侧激光雷达不在线，"
-            if (!s.engaged) msg += "OP未定速，"
-            if (!bHighWay && !app_road_overtake) msg += "公路超车未打开，"
-            if (bHighWay && !app_overtake) msg += "高速超车未打开，"
-            if (naviFlag) msg += "领航控制中，"
-            msg += ")"
+            val msg = "${nowTime} 条件不符合(${condReason})"
 
             Log.d("Overtake", msg)
             showLaneDebug(msg)
@@ -750,6 +754,7 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
             resetOvertakeAction()
         }
         clearOvertakeRuntime()
+        logOvertakeStage("1-基础条件", "不超车", condReason)
         return
     }
 
@@ -770,6 +775,7 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
             validLaneActionDbTime = now
         }
         clearOvertakeRuntime()
+        logOvertakeStage("3-车速门限", "暂停", "车速${vEgo}km/h<${overtakeMinSpeed}km/h")
         return
     }
 
@@ -783,6 +789,8 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
     // ============ 4. 变道命令已发送或正在收尾，等待状态机完成 ============
     if (overtakeCmdSent || overtakeActionPause) {
         overtakeInProgress = true
+        logOvertakeStage("4-等待变道完成", "进行中",
+            "cmdSent=${overtakeCmdSent} pause=${overtakeActionPause} atc=${s.atc_state}")
         return
     }
     overtakeInProgress = false
@@ -791,6 +799,7 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
     if (now < overtakeCooldownUntil) {
         overtakeTriggerStableTime = 0L
         logOvertakeReason("${nowTime} 超车冷却中(${p.modeName})")
+        logOvertakeStage("5-冷却", "不超车", "剩余${overtakeCooldownUntil - now}ms")
         return
     }
 
@@ -799,14 +808,18 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
     if (!trigger) {
         overtakeTriggerStableTime = 0L
         logOvertakeReason("${nowTime} 不超车：$triggerReason")
+        logOvertakeStage("6-触发评估", "不超车", triggerReason)
         return
     }
     //要求触发条件稳定一段时间，避免雷达数据抖动导致误触发
     if (overtakeTriggerStableTime == 0L) {
         overtakeTriggerStableTime = now
+        logOvertakeStage("6-触发稳定", "计时开始", "需稳定${p.stableTime}ms | $triggerReason")
         return
     }
     if (now - overtakeTriggerStableTime < p.stableTime) {
+        logOvertakeStage("6-触发稳定", "等待中",
+            "已${now - overtakeTriggerStableTime}ms/${p.stableTime}ms | $triggerReason")
         return
     }
 
@@ -820,6 +833,8 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
     if (rightEval.safe && p.allowRightOvertake) candidates.add(rightEval)
     if (candidates.isEmpty()) {
         logOvertakeReason("${nowTime} 不超车：两侧均不安全(左:${leftEval.reason}; 右:${rightEval.reason})")
+        logOvertakeStage("7-两侧评估", "不超车",
+            "两侧均不安全(左:${leftEval.reason}; 右:${rightEval.reason})")
         return
     }
 
@@ -834,12 +849,14 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
     for (c in ordered) {
         if (decideOvertakeLane(vLaneResult, navLane, c.side, bHighWay, road_median).second == c.side) {
             logOvertakeReason("${nowTime} 超车(${c.side}/${p.modeName}): ${c.reason} | $triggerReason")
+            logOvertakeStage("8-执行超车", "超车${c.side}", "${c.reason} | $triggerReason")
             doOvertakeAction(c.side)
             return
         }
     }
 
     logOvertakeReason("${nowTime} 不超车：导航车道不允许(${ordered[0].reason})")
+    logOvertakeStage("8-导航校验", "不超车", "导航车道不允许(${ordered[0].reason})")
 }
 
 

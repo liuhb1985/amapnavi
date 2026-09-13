@@ -737,3 +737,102 @@ fun MainActivity.sideFrontVrel(side: LaneChangeAction): Int? {
 }
 
 
+// -----------------------------
+// 超车诊断面板(测试用)
+//   把一次决策的输入、所处阶段、两侧评估、最终结论拼成一段文本，
+//   显示在主界面面板上，方便测试时直接查看/复制反馈。
+//   仅读取状态并重复调用纯评估函数，不产生任何副作用。
+// -----------------------------
+private fun boolStr(b: Boolean): String = if (b) "✓" else "✗"
+
+fun MainActivity.buildOvertakeDebugText(stage: String, decision: String, reason: String): String {
+    val s = opStateManager.state
+    val p = currentOvertakeParams()
+    val now = System.currentTimeMillis()
+    val vEgo = s.vEgo ?: 0
+    val vCruise = s.vCruise ?: 0
+    val minSpeed = if (bHighWay) 60 else 30
+    val cdLeft = (overtakeCooldownUntil - now).coerceAtLeast(0L)
+    val stable = if (overtakeTriggerStableTime == 0L) 0L else now - overtakeTriggerStableTime
+    val drel = s.drel
+    val timeGap = if (vEgo > 0 && drel != null) drel.toFloat() / (vEgo / 3.6f) else 0f
+
+    val sb = StringBuilder()
+    sb.append("【超车诊断】").append(stage).append(" → ").append(decision).append('\n')
+
+    // 第1行：模式 / 道路 / 开关 / 领航 / 传感器 / 定速
+    sb.append("模式:").append(p.modeName).append('(').append(p.mode).append(')')
+        .append(" 道路:").append(if (bHighWay) "高速" else "公路")
+        .append(" 开关:").append(boolStr(if (bHighWay) app_overtake else app_road_overtake))
+        .append(" 领航:").append(boolStr(overtakeDebugNaviFlag))
+        .append(" 雷达L:").append(boolStr(s.lidar_l)).append(" 雷达R:").append(boolStr(s.lidar_r))
+        .append(" 定速:").append(boolStr(s.engaged))
+        .append('\n')
+
+    // 第2行：车速 / 巡航 / 冷却 / 变道状态机
+    sb.append("车速:").append(vEgo).append('/').append(minSpeed)
+        .append(" 巡航:").append(vCruise)
+        .append(" 冷却:").append(cdLeft).append("ms")
+        .append(" 状态:cmd=").append(boolStr(overtakeCmdSent))
+        .append(" pause=").append(boolStr(overtakeActionPause))
+        .append(" prog=").append(boolStr(overtakeInProgress))
+        .append(" atc=").append(s.atc_state ?: -1)
+        .append(" 稳定:").append(stable).append('/').append(p.stableTime).append("ms")
+        .append('\n')
+
+    // 第3行：触发条件(前车距离/相对速度/时距)
+    val (trigger, triggerReason) = evaluateOvertakeTrigger()
+    sb.append("触发:").append(boolStr(trigger))
+        .append(" 前车:").append(boolStr(s.lead1))
+        .append(" drel=").append(drel ?: "-")
+        .append(" vrel=").append(s.vrel ?: "-")
+        .append(" vlead=").append(s.vlead ?: "-")
+        .append(" 时距=").append(if (timeGap > 0f) "%.1fs".format(timeGap) else "-")
+        .append(" → ").append(triggerReason)
+        .append('\n')
+
+    // 第4/5行：左右两侧原始数据 + 评估结论
+    sb.append(sideDebugLine(LaneChangeAction.LEFT)).append('\n')
+    sb.append(sideDebugLine(LaneChangeAction.RIGHT)).append('\n')
+
+    // 第6行：最终结论
+    sb.append("结论:").append(decision).append(" —— ").append(reason)
+    return sb.toString()
+}
+
+// 单侧诊断行：即使评估提前返回，也把该侧原始传感器数据一并列出
+private fun MainActivity.sideDebugLine(side: LaneChangeAction): String {
+    val s = opStateManager.state
+    val sideStr = if (side == LaneChangeAction.LEFT) "左" else "右"
+    val eval = evaluateOvertakeSide(side)
+    val laneWidth = if (side == LaneChangeAction.LEFT) s.l_lane_width else s.r_lane_width
+    val front = sideFrontDistance(side)
+    val rear = sideRearDistance(side)
+    val vrel = sideFrontVrel(side)
+    val laneCnt = if (side == LaneChangeAction.LEFT) vLaneResult.leftLaneCnt else vLaneResult.rightLaneCnt
+    val laneId = if (side == LaneChangeAction.LEFT) vLaneResult.leftLaneId else vLaneResult.rightLaneId
+
+    return sideStr + ": 车道" + laneCnt + "(id" + laneId + ")" +
+        " 雷达" + boolStr(sideSensorOk(side)) +
+        " 宽" + (laneWidth?.let { "%.1f".format(it) } ?: "-") +
+        " 盲区" + LaneChangeSafetyCheck(side) +
+        " 侧前" + (front?.let { "%.0f".format(it) } ?: "-") +
+        " 侧后" + (rear?.let { "%.0f".format(it) } ?: "-") +
+        " 侧前vr" + (vrel ?: "-") +
+        " 需净空" + "%.0f".format(overtakeRequiredRearDist()) +
+        " 评分" + eval.score + (if (eval.safe) " 安全" else " 不安全") +
+        " | " + eval.reason
+}
+
+// 决策阶段上报：记录最近一次阶段/结论/原因，并同步一条Logcat(tag: OvertakeDbg)
+//   诊断页内容由定时刷新统一渲染(见 MainActivityUi.renderOvertakeDebugPage)
+fun MainActivity.logOvertakeStage(stage: String, decision: String, reason: String) {
+    overtakeDebugStage = stage
+    overtakeDebugDecision = decision
+    overtakeDebugReason = reason
+    if (!overtakeDebugEnable) return
+    Log.d("OvertakeDbg", "$stage → $decision : $reason")
+    renderOvertakeDebugPage()
+}
+
+

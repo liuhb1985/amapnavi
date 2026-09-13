@@ -107,6 +107,18 @@ class MainActivity : AppCompatActivity() {
     internal lateinit var driveWayTextView: TextView
     internal lateinit var vLaneTextViewLayout: LinearLayout
     internal lateinit var vLaneTextView: TextView
+    internal lateinit var tvOvertakeDebug: TextView
+    internal lateinit var tvOvertakeDebugHead: TextView
+    internal lateinit var tvRadarFront: TextView
+    internal lateinit var tvRadarLeftFront: TextView
+    internal lateinit var tvRadarRightFront: TextView
+    internal lateinit var tvRadarLeftRear: TextView
+    internal lateinit var tvRadarRightRear: TextView
+    internal lateinit var tvRadarEgo: TextView
+    internal lateinit var layoutOvertakeDebug: LinearLayout
+    internal lateinit var btnOvertakeDebug: Button
+    internal lateinit var btnOvertakeDebugClose: Button
+    internal var overtakeDebugRefreshJob: Job? = null
     internal lateinit var btnAppOverTake: Button
     //private lateinit var btnLaneDetect: Button
     internal lateinit var btnNavSetting: Button
@@ -502,6 +514,18 @@ class MainActivity : AppCompatActivity() {
         vLaneTextViewLayout = findViewById(R.id.vLaneTextViewLayout)
         vLaneTextView = findViewById(R.id.vLaneTextView)
 
+        layoutOvertakeDebug = findViewById(R.id.layoutOvertakeDebug)
+        tvOvertakeDebug = findViewById(R.id.tvOvertakeDebug)
+        tvOvertakeDebugHead = findViewById(R.id.tvOvertakeDebugHead)
+        tvRadarFront = findViewById(R.id.tvRadarFront)
+        tvRadarLeftFront = findViewById(R.id.tvRadarLeftFront)
+        tvRadarRightFront = findViewById(R.id.tvRadarRightFront)
+        tvRadarLeftRear = findViewById(R.id.tvRadarLeftRear)
+        tvRadarRightRear = findViewById(R.id.tvRadarRightRear)
+        tvRadarEgo = findViewById(R.id.tvRadarEgo)
+        btnOvertakeDebug = findViewById(R.id.btnOvertakeDebug)
+        btnOvertakeDebugClose = findViewById(R.id.btnOvertakeDebugClose)
+
         imageView = findViewById(R.id.imageView)
         tvDevicID = findViewById(R.id.tvDevicID)
         tvUdpStatus = findViewById(R.id.tvUdpStatus)
@@ -792,6 +816,34 @@ class MainActivity : AppCompatActivity() {
                 uiHandler.removeCallbacks(hideRawLogRunnable)
                 uiHandler.postDelayed(hideRawLogRunnable, 5000)
             }
+        }
+
+        btnOvertakeDebug.setOnClickListener {
+            val show = !overtakeDebugEnable
+            setOvertakeDebugPanelVisible(show)
+            btnOvertakeDebug.text = if (show) "隐藏诊断" else "超车诊断"
+        }
+
+        //诊断页内的关闭按钮
+        btnOvertakeDebugClose.setOnClickListener {
+            setOvertakeDebugPanelVisible(false)
+            btnOvertakeDebug.text = "超车诊断"
+        }
+
+        //点击模型可复制全部诊断内容，便于测试后反馈
+        tvOvertakeDebug.setOnClickListener {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("OvertakeDebug", tvOvertakeDebug.text)
+            clipboard.setPrimaryClip(clip)
+            Toast.makeText(this, "超车诊断已复制", Toast.LENGTH_SHORT).show()
+        }
+
+        //点击顶栏结论同样可复制
+        tvOvertakeDebugHead.setOnClickListener {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("OvertakeDebug", tvOvertakeDebug.text)
+            clipboard.setPrimaryClip(clip)
+            Toast.makeText(this, "超车诊断已复制", Toast.LENGTH_SHORT).show()
         }
 
         btnMoreButton.setOnClickListener {

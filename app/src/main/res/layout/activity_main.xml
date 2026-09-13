@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 根容器用FrameLayout：超车诊断面板以悬浮方式显示，不占用原有布局空间，不影响其他按钮 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+<LinearLayout
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -8,8 +14,7 @@
     android:paddingStart="5dp"
     android:paddingEnd="5dp"
     android:paddingBottom="5dp"
-    android:id="@+id/containerLinearLayout"
-    android:background="#FFFFFF">
+    android:id="@+id/containerLinearLayout">
 
     <!-- 顶部环形速度显示栏 -->
     <LinearLayout
@@ -388,6 +393,25 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintHorizontal_weight="1"/>
 
+        <!-- 超车诊断：开关悬浮诊断面板(仅调试用) -->
+        <Button
+            android:id="@+id/btnOvertakeDebug"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:minHeight="30dp"
+            android:minWidth="0dp"
+            android:text="超车诊断"
+            android:textSize="14sp"
+            android:includeFontPadding="false"
+            android:gravity="center"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/btn_blue"
+            android:textColor="#FFFFFF"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/btnInstallFlask"/>
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- android:visibility="gone" -->
@@ -629,5 +653,201 @@
                 android:scrollbars="vertical" />
         </ScrollView>
     </LinearLayout>
-
 </LinearLayout>
+
+    <!-- 超车诊断页：铺满整个界面，默认隐藏，关闭后完全恢复原界面 -->
+    <LinearLayout
+        android:id="@+id/layoutOvertakeDebug"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:background="#FAFDFDF7"
+        android:elevation="8dp"
+        android:padding="6dp">
+
+        <!-- 顶部：阶段/结论 + 关闭 -->
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:id="@+id/tvOvertakeDebugHead"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="【超车诊断】"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#D84315"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+
+            <Button
+                android:id="@+id/btnOvertakeDebugClose"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="关闭"
+                android:textSize="14sp"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/btn_blue"/>
+        </LinearLayout>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:scrollbars="vertical">
+
+            <LinearLayout
+                android:orientation="vertical"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <!-- 方位雷达示意图：上排(左前/正前/右前) - 自车 - 下排(左后/右后) -->
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:baselineAligned="false">
+
+                    <TextView
+                        android:id="@+id/tvRadarLeftFront"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_margin="3dp"
+                        android:minHeight="96dp"
+                        android:padding="6dp"
+                        android:gravity="center"
+                        android:textSize="15sp"
+                        android:textColor="#757575"
+                        android:background="#EEEEEE"
+                        android:text="左前方"/>
+
+                    <TextView
+                        android:id="@+id/tvRadarFront"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_margin="3dp"
+                        android:minHeight="96dp"
+                        android:padding="6dp"
+                        android:gravity="center"
+                        android:textSize="15sp"
+                        android:textColor="#757575"
+                        android:background="#EEEEEE"
+                        android:text="正前方"/>
+
+                    <TextView
+                        android:id="@+id/tvRadarRightFront"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_margin="3dp"
+                        android:minHeight="96dp"
+                        android:padding="6dp"
+                        android:gravity="center"
+                        android:textSize="15sp"
+                        android:textColor="#757575"
+                        android:background="#EEEEEE"
+                        android:text="右前方"/>
+                </LinearLayout>
+
+                <!-- 自车 -->
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center">
+
+                    <TextView
+                        android:id="@+id/tvRadarEgo"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minWidth="150dp"
+                        android:paddingStart="18dp"
+                        android:paddingEnd="18dp"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="8dp"
+                        android:gravity="center"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="#FFFFFF"
+                        android:background="#37474F"
+                        android:text="自车"/>
+                </LinearLayout>
+
+                <!-- 下排 -->
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:baselineAligned="false">
+
+                    <TextView
+                        android:id="@+id/tvRadarLeftRear"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_margin="3dp"
+                        android:minHeight="96dp"
+                        android:padding="6dp"
+                        android:gravity="center"
+                        android:textSize="15sp"
+                        android:textColor="#757575"
+                        android:background="#EEEEEE"
+                        android:text="左后方"/>
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"/>
+
+                    <TextView
+                        android:id="@+id/tvRadarRightRear"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_margin="3dp"
+                        android:minHeight="96dp"
+                        android:padding="6dp"
+                        android:gravity="center"
+                        android:textSize="15sp"
+                        android:textColor="#757575"
+                        android:background="#EEEEEE"
+                        android:text="右后方"/>
+                </LinearLayout>
+
+                <!-- 决策详情 -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="— 决策详情(点击可复制) —"
+                    android:textSize="12sp"
+                    android:textColor="#999999"
+                    android:gravity="center"/>
+
+                <TextView
+                    android:id="@+id/tvOvertakeDebug"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textSize="13sp"
+                    android:textColor="#000000"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="2dp"
+                    android:paddingTop="2dp"/>
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+
+</FrameLayout>

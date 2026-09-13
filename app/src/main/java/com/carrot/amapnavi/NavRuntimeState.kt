@@ -61,3 +61,16 @@ var overtakeInProgress = false                         // 超车变道进行中
 var overtakeTriggerStableTime = 0L                     // 触发条件连续满足起始时间(ms)
 var overtakeLastReason = ""                            // 上次记录的决策原因(用于去重日志)
 var overtakeLastLogTime = 0L                           // 上次记录决策原因的时间(ms)
+
+// -----------------------------
+// 超车诊断面板运行态(测试用，可随时开关)
+//   面板把每次决策的输入/阶段/两侧评估/结论汇总显示在界面上，
+//   便于测试时直接截图或复制反馈。
+// -----------------------------
+var overtakeDebugEnable = false                        // 面板显示开关
+var overtakeDebugNaviFlag = false                      // 最近一次导航是否在控制中(领航)
+var overtakeDebugStage = ""                            // 最近一次决策所处阶段
+var overtakeDebugDecision = ""                         // 最近一次决策结论
+var overtakeDebugReason = ""                           // 最近一次决策原因
+var overtakeDebugLastText = ""                         // 上次刷新到UI的完整文本
+var overtakeDebugLastTime = 0L                         // 上次刷新UI的时间(ms)
