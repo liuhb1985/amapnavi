@@ -261,11 +261,24 @@ private val framePaint = Paint().apply { color = Color.YELLOW; textSize = 15f; t
 private val maskPixels = IntArray(protoSize * protoSize)
 private val maskBitmap = Bitmap.createBitmap(protoSize, protoSize, Bitmap.Config.ARGB_8888)
 
-private fun drawResultsWithLaneType(
-        bitmap: Bitmap,
-        results: List<SegResult>,
-        infer_time: Long
-): Pair<Bitmap, LaneUiInfo> {
+/**
+ * 左右车道线选择结果
+ */
+internal data class LaneSelection(
+        val leftType: String,
+        val rightType: String,
+        val leftTypeCn: String,
+        val rightTypeCn: String,
+        val leftTypeCnLite: String,
+        val rightTypeCnLite: String
+)
+
+/**
+ * 从检测结果里挑出左右最近的两条线并判定线型。
+ * 抽成独立函数是为了让「车道线推理测试页」复用完全相同的判据，避免两边逻辑漂移。
+ * 注意：这里不写任何全局状态，生产绘制仍由 drawResultsWithLaneType 负责。
+ */
+internal fun selectLanes(results: List<SegResult>): LaneSelection {
 
     val centerX = protoSize / 2f
 
@@ -321,12 +334,33 @@ private fun drawResultsWithLaneType(
     // =====================
     // Step 3：线型判断
     // =====================
-    val leftType = leftRes?.let { CLASS_TO_TYPE[it.res.classId] } ?: "none"
-    val rightType = rightRes?.let { CLASS_TO_TYPE[it.res.classId] } ?: "none"
-    val leftTypeCn = leftRes?.let { CLASS_TO_TYPE_CN[it.res.classId] } ?: "无线"
-    val rightTypeCn = rightRes?.let { CLASS_TO_TYPE_CN[it.res.classId] } ?: "无线"
-    val leftTypeCnLite = leftRes?.let { CLASS_TO_TYPE_CN_LITE[it.res.classId] } ?: "无"
-    val rightTypeCnLite = rightRes?.let { CLASS_TO_TYPE_CN_LITE[it.res.classId] } ?: "无"
+    return LaneSelection(
+            leftType = leftRes?.let { CLASS_TO_TYPE[it.res.classId] } ?: "none",
+            rightType = rightRes?.let { CLASS_TO_TYPE[it.res.classId] } ?: "none",
+            leftTypeCn = leftRes?.let { CLASS_TO_TYPE_CN[it.res.classId] } ?: "无线",
+            rightTypeCn = rightRes?.let { CLASS_TO_TYPE_CN[it.res.classId] } ?: "无线",
+            leftTypeCnLite = leftRes?.let { CLASS_TO_TYPE_CN_LITE[it.res.classId] } ?: "无",
+            rightTypeCnLite = rightRes?.let { CLASS_TO_TYPE_CN_LITE[it.res.classId] } ?: "无"
+    )
+}
+
+private fun drawResultsWithLaneType(
+        bitmap: Bitmap,
+        results: List<SegResult>,
+        infer_time: Long
+): Pair<Bitmap, LaneUiInfo> {
+
+    // =====================
+    // Step 1~3：选出左右线（与测试页共用同一套判据）
+    // =====================
+    val selection = selectLanes(results)
+
+    val leftType = selection.leftType
+    val rightType = selection.rightType
+    val leftTypeCn = selection.leftTypeCn
+    val rightTypeCn = selection.rightTypeCn
+    val leftTypeCnLite = selection.leftTypeCnLite
+    val rightTypeCnLite = selection.rightTypeCnLite
 
     val frameTime = infer_time
 
@@ -357,15 +391,15 @@ private fun drawResultsWithLaneType(
         val outBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
         val canvas = Canvas(outBitmap)
 
-        fun drawMask(info: LaneInfo) {
-            val color = when (CLASS_TO_TYPE[info.res.classId]) {
+        fun drawMask(res: SegResult) {
+            val color = when (CLASS_TO_TYPE[res.classId]) {
                 "solid" -> Color.RED
                 "dashed" -> Color.GREEN
                 else -> Color.BLUE
             }
             maskPaint.color = color
 
-            val mask = info.res.mask
+            val mask = res.mask
             // 填充 maskPixels
             for (i in mask.indices) maskPixels[i] = if (mask[i] > 0) color else 0
             maskBitmap.setPixels(maskPixels, 0, protoSize, 0, 0, protoSize, protoSize)
@@ -378,7 +412,7 @@ private fun drawResultsWithLaneType(
             // 遍历所有有效 lane
             for (res in results) {
                 if (IGNORE_CLASSES.contains(res.classId)) continue
-                drawMask(LaneInfo(res, 0, 0f)) // bottom/cx 在这里用不到，只用于绘制
+                drawMask(res) // 这里只用于绘制，不需要 bottom/cx
             }
             //leftRes?.let { drawMask(it) }
             //rightRes?.let { drawMask(it) }

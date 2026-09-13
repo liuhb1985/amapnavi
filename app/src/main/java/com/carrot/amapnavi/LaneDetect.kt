@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.RectF
 import ai.onnxruntime.*
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import kotlin.math.exp
 import android.util.Log
@@ -14,6 +16,9 @@ import kotlin.math.min
 //val protoSize = 160
 val inputSize = 416
 val protoSize = 104
+
+// 调试：每帧打印输出张量形状（正式版关闭，避免日志 I/O 拖慢推理）
+private const val DEBUG_SHAPE = false
 
 // ----------------------------
 // 数据结构
@@ -37,9 +42,28 @@ class LaneDetect(context: Context) {
 
     init {
         val modelBytes = context.assets.open("lane.onnx").readBytes()
+
+        // 线程数：手机上别用满核（小核参与反而拖慢），2~4 通常最优
+        val threadNum = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
+
         val opts = OrtSession.SessionOptions()
         opts.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
-        session = env.createSession(modelBytes, opts)
+        opts.setIntraOpNumThreads(threadNum)
+        opts.setInterOpNumThreads(1)
+
+        // XNNPACK：ARM 上有手写汇编 kernel，对 fp32 Conv 明显加速
+        // 失败（个别 ABI / 版本不支持）时回退纯 CPU EP，不影响功能
+        session = try {
+            opts.addXnnpack(mapOf<String, String>())
+            env.createSession(modelBytes, opts)
+        } catch (e: Exception) {
+            Log.w("LaneDetect", "addXnnpack failed, fallback to CPU EP", e)
+            val cpuOpts = OrtSession.SessionOptions()
+            cpuOpts.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
+            cpuOpts.setIntraOpNumThreads(threadNum)
+            cpuOpts.setInterOpNumThreads(1)
+            env.createSession(modelBytes, cpuOpts)
+        }
     }
 
     // 复用 Bitmap 和 Canvas，避免每次缩放分配
@@ -47,83 +71,179 @@ class LaneDetect(context: Context) {
     private val resizeCanvas = android.graphics.Canvas(resizeBitmap)
     private val resizeDstRect = android.graphics.Rect(0, 0, inputSize, inputSize)
 
-    // 复用 FloatBuffer，避免每次分配
-    private val inputFloatArray = FloatArray(1 * 3 * inputSize * inputSize)
-    private val inputFloatBuffer = java.nio.FloatBuffer.wrap(inputFloatArray)
+    // 输入张量只创建一次，并绑定 direct（堆外）内存：
+    //  1) 省掉每帧「Java 堆数组 → native」的整块拷贝（3*416*416*4 ≈ 2MB）
+    //  2) 省掉每帧 new / close OnnxTensor 的开销
+    private val inputShape = longArrayOf(1, 3, inputSize.toLong(), inputSize.toLong())
+    private val inputFloatBuffer: FloatBuffer = ByteBuffer
+        .allocateDirect(3 * inputSize * inputSize * 4)
+        .order(ByteOrder.nativeOrder())
+        .asFloatBuffer()
+    private val inputTensor: OnnxTensor = OnnxTensor.createTensor(env, inputFloatBuffer, inputShape)
+    private val inputFeed: Map<String, OnnxTensor> = mapOf("images" to inputTensor)
+
+    // 复用像素数组（原来每帧 new IntArray(416*416) ≈ 692KB，会造成 GC 抖动）
+    private val pixels = IntArray(inputSize * inputSize)
 
     // ----------------------------
-    // 复用 bitmap → FloatBuffer（零分配）
+    // 复用 bitmap → direct 输入内存（零分配、零额外拷贝）
     // ----------------------------
-    private fun bitmapToFloatBuffer(src: Bitmap): java.nio.FloatBuffer {
+    private fun fillInputBuffer(src: Bitmap) {
         // 缩放 bitmap 到 inputSize x inputSize
         resizeCanvas.drawBitmap(src, null, resizeDstRect, null)
 
-        val hw = inputSize * inputSize
-        val pixels = IntArray(hw)
         resizeBitmap.getPixels(pixels, 0, inputSize, 0, 0, inputSize, inputSize)
 
         val inv255 = 1f / 255f
+        val buf = inputFloatBuffer
+        buf.clear()
 
-        var r = 0
-        var g = hw
-        var b = hw * 2
-
+        // 三段顺序写入，内存访问连续
         for (p in pixels) {
-            inputFloatArray[r++] = ((p shr 16) and 0xFF) * inv255
-            inputFloatArray[g++] = ((p shr 8) and 0xFF) * inv255
-            inputFloatArray[b++] = (p and 0xFF) * inv255
+            buf.put(((p shr 16) and 0xFF) * inv255)   // R
+        }
+        for (p in pixels) {
+            buf.put(((p shr 8) and 0xFF) * inv255)    // G
+        }
+        for (p in pixels) {
+            buf.put((p and 0xFF) * inv255)            // B
         }
 
-        inputFloatBuffer.rewind()
-        return inputFloatBuffer
+        // position 归零，保证 ORT 从头部读取整块数据
+        buf.position(0)
     }
 
     // ----------------------------
     // 优化 infer()
     // ----------------------------
     fun infer(bitmap: Bitmap): List<SegResult> {
-        val input = bitmapToFloatBuffer(bitmap)
-        val shape = longArrayOf(1, 3, inputSize.toLong(), inputSize.toLong())
+        // 复用同一块 direct 输入内存（tensor 已在 init 阶段建好，不再每帧创建）
+        fillInputBuffer(bitmap)
 
-        var tensor: OnnxTensor? = null
         var outputs: OrtSession.Result? = null
 
         try {
-            tensor = OnnxTensor.createTensor(env, input, shape)
-            outputs = session.run(mapOf("images" to tensor))
+            val result = session.run(inputFeed)
+            outputs = result
 
-            // 调试输出模型形状
-            for ((name, value) in outputs) {
-                val t = value as OnnxTensor
-                Log.d("ONNX", "name=$name, shape=${t.info.shape.contentToString()}")
+            // 调试输出模型形状（默认关闭，避免每帧日志 I/O 拖慢推理）
+            if (DEBUG_SHAPE) {
+                for ((name, value) in result) {
+                    val t = value as OnnxTensor
+                    Log.d("ONNX", "name=$name, shape=${t.info.shape.contentToString()}")
+                }
             }
 
+            // 输出只有 2 个，按名字取即可（遍历开销可忽略）
             var predsTensor: OnnxTensor? = null
             var protoTensor: OnnxTensor? = null
-
-            for (entry in outputs) {
+            for (entry in result) {
                 when (entry.key) {
                     "output0" -> predsTensor = entry.value as OnnxTensor
                     "output1" -> protoTensor = entry.value as OnnxTensor
                 }
             }
-
             if (predsTensor == null || protoTensor == null) {
                 throw RuntimeException("ONNX outputs missing output0 or output1")
             }
 
             // 类型 cast 安全
             @Suppress("UNCHECKED_CAST")
-            val preds = predsTensor.value as Array<Array<FloatArray>>       // [1,42,8400]
+            val preds = predsTensor.value as Array<Array<FloatArray>>       // [1,42,3549]
             @Suppress("UNCHECKED_CAST")
-            val proto = protoTensor.value as Array<Array<Array<FloatArray>>> // [1,32,160,160]
+            val proto = protoTensor.value as Array<Array<Array<FloatArray>>> // [1,32,104,104]
 
             return postProcess(preds[0], proto[0])
 
         } finally {
             try { outputs?.close() } catch (_: Exception) {}
-            try { tensor?.close() } catch (_: Exception) {}
         }
+    }
+
+    // ----------------------------
+    // 释放 native 资源（只有「车道线推理测试页」的独立实例会调用；
+    // 生产实例常驻不释放。调用前必须确保没有 infer() 正在跑）
+    // ----------------------------
+    fun close() {
+        try { inputTensor.close() } catch (_: Throwable) {}
+        try { session.close() } catch (_: Throwable) {}
+    }
+
+    // ----------------------------
+    // 自检：用「参考实现」(单次遍历、逐像素内联取 RGB) 重算一遍预处理张量，
+    // 与当前「复用 direct buffer + 三段顺序写入」的结果逐元素比较。
+    // 两者应完全相同(最大差异 0)，用于在真机上验证优化没有改变输入数据。
+    // ----------------------------
+    fun verifyInputPath(src: Bitmap): String {
+        val plane = inputSize * inputSize
+        val inv255 = 1f / 255f
+
+        // 1) 当前(优化后)的写入路径
+        fillInputBuffer(src)
+
+        // 2) 参考实现
+        resizeCanvas.drawBitmap(src, null, resizeDstRect, null)
+        val refPixels = IntArray(plane)
+        resizeBitmap.getPixels(refPixels, 0, inputSize, 0, 0, inputSize, inputSize)
+
+        val refBuf = FloatArray(plane * 3)
+        for (i in 0 until plane) {
+            val p = refPixels[i]
+            refBuf[i] = ((p shr 16) and 0xFF) * inv255
+            refBuf[plane + i] = ((p shr 8) and 0xFF) * inv255
+            refBuf[plane * 2 + i] = (p and 0xFF) * inv255
+        }
+
+        // 3) 逐元素比较，同时统计各通道均值（用于确认数据确实写入）
+        var maxDiff = 0f
+        var diffCnt = 0
+        var firstDiffIdx = -1
+        var sumR = 0.0
+        var sumG = 0.0
+        var sumB = 0.0
+        var minVal = Float.MAX_VALUE
+        var maxVal = -Float.MAX_VALUE
+
+        for (i in 0 until plane * 3) {
+            val v = inputFloatBuffer.get(i)
+            val d = kotlin.math.abs(v - refBuf[i])
+            if (d > 0f) {
+                diffCnt++
+                if (firstDiffIdx < 0) firstDiffIdx = i
+            }
+            if (d > maxDiff) maxDiff = d
+            if (v < minVal) minVal = v
+            if (v > maxVal) maxVal = v
+            when {
+                i < plane -> sumR += v
+                i < plane * 2 -> sumG += v
+                else -> sumB += v
+            }
+        }
+
+        val sb = StringBuilder()
+        sb.append("=== 预处理自检（优化路径 vs 参考实现）===\n")
+        sb.append("张量: 1x3x").append(inputSize).append('x').append(inputSize)
+            .append("  元素数 ").append(plane * 3).append('\n')
+        sb.append("逐元素最大差异: ").append(maxDiff).append('\n')
+        sb.append("有差异的元素个数: ").append(diffCnt)
+        if (firstDiffIdx >= 0) sb.append("  首个位置 ").append(firstDiffIdx)
+        sb.append('\n')
+        sb.append("buffer position/limit: ").append(inputFloatBuffer.position())
+            .append('/').append(inputFloatBuffer.limit()).append('\n')
+        sb.append(
+            "均值 R=" + "%.4f".format(sumR / plane) +
+                    " G=" + "%.4f".format(sumG / plane) +
+                    " B=" + "%.4f".format(sumB / plane) + '\n'
+        )
+        sb.append("取值范围: ").append(minVal).append(" ~ ").append(maxVal).append('\n')
+        sb.append('\n')
+        if (diffCnt == 0) {
+            sb.append("结论: 与参考实现逐元素完全一致，优化未改变输入数据 [OK]\n")
+        } else {
+            sb.append("结论: 存在差异，预处理实现有问题 [FAIL]\n")
+        }
+        return sb.toString()
     }
 
     private fun composeMask(
@@ -230,8 +350,8 @@ class LaneDetect(context: Context) {
 
         // ---------- 4. 输出结果（此处不算 mask） ----------
         val results = ArrayList<SegResult>(keep.size)
-        maskPool.clear() // 每帧开始清空池
-        for (a in keep) {
+        for (idx in keep.indices) {
+            val a = keep[idx]
             val box = RectF(
                 a.cx - a.w * 0.5f,
                 a.cy - a.h * 0.5f,
@@ -239,9 +359,11 @@ class LaneDetect(context: Context) {
                 a.cy + a.h * 0.5f
             )
 
-            // 从池里拿数组
-            val mask = if (maskPool.size > results.size) {
-                maskPool[results.size]
+            // 从池里按索引取数组复用（池不够才新建）。
+            // 注意：数组会被下一帧 infer() 覆盖，消费方必须在本帧内用完——
+            // 生产是 infer 后同步绘制，测试页也在下次 infer 前画完，均满足。
+            val mask = if (idx < maskPool.size) {
+                maskPool[idx]
             } else {
                 ByteArray(protoSize * protoSize).also { maskPool.add(it) }
             }
@@ -257,6 +379,11 @@ class LaneDetect(context: Context) {
                     mask = mask
                 )
             )
+        }
+
+        // 池按需增长，收缩到本帧实际用量，避免偶发的多目标帧把容量永久撑大
+        while (maskPool.size > results.size) {
+            maskPool.removeAt(maskPool.size - 1)
         }
 
         return results

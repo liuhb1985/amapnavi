@@ -129,6 +129,7 @@ class MainActivity : AppCompatActivity() {
     internal lateinit var btnDecRoadLimit: Button
     internal lateinit var btnResetRoadLimit: Button
     internal lateinit var btnTbtTest: Button
+    internal lateinit var btnLaneTest: Button
     internal lateinit var btnInstallFlask: Button
     internal lateinit var btnInstallOpencv: Button
     //private lateinit var rawLogCam: TextView
@@ -537,6 +538,7 @@ class MainActivity : AppCompatActivity() {
         btnDecRoadLimit = findViewById(R.id.btnDecRoadLimit)
         btnResetRoadLimit = findViewById(R.id.btnResetRoadLimit)
         btnTbtTest = findViewById(R.id.btnTbtTest)
+        btnLaneTest = findViewById(R.id.btnLaneTest)
 
         val container = findViewById<LinearLayout>(R.id.containerLinearLayout)
         web_container = findViewById<LinearLayout>(R.id.webLinearLayout)
@@ -627,6 +629,11 @@ class MainActivity : AppCompatActivity() {
                 setRawLogUIVisible(true)
                 updateRawLogUI("安装OpenCV库命令已发出，等待执行结果", true)
             }
+        }
+
+        // 车道线推理测试页（真机验证 ONNX 推理是否正常）
+        btnLaneTest.setOnClickListener {
+            showLaneTestPage()
         }
 
         tvDistance.setOnClickListener {

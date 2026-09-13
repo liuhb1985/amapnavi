@@ -15,9 +15,10 @@ android {
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
-        // Chaquopy 需要指定 ABI
+        // 只打包真机 ABI：x86/x86_64 仅模拟器需要，去掉可让 APK 减少约 15~18MB
         ndk {
-            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            abiFilters "arm64-v8a", "armeabi-v7a"
+            // 若设备全是 64 位（如车机），可只保留 "arm64-v8a"，再多省约 8MB
         }
     }
 
