@@ -194,8 +194,9 @@
         android:paddingStart="4dp"
         android:paddingEnd="4dp">
 
+        <!-- 超车：打开全屏超车诊断页 -->
         <Button
-            android:id="@+id/btnAppOverTake"
+            android:id="@+id/btnOvertakeDebug"
             android:layout_width="0dp"
             android:layout_height="30dp"
             android:text="超车"
@@ -208,6 +209,21 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintHorizontal_weight="1" />
 
+        <!-- 原“超车功能”按钮(webView控制)，按需求隐藏，保留控件以免代码引用报错 -->
+        <Button
+            android:id="@+id/btnAppOverTake"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:visibility="gone"
+            android:text="超车功能"
+            android:textSize="14sp"
+            android:background="@drawable/btn_blue"
+            android:textColor="#FFFFFF"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
         <Button
             android:id="@+id/btnSetting"
             android:layout_width="0dp"
@@ -217,7 +233,7 @@
             android:background="@drawable/btn_green"
             android:textColor="#FFFFFF"
             android:layout_marginEnd="6dp"
-            app:layout_constraintStart_toEndOf="@id/btnAppOverTake"
+            app:layout_constraintStart_toEndOf="@id/btnOvertakeDebug"
             app:layout_constraintEnd_toStartOf="@id/btnNavSetting"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintHorizontal_weight="1" />
@@ -392,25 +408,6 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintHorizontal_weight="1"/>
-
-        <!-- 超车诊断：开关悬浮诊断面板(仅调试用) -->
-        <Button
-            android:id="@+id/btnOvertakeDebug"
-            android:layout_width="wrap_content"
-            android:layout_height="30dp"
-            android:minHeight="30dp"
-            android:minWidth="0dp"
-            android:text="超车诊断"
-            android:textSize="14sp"
-            android:includeFontPadding="false"
-            android:gravity="center"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:layout_marginTop="6dp"
-            android:background="@drawable/btn_blue"
-            android:textColor="#FFFFFF"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/btnInstallFlask"/>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -711,7 +708,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
 
-                <!-- 方位雷达示意图：上排(左前/正前/右前) - 自车 - 下排(左后/右后) -->
+                <!-- 方位雷达示意图：
+                     左前  正前  右前
+                     左后  自车  右后
+                     两排各 3 格等宽(weight=1)，上下天然对齐，且比原来少一行高度 -->
                 <LinearLayout
                     android:orientation="horizontal"
                     android:layout_width="match_parent"
@@ -721,10 +721,9 @@
                     <TextView
                         android:id="@+id/tvRadarLeftFront"
                         android:layout_width="0dp"
-                        android:layout_height="match_parent"
+                        android:layout_height="96dp"
                         android:layout_weight="1"
                         android:layout_margin="3dp"
-                        android:minHeight="96dp"
                         android:padding="6dp"
                         android:gravity="center"
                         android:textSize="15sp"
@@ -735,10 +734,9 @@
                     <TextView
                         android:id="@+id/tvRadarFront"
                         android:layout_width="0dp"
-                        android:layout_height="match_parent"
+                        android:layout_height="96dp"
                         android:layout_weight="1"
                         android:layout_margin="3dp"
-                        android:minHeight="96dp"
                         android:padding="6dp"
                         android:gravity="center"
                         android:textSize="15sp"
@@ -749,10 +747,9 @@
                     <TextView
                         android:id="@+id/tvRadarRightFront"
                         android:layout_width="0dp"
-                        android:layout_height="match_parent"
+                        android:layout_height="96dp"
                         android:layout_weight="1"
                         android:layout_margin="3dp"
-                        android:minHeight="96dp"
                         android:padding="6dp"
                         android:gravity="center"
                         android:textSize="15sp"
@@ -761,31 +758,7 @@
                         android:text="右前方"/>
                 </LinearLayout>
 
-                <!-- 自车 -->
-                <LinearLayout
-                    android:orientation="horizontal"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center">
-
-                    <TextView
-                        android:id="@+id/tvRadarEgo"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:minWidth="150dp"
-                        android:paddingStart="18dp"
-                        android:paddingEnd="18dp"
-                        android:paddingTop="8dp"
-                        android:paddingBottom="8dp"
-                        android:gravity="center"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:textColor="#FFFFFF"
-                        android:background="#37474F"
-                        android:text="自车"/>
-                </LinearLayout>
-
-                <!-- 下排 -->
+                <!-- 第二排：左后 - 自车 - 右后（自车居中，两侧与上排左前/右前同列） -->
                 <LinearLayout
                     android:orientation="horizontal"
                     android:layout_width="match_parent"
@@ -795,10 +768,9 @@
                     <TextView
                         android:id="@+id/tvRadarLeftRear"
                         android:layout_width="0dp"
-                        android:layout_height="match_parent"
+                        android:layout_height="96dp"
                         android:layout_weight="1"
                         android:layout_margin="3dp"
-                        android:minHeight="96dp"
                         android:padding="6dp"
                         android:gravity="center"
                         android:textSize="15sp"
@@ -806,18 +778,27 @@
                         android:background="#EEEEEE"
                         android:text="左后方"/>
 
-                    <View
+                    <TextView
+                        android:id="@+id/tvRadarEgo"
                         android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:layout_weight="1"/>
+                        android:layout_height="96dp"
+                        android:layout_weight="1"
+                        android:layout_margin="3dp"
+                        android:padding="4dp"
+                        android:gravity="center"
+                        android:maxLines="2"
+                        android:textSize="15sp"
+                        android:textStyle="bold"
+                        android:textColor="#FFFFFF"
+                        android:background="#37474F"
+                        android:text="自车"/>
 
                     <TextView
                         android:id="@+id/tvRadarRightRear"
                         android:layout_width="0dp"
-                        android:layout_height="match_parent"
+                        android:layout_height="96dp"
                         android:layout_weight="1"
                         android:layout_margin="3dp"
-                        android:minHeight="96dp"
                         android:padding="6dp"
                         android:gravity="center"
                         android:textSize="15sp"
@@ -832,7 +813,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:text="— 决策详情(点击可复制) —"
-                    android:textSize="12sp"
+                    android:textSize="14sp"
                     android:textColor="#999999"
                     android:gravity="center"/>
 
@@ -841,13 +822,60 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text=""
-                    android:textSize="13sp"
+                    android:textSize="16sp"
                     android:textColor="#000000"
                     android:fontFamily="monospace"
-                    android:lineSpacingExtra="2dp"
+                    android:lineSpacingExtra="3dp"
                     android:paddingTop="2dp"/>
             </LinearLayout>
         </ScrollView>
+
+        <!-- 页脚：超车专用日志(独立文件) 记录开关 + 导出 -->
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:layout_marginTop="4dp">
+
+            <TextView
+                android:id="@+id/tvOvertakeLogState"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="超车日志:未记录"
+                android:textSize="12sp"
+                android:textColor="#666666"
+                android:maxLines="1"
+                android:ellipsize="middle"/>
+
+            <Button
+                android:id="@+id/btnOvertakeLogToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:layout_marginEnd="6dp"
+                android:text="记录"
+                android:textSize="14sp"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/btn_blue"/>
+
+            <Button
+                android:id="@+id/btnOvertakeLogShare"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:text="发日志"
+                android:textSize="14sp"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/btn_green"/>
+        </LinearLayout>
     </LinearLayout>
 
 </FrameLayout>

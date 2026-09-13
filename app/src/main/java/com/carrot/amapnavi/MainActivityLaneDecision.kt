@@ -830,9 +830,89 @@ fun MainActivity.logOvertakeStage(stage: String, decision: String, reason: Strin
     overtakeDebugStage = stage
     overtakeDebugDecision = decision
     overtakeDebugReason = reason
+
+    // 超车专用日志(独立文件，不受诊断页显示/主日志开关影响)
+    OvertakeLogger.onDecision(stage, decision, reason) { overtakeSnapshotLine() }
+
     if (!overtakeDebugEnable) return
     Log.d("OvertakeDbg", "$stage → $decision : $reason")
     renderOvertakeDebugPage()
+}
+
+// -----------------------------
+// 超车日志快照行(单行紧凑格式，供 OvertakeLogger 落盘)
+//   把一帧决策的全部输入量压成一行，导出后可逐帧比对差异；
+//   仅读状态 + 调用纯评估函数，无任何副作用。
+// -----------------------------
+fun MainActivity.overtakeSnapshotLine(): String {
+    val s = opStateManager.state
+    val p = currentOvertakeParams()
+    val now = System.currentTimeMillis()
+    val vEgo = s.vEgo ?: 0
+    val drel = s.drel
+    val b: (Boolean) -> String = { if (it) "1" else "0" }
+    fun f1(v: Float?): String = if (v == null) "-" else "%.1f".format(v)
+    fun mm(v: Int?): String = if (v == null) "-" else "%.2f".format(v / 1000f)
+
+    val timeGap = if (vEgo > 0 && drel != null) "%.1fs".format(drel / (vEgo / 3.6f)) else "-"
+    val cdLeft = (overtakeCooldownUntil - now).coerceAtLeast(0L)
+    val stable = if (overtakeTriggerStableTime == 0L) 0L else now - overtakeTriggerStableTime
+    val (trigger, triggerReason) = evaluateOvertakeTrigger()
+    val leftEval = evaluateOvertakeSide(LaneChangeAction.LEFT)
+    val rightEval = evaluateOvertakeSide(LaneChangeAction.RIGHT)
+
+    return buildString {
+        // 基础：车速/门限/模式/道路/开关/领航/定速/数据新鲜度
+        append("v=").append(vEgo).append('/').append(if (bHighWay) 60 else 30)
+        append(" cruise=").append(s.vCruise ?: -1)
+        append(" mode=").append(p.modeName).append(p.mode)
+        append(" road=").append(if (bHighWay) "HW" else "RD")
+        append(" sw=").append(b(if (bHighWay) app_overtake else app_road_overtake))
+        append(" navi=").append(b(overtakeDebugNaviFlag))
+        append(" eng=").append(b(s.engaged))
+        append(" atc=").append(s.atc_state ?: -1)
+        append(" dataAge=").append(if (s.data_time > 0) "${now - s.data_time}ms" else "-")
+
+        // 本车道前车
+        append(" | lead=").append(b(s.lead1))
+        append(" drel=").append(drel ?: -1)
+        append(" vlead=").append(s.vlead ?: -1)
+        append(" vrel=").append(s.vrel ?: -1)
+        append(" gap=").append(timeGap)
+
+        // 侧向传感器原始值：毫米波前角(m) + 激光雷达四角(距离,横距 m / 相对速度)
+        append(" | LfRadar=").append(if (s.l_lead) s.l_drel ?: -1 else "-")
+        append(" LfLidar=").append(mm(s.lf_drel)).append(',').append(mm(s.lf_xrel)).append(" vr=").append(s.lf_vrel ?: -1)
+        append(" RfRadar=").append(if (s.r_lead) s.r_drel ?: -1 else "-")
+        append(" RfLidar=").append(mm(s.rf_drel)).append(',').append(mm(s.rf_xrel)).append(" vr=").append(s.rf_vrel ?: -1)
+        append(" LbLidar=").append(mm(s.lb_drel)).append(',').append(mm(s.lb_xrel)).append(" vr=").append(s.lb_vrel ?: -1)
+        append(" RbLidar=").append(mm(s.rb_drel)).append(',').append(mm(s.rb_xrel)).append(" vr=").append(s.rb_vrel ?: -1)
+
+        // 盲区 / 传感器在线
+        append(" | blindF=").append(b(s.l_front_blind)).append('/').append(b(s.r_front_blind))
+        append(" lidarBlind=").append(b(s.lidar_lblind)).append('/').append(b(s.lidar_rblind))
+        append(" bp=").append(b(s.left_blindspot)).append('/').append(b(s.right_blindspot))
+        append(" onlineLR=").append(b(s.lidar_l)).append('/').append(b(s.lidar_r))
+
+        // 车道
+        append(" | lw=").append(f1(s.l_lane_width)).append('/').append(f1(s.r_lane_width))
+        append(" laneL=").append(vLaneResult.leftLaneCnt).append("(id").append(vLaneResult.leftLaneId).append(')')
+        append(" laneR=").append(vLaneResult.rightLaneCnt).append("(id").append(vLaneResult.rightLaneId).append(')')
+
+        // 变道状态机 / 冷却 / 触发稳定
+        append(" | cmd=").append(b(overtakeCmdSent))
+        append(" pause=").append(b(overtakeActionPause))
+        append(" prog=").append(b(overtakeInProgress))
+        append(" cd=").append(cdLeft)
+        append(" stable=").append(stable).append('/').append(p.stableTime)
+        append(" lastDir=").append(overtakeLastDirection)
+
+        // 评估结论
+        append(" | trg=").append(b(trigger)).append('(').append(triggerReason).append(')')
+        append(" needRear=").append("%.1f".format(overtakeRequiredRearDist()))
+        append(" L=").append(leftEval.score).append('/').append(b(leftEval.safe)).append('(').append(leftEval.reason).append(')')
+        append(" R=").append(rightEval.score).append('/').append(b(rightEval.safe)).append('(').append(rightEval.reason).append(')')
+    }
 }
 
 

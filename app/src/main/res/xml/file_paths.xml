@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 允许访问 app 专属外部目录 -->
+    <!-- app 专属外部目录（无存储权限时的回退位置） -->
     <external-files-path
         name="logs"
         path="logs/" />
+    <!-- 手机存储根目录下的 AmapNavi/（文件管理器可见的日志主目录）；
+         path 按前缀匹配，AmapNavi/overtake/ 等子目录一并覆盖 -->
+    <external-path
+        name="amapnavi"
+        path="AmapNavi/" />
 </paths>

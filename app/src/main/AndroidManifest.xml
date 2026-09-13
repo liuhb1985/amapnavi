@@ -10,6 +10,11 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.CAMERA"/>
 
+    <!-- 日志写到手机存储根目录 AmapNavi/（文件管理器可见，用户可自行挑选发送）；
+         未授予时自动回退 app 私有目录 -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

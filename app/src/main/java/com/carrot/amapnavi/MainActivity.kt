@@ -33,7 +33,9 @@ import android.media.MediaPlayer
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.app.Activity
+import android.Manifest
 import android.content.*
+import android.content.pm.PackageManager
 import android.graphics.*
 import android.net.Uri
 import com.carrot.lane.LaneDetect
@@ -690,7 +692,7 @@ class MainActivity : AppCompatActivity() {
         val btnExportLog = findViewById<Button>(R.id.btnExportLog)
 
         btnExportLog.setOnClickListener {
-            AppLogger.shareTodayLog(this)
+            requestStorageThen { AppLogger.shareLogs(this) }
         }
 
         val btnSetting = findViewById<Button>(R.id.btnSetting)
@@ -821,13 +823,52 @@ class MainActivity : AppCompatActivity() {
         btnOvertakeDebug.setOnClickListener {
             val show = !overtakeDebugEnable
             setOvertakeDebugPanelVisible(show)
-            btnOvertakeDebug.text = if (show) "隐藏诊断" else "超车诊断"
+            btnOvertakeDebug.text = if (show) "隐藏" else "超车"
         }
 
         //诊断页内的关闭按钮
         btnOvertakeDebugClose.setOnClickListener {
             setOvertakeDebugPanelVisible(false)
-            btnOvertakeDebug.text = "超车诊断"
+            btnOvertakeDebug.text = "超车"
+        }
+
+        //超车专用日志：独立文件夹(AmapNavi/overtake/日期_0001.log)，与主日志(AmapNavi/app/)无关
+        OvertakeLogger.init(this)
+        val btnOvertakeLogToggle = findViewById<Button>(R.id.btnOvertakeLogToggle)
+        val btnOvertakeLogShare = findViewById<Button>(R.id.btnOvertakeLogShare)
+        val tvOvertakeLogState = findViewById<TextView>(R.id.tvOvertakeLogState)
+
+        fun refreshOvertakeLogUi() {
+            if (OvertakeLogger.enabled) {
+                btnOvertakeLogToggle.text = "停止记录"
+                tvOvertakeLogState.text = "超车日志:记录中 " + OvertakeLogger.todayFileName(this)
+            } else {
+                btnOvertakeLogToggle.text = "记录"
+                tvOvertakeLogState.text = "超车日志:未记录"
+            }
+        }
+        refreshOvertakeLogUi()
+
+        fun doToggleOvertakeLog() {
+            val on = OvertakeLogger.toggle(this)
+            refreshOvertakeLogUi()
+            Toast.makeText(
+                this,
+                if (on) "开始记录 → ${OvertakeLogger.logDirPath(this)}" +
+                    "\n日志存这里，文件管理器可直接查看/发送"
+                else "已停止记录，可点「发日志」导出",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+
+        btnOvertakeLogToggle.setOnClickListener {
+            //开始记录前先确保有存储权限（日志要写手机存储公共目录）；停止不需要
+            if (OvertakeLogger.enabled) doToggleOvertakeLog()
+            else requestStorageThen { doToggleOvertakeLog() }
+        }
+
+        btnOvertakeLogShare.setOnClickListener {
+            requestStorageThen { OvertakeLogger.shareLogs(this) }
         }
 
         //点击模型可复制全部诊断内容，便于测试后反馈
@@ -889,6 +930,49 @@ class MainActivity : AppCompatActivity() {
         }
 
         Log.i("MainActivity", "UdpService started")
+    }
+
+    //------------------------ 日志存储权限 ----------------------------
+    // 日志优先写到手机存储 AmapNavi/ 下（主日志 app/、超车日志 overtake/，文件管理器可见、
+    // 可自己挑文件发送），这需要 WRITE_EXTERNAL_STORAGE；没授权时先申请，授权/拒绝后都继续原动作
+    // （拒绝也照样能用，只是回退到 app 私有目录 Android/data/<包名>/files/logs/）
+    private var pendingAfterStoragePermission: (() -> Unit)? = null
+    private val REQ_STORAGE_PERMISSION = 1001
+
+    private fun requestStorageThen(action: () -> Unit) {
+        if (LogStorage.hasWritePermission(this) || Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            LogStorage.reset()   // 可能刚在系统设置里授权，重新探测一次用哪个目录
+            action()
+            return
+        }
+        pendingAfterStoragePermission = action
+        requestPermissions(LogStorage.STORAGE_PERMISSIONS, REQ_STORAGE_PERMISSION)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQ_STORAGE_PERMISSION) return
+
+        val idx = permissions.indexOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        val granted = idx >= 0 && idx < grantResults.size &&
+            grantResults[idx] == PackageManager.PERMISSION_GRANTED
+        LogStorage.reset()   // 授权结果决定用公共目录还是私有目录，重新探测
+
+        if (!granted) {
+            Toast.makeText(
+                this,
+                "未授予存储权限：日志改存应用私有目录，文件管理器里可能看不到",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+
+        val action = pendingAfterStoragePermission
+        pendingAfterStoragePermission = null
+        action?.invoke()
     }
 
     override fun onDestroy() {
