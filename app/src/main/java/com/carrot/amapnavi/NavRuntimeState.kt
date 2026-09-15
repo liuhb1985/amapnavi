@@ -73,4 +73,6 @@ var overtakeDebugStage = ""                            // 最近一次决策所�
 var overtakeDebugDecision = ""                         // 最近一次决策结论
 var overtakeDebugReason = ""                           // 最近一次决策原因
 var overtakeDebugLastText = ""                         // 上次刷新到UI的完整文本
+var overtakeDebugLastHead = ""                         // 上次刷新到UI的顶栏文本(相同则不重复setText)
+var overtakeDebugLastTextTime = 0L                     // 上次刷新详情文本的时间(ms，用于限速)
 var overtakeDebugLastTime = 0L                         // 上次刷新UI的时间(ms)

@@ -369,9 +369,15 @@ fun MainActivity.renderOvertakeDebugPage() {
     val leftRear = radarLeftRearCard()
     val rightRear = radarRightRearCard()
     val ego = "自车 " + (opStateManager.state.vEgo ?: 0) + " km/h"
+    val nowMs = System.currentTimeMillis()
 
     lifecycleScope.launch(Dispatchers.Main) {
-        tvOvertakeDebugHead.text = head
+        // 文本没变就不要反复 setText：setText 会触发重新排版，
+        // 长文本每次重排都会让整块面板抖一下（看起来在闪）。
+        if (head != overtakeDebugLastHead) {
+            overtakeDebugLastHead = head
+            tvOvertakeDebugHead.text = head
+        }
 
         applyRadarCard(tvRadarFront, front)
         applyRadarCard(tvRadarLeftFront, leftFront)
@@ -380,8 +386,11 @@ fun MainActivity.renderOvertakeDebugPage() {
         applyRadarCard(tvRadarRightRear, rightRear)
         tvRadarEgo.text = ego
 
-        if (detail != overtakeDebugLastText) {
+        // 详情里带实时数值(车速/距离/计时)，每帧都在变；限速到 400ms 刷新一次，
+        // 既能看实时值，又不会因为每 200ms 重排一次而闪。
+        if (detail != overtakeDebugLastText && nowMs - overtakeDebugLastTextTime >= 400L) {
             overtakeDebugLastText = detail
+            overtakeDebugLastTextTime = nowMs
             tvOvertakeDebug.text = detail
         }
     }

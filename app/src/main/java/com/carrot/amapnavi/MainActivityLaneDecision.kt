@@ -836,7 +836,9 @@ fun MainActivity.logOvertakeStage(stage: String, decision: String, reason: Strin
 
     if (!overtakeDebugEnable) return
     Log.d("OvertakeDbg", "$stage → $decision : $reason")
-    renderOvertakeDebugPage()
+    // 注意：这里不要直接整页重绘。决策是每个控制周期都跑的，在决策里重绘会把
+    // 阶段/结论/数值以决策频率反复刷到界面上（视觉上就是整块面板一直在闪）。
+    // 面板显示期间由 startOvertakeDebugRefresh() 的定时刷新统一渲染(200ms)。
 }
 
 // -----------------------------
