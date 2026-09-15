@@ -135,9 +135,8 @@ fun MainActivity.doOvertakeAction(action: LaneChangeAction) {
         Log.d("OvertakeCmd", msg)
         showLaneDebug(msg)
 
-        if (overtake_mode <= 1) {
-            overtakeCmdIndex++
-        }
+        // 同变道命令：重发必须递增序号，否则会被 CP 当成重复命令丢弃
+        overtakeCmdIndex++
         sendOvertakeActionCmd(overtakeAction)
         lastOvertakeCmdSendTime = now
         overtakeCmdSentRetryCnt++

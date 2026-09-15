@@ -31,14 +31,36 @@ fun MainActivity.LaneChangeActionStr(action: LaneChangeAction): String {
     }
 }
 
-//发送变道json命令
+/* =========================================================
+ * CP 变道命令协议映射
+ *
+ * CP 侧真正生效的遥控变道接口是 carrot_man 的 UDP 7706：
+ *   carrot_man_thread 收到报文 → CarrotServ.update()
+ *     → carrotCmd / carrotArg → 发布 carrotMan 消息
+ *       → desire_helper._update_atc_blinker() → LaneChangeState.preLaneChange
+ * 其中只识别 carrotCmd == "LANECHANGE"，carrotArg = "LEFT"/"RIGHT"。
+ *
+ * 旧的 {"index","cmd","arg"} 是发到 amapnavi(4211) 的，amapnavi 只把它存进
+ * shared_data.remote_cmd/remote_arg，CP 侧没有任何消费者（等于没接线），
+ * 因此这里统一改发 7706，直接用 carrot_serv 的现成协议。
+ * ========================================================= */
+private fun laneCmdToCarrotCmd(cmd: String): String = when (cmd) {
+    // 超车变道在 CP 侧同样是走变道控制
+    "OVERTAKE" -> "LANECHANGE"
+    // 路口转弯在 CP 侧也是走变道控制（转弯意图由 CP 自己按导航 TBT 推算 atcType）
+    "TURN" -> "LANECHANGE"
+    else -> cmd
+}
+
+//发送变道json命令（发往 carrot_serv / carrotMan，UDP 7706）
 fun MainActivity.sendLaneCmd(index: Int, cmd: String, arg: String) {
     val json = JSONObject() //组JSON
-    json.put("index", index)
-    json.put("cmd", cmd) //OVERTAKE
-    json.put("arg", arg) //LEFT/RIGHT
+    // CP 用 carrotIndex 与上一条命令比较判断是否为新命令，重发时会递增，值相同时会被去重
+    json.put("carrotIndex", index)
+    json.put("carrotCmd", laneCmdToCarrotCmd(cmd)) //LANECHANGE
+    json.put("carrotArg", arg) //LEFT/RIGHT
     val jsonStr = json.toString()
-    cmUdpServiceSend(jsonStr, port = naviOpPort)
+    cmUdpServiceSend(jsonStr, port = carrotManOpPort)
 }
 
 fun MainActivity.sendBlinkerCtrlComm(index: Int, ctrl: String, state: String) {
@@ -400,9 +422,9 @@ fun MainActivity.doLaneChangeAction(action: LaneChangeAction, edgeAction: LaneCh
         Log.d("LaneCmd", msg)
         showLaneDebug(msg)
 
-        if (nav_mode <= 1) {
-            laneChangeCmdIndex++
-        }
+        // CP 侧用 carrotIndex 是否变化来判断"这是新命令"，重发必须递增序号，
+        // 否则会被 CP 当成重复命令丢弃（旧协议发到 amapnavi 时序号没人消费，所以原来只在 nav_mode<=1 递增）
+        laneChangeCmdIndex++
         sendLaneActionCmd(laneAction)
         lastCmdSendTime = now
         laneCmdSentRetryCnt++

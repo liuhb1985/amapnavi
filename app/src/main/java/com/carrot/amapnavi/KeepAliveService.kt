@@ -279,8 +279,10 @@ class KeepAliveService : Service() {
                 }
 
                 try {
-                    // ================= Navi UDP：3 秒 =================
-                    if (now - lastNaviSendTime >= 3000L) {
+                    // ================= Navi UDP：2 秒 =================
+                    // CP 侧对心跳型客户端的超时是 5 秒；原来 3 秒一次余量偏小，
+                    // 丢一个广播包就可能被判离线（客户端数量跳变），改为 2 秒。
+                    if (now - lastNaviSendTime >= 2000L) {
                         for ((ip, broadcast) in ipBroadcastPairs) {
                             cmUdpService.send(
                                     JSONObject().apply {
