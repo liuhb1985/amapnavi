@@ -160,15 +160,6 @@
             android:textColor="#000000"
             android:padding="0dp" />
 
-        <CheckBox
-            android:id="@+id/cbOvertakeSettingLaneOvertake"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="超车融合导航(把车道信息发给CP)"
-            android:textSize="14sp"
-            android:textColor="#000000"
-            android:padding="0dp" />
 
         <TextView
             android:layout_width="wrap_content"

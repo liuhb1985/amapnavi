@@ -23,7 +23,6 @@ class OvertakeSettingActivity : AppCompatActivity() {
     private lateinit var cbRoad: CheckBox
     private lateinit var cbLidarSelfCheck: CheckBox
     private lateinit var cbThreshFollowCp: CheckBox
-    private lateinit var cbLaneOvertake: CheckBox
     private lateinit var etReverseCooldown: EditText
 
     private val prefsName = "user_settings"
@@ -37,7 +36,6 @@ class OvertakeSettingActivity : AppCompatActivity() {
         cbRoad = findViewById(R.id.cbOvertakeSettingRoad)
         cbLidarSelfCheck = findViewById(R.id.cbOvertakeSettingLidarSelfCheck)
         cbThreshFollowCp = findViewById(R.id.cbOvertakeSettingThreshFollowCp)
-        cbLaneOvertake = findViewById(R.id.cbOvertakeSettingLaneOvertake)
         etReverseCooldown = findViewById(R.id.etReverseCooldown)
 
         load()
@@ -94,7 +92,6 @@ class OvertakeSettingActivity : AppCompatActivity() {
                 .putBoolean("app_road_overtake", cbRoad.isChecked)
                 .putBoolean("app_lidar_self_check", cbLidarSelfCheck.isChecked)
                 .putBoolean("app_thresh_follow_cp", cbThreshFollowCp.isChecked)
-                .putBoolean("lane_overtake", cbLaneOvertake.isChecked)
                 .putInt("overtake_reverse_cooldown_s", cooldown.coerceIn(0, 120))
                 .apply()
     }
@@ -110,7 +107,6 @@ class OvertakeSettingActivity : AppCompatActivity() {
         cbRoad.isChecked = prefs.getBoolean("app_road_overtake", false)
         cbLidarSelfCheck.isChecked = prefs.getBoolean("app_lidar_self_check", true)
         cbThreshFollowCp.isChecked = prefs.getBoolean("app_thresh_follow_cp", true)
-        cbLaneOvertake.isChecked = prefs.getBoolean("lane_overtake", false)
         etReverseCooldown.setText(
             prefs.getInt("overtake_reverse_cooldown_s", 20).toString()
         )

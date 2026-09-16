@@ -158,12 +158,6 @@ fun MainActivity.loadUserSettings() {
         editor.putBoolean("smooth_speed_limit", false)
         false
     }
-    lane_overtake = if (prefs.contains("lane_overtake")) {
-        prefs.getBoolean("lane_overtake", false)
-    } else {
-        editor.putBoolean("lane_overtake", false)
-        false
-    }
     lane_show = if (prefs.contains("lane_show")) {
         prefs.getBoolean("lane_show", false)
     } else {

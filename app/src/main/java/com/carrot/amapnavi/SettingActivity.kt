@@ -452,7 +452,6 @@ class SettingActivity : AppCompatActivity() {
 
                     "app_overtake" to prefs.getBoolean("app_overtake", false),
                     "app_road_overtake" to prefs.getBoolean("app_road_overtake", false),
-                    "lane_overtake" to prefs.getBoolean("lane_overtake", false),
                     "overtake_mode" to prefs.getInt("overtake_mode", 2),
                     "vision_lane_mode" to prefs.getInt("vision_lane_mode", 1),
             )

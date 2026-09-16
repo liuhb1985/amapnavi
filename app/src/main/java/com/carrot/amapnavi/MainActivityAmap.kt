@@ -15,7 +15,6 @@ import org.json.JSONObject
  * 高德导航数据解析 / 车道级引导模块
  *   - 导航状态解析（updateNaviState / updateTrafficState）
  *   - 车道级引导解析（parseDriveWay）
- *   - 车道数据 UDP 广播（sendLaneToPythonIO）
  *   - 日志格式化（formatAmapData）与模拟数据
  * 说明：本文件中的函数均为 MainActivity 的扩展函数。
  * ========================================================= */
@@ -471,7 +470,6 @@ fun MainActivity.parseDriveWay(extras: Map<*, *>?) {
         navi_lane_cnt = -1
         updateDriveWayTextOnUI("", false)
         val laneStrArray = Array(0) { "" }
-        sendLaneToPythonIO (laneStrArray, 0)
 
         //清空导航车道信息
         navLane = NavLane(
@@ -546,33 +544,12 @@ fun MainActivity.parseDriveWay(extras: Map<*, *>?) {
     //updateDriveWayTextOnUI(sb.toString(), true)
     updateDriveWayTextOnUI(lane_icon.toString(), true)
 
-    //车道传递给python
-    if(lane_overtake) {
-        sendLaneToPythonIO(laneStrArray, validCount)
-    }else{
-        val laneStrArray = Array(0) { "" }
-        sendLaneToPythonIO (laneStrArray, 0)
-    }
 }
 
 // 模拟函数，传入假数据
 fun MainActivity.simulateDriveWayBroadcast(rawData: Map<String, Any?>) {
     val extras = rawData["extras"] as? Map<*, *> ?: return
     parseDriveWay(extras)
-}
-
-fun MainActivity.sendLaneToPythonIO(arr: Array<String>, validCount: Int) {
-    CoroutineScope(Dispatchers.IO).launch {
-        //数据通过广播发送（原 Python auto_overtake_controller 监听 4210 接收，Python 版已删除）
-        val validArr = arr.take(validCount).toTypedArray() //取有效部分
-        val json = JSONObject() //组JSON
-        if(validCount > 0) {
-            json.put("laneStrArray", JSONArray(validArr))
-        }
-        json.put("laneValidCount", validCount)
-        val jsonStr = json.toString()
-        cmUdpServiceSend(jsonStr, host="255.255.255.255", port = overtakeAppPort)
-    }
 }
 
 // -------- 模拟数据 --------
@@ -746,11 +723,6 @@ fun MainActivity.formatAmapData(rawData: Map<String, Any?>): String {
     // 13012 车道级引导解析
     if (keyType == 13012) {
         parseDriveWay(extras)
-    }
-
-    if(!lane_overtake) {
-        val laneStrArray = Array(0) { "" }
-        sendLaneToPythonIO(laneStrArray, 0)
     }
 
     val logShow = StringBuilder()

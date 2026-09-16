@@ -223,7 +223,6 @@ class MainActivity : AppCompatActivity() {
     internal var nav_turn = true
     internal var nav_mode = 2
     internal var smooth_speed_limit = false
-    internal var lane_overtake = false
     internal var naviTrafficAssistLast = false
     internal var red_light_min_speed_limit = 1
     internal var cp_min_speed_limit = 20
