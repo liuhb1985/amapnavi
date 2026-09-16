@@ -360,7 +360,8 @@ fun MainActivity.renderOvertakeDebugPage() {
     val decision = overtakeDebugDecision.ifEmpty { "-" }
     val reason = overtakeDebugReason.ifEmpty { "-" }
 
-    val head = "【超车诊断】$stage → $decision"
+    // 顶部空间紧张：不再显示"【超车诊断】"前缀
+    val head = "$stage → $decision"
     val detail = buildOvertakeDebugText(stage, decision, reason)
 
     val front = radarFrontCard()

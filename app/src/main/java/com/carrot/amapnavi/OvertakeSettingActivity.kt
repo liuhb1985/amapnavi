@@ -1,6 +1,7 @@
 package com.carrot.amapnavi
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.CheckBox
@@ -49,6 +50,14 @@ class OvertakeSettingActivity : AppCompatActivity() {
             finish()
         }
         findViewById<Button>(R.id.btnCancelOvertakeSetting).setOnClickListener { finish() }
+
+        // 顶部一排分页入口
+        findViewById<Button>(R.id.btnGotoGeneral).setOnClickListener {
+            startActivity(Intent(this, SettingActivity::class.java))
+        }
+        findViewById<Button>(R.id.btnGotoNav).setOnClickListener {
+            startActivity(Intent(this, NavSettingActivity::class.java))
+        }
     }
 
     private fun changeValue(view: EditText, delta: Int) {

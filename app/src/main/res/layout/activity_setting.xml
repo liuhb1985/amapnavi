@@ -15,6 +15,46 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
+        <!-- 设置分页入口 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="6dp">
+
+            <Button
+                android:id="@+id/btnGotoGeneral"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="1"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:text="通用参数"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnGotoNav"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:text="领航参数"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnGotoOvertake"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:text="超车参数"
+                android:textSize="13sp" />
+        </LinearLayout>
+
         <!-- 1. 导航红灯辅助停车 -->
         <com.google.android.flexbox.FlexboxLayout
             android:layout_width="match_parent"

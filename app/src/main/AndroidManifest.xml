@@ -60,6 +60,12 @@
             />
 
         <activity
+            android:name=".NavSettingActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+            />
+
+        <activity
             android:name=".UdpDeviceActivity"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
 

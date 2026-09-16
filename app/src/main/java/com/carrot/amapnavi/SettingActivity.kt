@@ -549,6 +549,14 @@ class SettingActivity : AppCompatActivity() {
         }
 
         btnCancelSetting.setOnClickListener { finish() }
+
+        // 顶部一排分页入口
+        findViewById<Button>(R.id.btnGotoNav).setOnClickListener {
+            startActivity(android.content.Intent(this, NavSettingActivity::class.java))
+        }
+        findViewById<Button>(R.id.btnGotoOvertake).setOnClickListener {
+            startActivity(android.content.Intent(this, OvertakeSettingActivity::class.java))
+        }
     }
 
     private fun saveSettings() {

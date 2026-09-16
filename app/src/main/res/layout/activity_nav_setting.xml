@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 车道领航专用设置页：入口在设置页顶部的"领航参数"按钮 -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- 设置分页入口 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/btnGotoGeneral"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="1"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:text="通用参数"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnGotoNav"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:text="领航参数"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnGotoOvertake"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:text="超车参数"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="车道领航设置"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#000000" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <CheckBox
+                android:id="@+id/cbNavSettingAppNavi"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="高速车道领航"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+
+            <CheckBox
+                android:id="@+id/cbNavSettingAppRoadNavi"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="公路车道领航"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="领航模式"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <RadioGroup
+            android:id="@+id/rgNavSettingMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/rbNavSettingFastMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="激进"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <RadioButton
+                android:id="@+id/rbNavSettingNormalMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="标准"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <RadioButton
+                android:id="@+id/rbNavSettingSlowMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="保守"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+        </RadioGroup>
+
+        <CheckBox
+            android:id="@+id/cbNavSettingSuggestLane"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="推荐车道"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <CheckBox
+            android:id="@+id/cbNavSettingDisLane"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="禁行车道"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <CheckBox
+            android:id="@+id/cbNavSettingKeepLeft"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="保持左侧"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <CheckBox
+            android:id="@+id/cbNavSettingKeepRight"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="保持右侧"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <CheckBox
+            android:id="@+id/cbNavSettingSpeak"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="领航语音"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <CheckBox
+            android:id="@+id/cbNavSettingSpeakFirst"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="首次语音"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <CheckBox
+            android:id="@+id/cbNavSettingBlindDecSpeed"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="盲区减速"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <CheckBox
+            android:id="@+id/cbNavSettingRoadMedian"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="道路中间隔离带"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <CheckBox
+            android:id="@+id/cbNavSettingRightFirst"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="右侧优先"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <CheckBox
+            android:id="@+id/cbNavSettingNavTurn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="导航转弯"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="领航最低速度(km/h)"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnMinusNaviMinSpeed"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etNavNaviMinSpeed"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="number"
+                android:gravity="center"
+                android:text="20"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusNaviMinSpeed"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="+"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="变道控制距离 高速/低速"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnMinusAtcDistH"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etNavAtcDistH"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="number"
+                android:gravity="center"
+                android:text="200"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusAtcDistH"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="+"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnMinusAtcDistL"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="12dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etNavAtcDistL"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="number"
+                android:gravity="center"
+                android:text="50"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusAtcDistL"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="+"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="分岔距离 高速/低速"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnMinusForkDistH"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etNavForkDistH"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="number"
+                android:gravity="center"
+                android:text="80"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusForkDistH"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="+"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnMinusForkDistL"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="12dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etNavForkDistL"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="number"
+                android:gravity="center"
+                android:text="30"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusForkDistL"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="+"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnSaveNavSetting"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="保存"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnCancelNavSetting"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="12dp"
+                android:text="返回"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>
