@@ -200,13 +200,14 @@ private fun MainActivity.localFrontDistTime(): Float =
 private fun MainActivity.localRearDistTime(): Float =
     if (lidar_rear_dist_mode == 1) lidar_rear_time_s else -lidar_rear_dist_m
 
+// 相对速度时距(s)：外推用(危险距离 = |d| - 接近速度 × 时距)；关掉"阈值跟随CP"用自己设的值
 private fun MainActivity.frontVrelTime(): Float =
-    if (!app_thresh_follow_cp) LidarSideSafety.FRONT_VREL_TIME_S
-    else opStateManager.state.lidar_front_vrel_time?.let { it / 10f } ?: LidarSideSafety.FRONT_VREL_TIME_S
+    if (!app_thresh_follow_cp) lidar_front_vrel_time_s
+    else opStateManager.state.lidar_front_vrel_time?.let { it / 10f } ?: lidar_front_vrel_time_s
 
 private fun MainActivity.rearVrelTime(): Float =
-    if (!app_thresh_follow_cp) LidarSideSafety.REAR_VREL_TIME_S
-    else opStateManager.state.lidar_behind_vrel_time?.let { it / 10f } ?: LidarSideSafety.REAR_VREL_TIME_S
+    if (!app_thresh_follow_cp) lidar_rear_vrel_time_s
+    else opStateManager.state.lidar_behind_vrel_time?.let { it / 10f } ?: lidar_rear_vrel_time_s
 
 // 某一个激光角是否危险（仅供卡片着色查询，不改迟滞状态：
 //  迟滞锁存由 lidarSideHazard() 在算"该侧禁止原因"时统一更新）

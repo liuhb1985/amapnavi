@@ -33,6 +33,10 @@ class OvertakeSettingActivity : AppCompatActivity() {
     private lateinit var rgRearThreshMode: RadioGroup
     private lateinit var etRearThresh: EditText
     private lateinit var tvRearThreshUnit: TextView
+    private lateinit var etFrontVrel: EditText
+    private lateinit var etRearVrel: EditText
+    private var frontVrelS = 4f
+    private var rearVrelS = 4f
     private var frontDistM = 5f
     private var frontTimeS = 1.2f
     private var rearDistM = 10f
@@ -60,6 +64,12 @@ class OvertakeSettingActivity : AppCompatActivity() {
         rgRearThreshMode = findViewById(R.id.rgRearThreshMode)
         etRearThresh = findViewById(R.id.etRearThresh)
         tvRearThreshUnit = findViewById(R.id.tvRearThreshUnit)
+        etFrontVrel = findViewById(R.id.etFrontVrel)
+        etRearVrel = findViewById(R.id.etRearVrel)
+        findViewById<Button>(R.id.btnMinusFrontVrel).setOnClickListener { stepVrel(true, -1) }
+        findViewById<Button>(R.id.btnPlusFrontVrel).setOnClickListener { stepVrel(true, 1) }
+        findViewById<Button>(R.id.btnMinusRearVrel).setOnClickListener { stepVrel(false, -1) }
+        findViewById<Button>(R.id.btnPlusRearVrel).setOnClickListener { stepVrel(false, 1) }
         rgFrontThreshMode.setOnCheckedChangeListener { _, _ ->
             if (loading) return@setOnCheckedChangeListener
             readFrontInput(lastFrontIsTime)          // 先按旧模式存回
@@ -149,9 +159,22 @@ class OvertakeSettingActivity : AppCompatActivity() {
         showRearThresh()
     }
 
+    // 相对速度时距：0.1s 步进，0 = 不外推
+    private fun stepVrel(front: Boolean, dir: Int) {
+        if (front) {
+            frontVrelS = (frontVrelS + dir * 0.1f).coerceIn(0f, 8.0f)
+            etFrontVrel.setText("%.1f".format(frontVrelS))
+        } else {
+            rearVrelS = (rearVrelS + dir * 0.1f).coerceIn(0f, 8.0f)
+            etRearVrel.setText("%.1f".format(rearVrelS))
+        }
+    }
+
     private fun save() {
         readFrontInput(frontIsTime())   // 先取回输入框里的值(可能手输过)
         readRearInput(rearIsTime())
+        frontVrelS = etFrontVrel.text.toString().toFloatOrNull() ?: frontVrelS
+        rearVrelS = etRearVrel.text.toString().toFloatOrNull() ?: rearVrelS
         val mode = when (rgOvertakeMode.checkedRadioButtonId) {
             R.id.rbOvertakeSettingFastMode -> 1
             R.id.rbOvertakeSettingSlowMode -> 3
@@ -171,6 +194,8 @@ class OvertakeSettingActivity : AppCompatActivity() {
                 .putInt("lidar_rear_dist_mode", if (rearIsTime()) 1 else 0)
                 .putFloat("lidar_rear_dist_m", rearDistM)
                 .putFloat("lidar_rear_time_s", rearTimeS)
+                .putFloat("lidar_front_vrel_time_s", frontVrelS)
+                .putFloat("lidar_rear_vrel_time_s", rearVrelS)
                 .putInt("overtake_reverse_cooldown_s", cooldown.coerceIn(0, 120))
                 .apply()
     }
@@ -190,6 +215,10 @@ class OvertakeSettingActivity : AppCompatActivity() {
         frontTimeS = prefs.getFloat("lidar_front_time_s", 1.2f)
         rearDistM = prefs.getFloat("lidar_rear_dist_m", 10f)
         rearTimeS = prefs.getFloat("lidar_rear_time_s", 1.5f)
+        frontVrelS = prefs.getFloat("lidar_front_vrel_time_s", 4f)
+        rearVrelS = prefs.getFloat("lidar_rear_vrel_time_s", 4f)
+        etFrontVrel.setText("%.1f".format(frontVrelS))
+        etRearVrel.setText("%.1f".format(rearVrelS))
         val frontMode = prefs.getInt("lidar_front_dist_mode", 0)
         val rearMode = prefs.getInt("lidar_rear_dist_mode", 0)
         lastFrontIsTime = frontMode == 1

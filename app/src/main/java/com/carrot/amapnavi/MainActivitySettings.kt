@@ -349,6 +349,8 @@ fun MainActivity.loadUserSettings() {
     lidar_rear_dist_mode = prefs.getInt("lidar_rear_dist_mode", 0)
     lidar_rear_dist_m = prefs.getFloat("lidar_rear_dist_m", 10f)
     lidar_rear_time_s = prefs.getFloat("lidar_rear_time_s", 1.5f)
+    lidar_front_vrel_time_s = prefs.getFloat("lidar_front_vrel_time_s", 4f)
+    lidar_rear_vrel_time_s = prefs.getFloat("lidar_rear_vrel_time_s", 4f)
 
     overtake_reverse_cooldown_ms = (if (prefs.contains("overtake_reverse_cooldown_s")) {
         prefs.getInt("overtake_reverse_cooldown_s", 20)

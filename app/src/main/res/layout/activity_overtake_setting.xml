@@ -331,6 +331,115 @@
                 android:textColor="#000000" />
         </LinearLayout>
 
+        <!-- 相对速度时距：外推接近用（危险距离 = 距离 - 接近速度 × 时距），0 = 不外推 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="相对速度时距(外推接近)"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="4dp">
+
+            <TextView
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="前方"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <Button
+                android:id="@+id/btnMinusFrontVrel"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etFrontVrel"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="numberDecimal"
+                android:gravity="center"
+                android:text="4.0"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusFrontVrel"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="+"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="s"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="4dp">
+
+            <TextView
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="后方"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <Button
+                android:id="@+id/btnMinusRearVrel"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etRearVrel"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="numberDecimal"
+                android:gravity="center"
+                android:text="4.0"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusRearVrel"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="+"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="s"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+        </LinearLayout>
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

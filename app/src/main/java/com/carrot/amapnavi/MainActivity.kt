@@ -267,6 +267,9 @@ class MainActivity : AppCompatActivity() {
     internal var lidar_rear_dist_mode = 0
     internal var lidar_rear_dist_m = 10f
     internal var lidar_rear_time_s = 1.5f
+    // 相对速度时距(s)：外推用，危险距离 = |d| - 接近速度 × 该时距
+    internal var lidar_front_vrel_time_s = 4f
+    internal var lidar_rear_vrel_time_s = 4f
     // 超车反向变道冷却(ms)：刚往一侧超完车后，这段时间内不允许往反方向再超车变道
     internal var overtake_reverse_cooldown_ms = 20_000L
 
