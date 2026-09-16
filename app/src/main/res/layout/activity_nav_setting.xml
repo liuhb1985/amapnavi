@@ -1,15 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 车道领航专用设置页：入口在设置页顶部的"领航参数"按钮 -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/navSettingScrollView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#FFFFFF">
 
     <LinearLayout
+        android:id="@+id/navSettingContent"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="16dp">
 
         <!-- 设置分页入口 -->
         <LinearLayout
@@ -21,34 +26,40 @@
             <Button
                 android:id="@+id/btnGotoGeneral"
                 android:layout_width="0dp"
-                android:layout_height="32dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:minHeight="0dp"
+                android:minHeight="42dp"
                 android:minWidth="0dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
                 android:text="通用参数"
-                android:textSize="13sp" />
+                android:textSize="14sp" />
 
             <Button
                 android:id="@+id/btnGotoNav"
                 android:layout_width="0dp"
-                android:layout_height="32dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
-                android:minHeight="0dp"
+                android:minHeight="42dp"
                 android:minWidth="0dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
                 android:text="领航参数"
-                android:textSize="13sp" />
+                android:textSize="14sp" />
 
             <Button
                 android:id="@+id/btnGotoOvertake"
                 android:layout_width="0dp"
-                android:layout_height="32dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
-                android:minHeight="0dp"
+                android:minHeight="42dp"
                 android:minWidth="0dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
                 android:text="超车参数"
-                android:textSize="13sp" />
+                android:textSize="14sp" />
         </LinearLayout>
 
         <TextView
@@ -59,17 +70,19 @@
             android:textStyle="bold"
             android:textColor="#000000" />
 
-        <LinearLayout
+        <!-- 所有开关一行排布，放不下自动换行（与通用设置页风格一致） -->
+        <com.google.android.flexbox.FlexboxLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:orientation="horizontal">
+            app:flexDirection="row"
+            app:flexWrap="wrap">
 
             <CheckBox
                 android:id="@+id/cbNavSettingAppNavi"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="高速车道领航"
+                android:text="车道领航(高速)"
                 android:textSize="14sp"
                 android:textColor="#000000"
                 android:padding="0dp" />
@@ -79,11 +92,132 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
-                android:text="公路车道领航"
+                android:text="车道领航(公路)"
                 android:textSize="14sp"
                 android:textColor="#000000"
                 android:padding="0dp" />
-        </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/cbNavSettingSuggestLane"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="走推荐车道"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+
+            <CheckBox
+                android:id="@+id/cbNavSettingDisLane"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="避开禁行车道"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+
+            <CheckBox
+                android:id="@+id/cbNavSettingKeepLeft"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="提前靠左"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+
+            <CheckBox
+                android:id="@+id/cbNavSettingKeepRight"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="提前靠右"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+
+            <CheckBox
+                android:id="@+id/cbNavSettingVisionKeepRight"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="纯视觉提前靠右"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+
+            <CheckBox
+                android:id="@+id/cbNavSettingSpeak"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="领航播报"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+
+            <CheckBox
+                android:id="@+id/cbNavSettingSpeakFirst"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="先播报后变道"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+
+            <CheckBox
+                android:id="@+id/cbNavSettingBlindDecSpeed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="盲区有车时减速"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+
+            <CheckBox
+                android:id="@+id/cbNavSettingRoadMedian"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="有隔离带(公路)"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+
+            <CheckBox
+                android:id="@+id/cbNavSettingRightFirst"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="优先从右计算车道(公路)"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+
+            <CheckBox
+                android:id="@+id/cbNavSettingNavTurn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="领航转弯"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+
+            <CheckBox
+                android:id="@+id/cbNavSettingLaneProb"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="使用车道置信度"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+
+        </com.google.android.flexbox.FlexboxLayout>
 
         <TextView
             android:layout_width="wrap_content"
@@ -113,7 +247,8 @@
                 android:layout_height="wrap_content"
                 android:text="标准"
                 android:textSize="14sp"
-                android:textColor="#000000" />
+                android:textColor="#000000"
+                android:checked="true" />
 
             <RadioButton
                 android:id="@+id/rbNavSettingSlowMode"
@@ -124,103 +259,11 @@
                 android:textColor="#000000" />
         </RadioGroup>
 
-        <CheckBox
-            android:id="@+id/cbNavSettingSuggestLane"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="推荐车道"
-            android:textSize="14sp"
-            android:textColor="#000000"
-            android:padding="0dp" />
-
-        <CheckBox
-            android:id="@+id/cbNavSettingDisLane"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="禁行车道"
-            android:textSize="14sp"
-            android:textColor="#000000"
-            android:padding="0dp" />
-
-        <CheckBox
-            android:id="@+id/cbNavSettingKeepLeft"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="保持左侧"
-            android:textSize="14sp"
-            android:textColor="#000000"
-            android:padding="0dp" />
-
-        <CheckBox
-            android:id="@+id/cbNavSettingKeepRight"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="保持右侧"
-            android:textSize="14sp"
-            android:textColor="#000000"
-            android:padding="0dp" />
-
-        <CheckBox
-            android:id="@+id/cbNavSettingSpeak"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="领航语音"
-            android:textSize="14sp"
-            android:textColor="#000000"
-            android:padding="0dp" />
-
-        <CheckBox
-            android:id="@+id/cbNavSettingSpeakFirst"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="首次语音"
-            android:textSize="14sp"
-            android:textColor="#000000"
-            android:padding="0dp" />
-
-        <CheckBox
-            android:id="@+id/cbNavSettingBlindDecSpeed"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="盲区减速"
-            android:textSize="14sp"
-            android:textColor="#000000"
-            android:padding="0dp" />
-
-        <CheckBox
-            android:id="@+id/cbNavSettingRoadMedian"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="道路中间隔离带"
-            android:textSize="14sp"
-            android:textColor="#000000"
-            android:padding="0dp" />
-
-        <CheckBox
-            android:id="@+id/cbNavSettingRightFirst"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="右侧优先"
-            android:textSize="14sp"
-            android:textColor="#000000"
-            android:padding="0dp" />
-
-        <CheckBox
-            android:id="@+id/cbNavSettingNavTurn"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="导航转弯"
-            android:textSize="14sp"
-            android:textColor="#000000"
-            android:padding="0dp" />
-
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
-            android:text="领航最低速度(km/h)"
+            android:text="车道领航最低车速(km/h)"
             android:textSize="14sp"
             android:textColor="#000000" />
 
@@ -279,7 +322,7 @@
                 android:layout_height="36dp"
                 android:inputType="number"
                 android:gravity="center"
-                android:text="200"
+                android:text="2000"
                 android:textSize="14sp" />
 
             <Button
@@ -303,7 +346,7 @@
                 android:layout_height="36dp"
                 android:inputType="number"
                 android:gravity="center"
-                android:text="50"
+                android:text="500"
                 android:textSize="14sp" />
 
             <Button

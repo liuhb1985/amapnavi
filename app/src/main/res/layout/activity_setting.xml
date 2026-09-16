@@ -11,6 +11,7 @@
     android:background="#FFFFFF">
 
     <LinearLayout
+        android:id="@+id/settingContentLayout"
         android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
@@ -25,34 +26,40 @@
             <Button
                 android:id="@+id/btnGotoGeneral"
                 android:layout_width="0dp"
-                android:layout_height="32dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:minHeight="0dp"
+                android:minHeight="42dp"
                 android:minWidth="0dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
                 android:text="通用参数"
-                android:textSize="13sp" />
+                android:textSize="14sp" />
 
             <Button
                 android:id="@+id/btnGotoNav"
                 android:layout_width="0dp"
-                android:layout_height="32dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
-                android:minHeight="0dp"
+                android:minHeight="42dp"
                 android:minWidth="0dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
                 android:text="领航参数"
-                android:textSize="13sp" />
+                android:textSize="14sp" />
 
             <Button
                 android:id="@+id/btnGotoOvertake"
                 android:layout_width="0dp"
-                android:layout_height="32dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
-                android:minHeight="0dp"
+                android:minHeight="42dp"
                 android:minWidth="0dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
                 android:text="超车参数"
-                android:textSize="13sp" />
+                android:textSize="14sp" />
         </LinearLayout>
 
         <!-- 1. 导航红灯辅助停车 -->
@@ -426,475 +433,6 @@
             android:layout_height="1dp"
             android:background="#DDDDDD"/>
 
-        <com.google.android.flexbox.FlexboxLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:flexDirection="row"
-            app:flexWrap="wrap">
-
-            <CheckBox
-                android:id="@+id/cbAppNavi"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="车道领航(高速)"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbAppRoadNavi"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="车道领航(公路)"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbNaviSpeak"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="领航播报"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbNaviSpeakFirst"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="先播报后变道"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbNaviBlindDecSpeed"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="盲区有车时减速"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbSuggestLaneEn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="走推荐车道"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbDisLaneEn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="避开禁行车道"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbKeepLeftEn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="提前靠左"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbKeepRightEn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="提前靠右"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbVisionKeepRight"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="纯视觉提前靠右"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbNavTurn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:visibility="gone"
-                android:text="领航转弯"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbLaneProb"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="使用车道置信度"
-                android:visibility="gone"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbRoadMeidan"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="有隔离带(公路)"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbRoadRightFirst"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="优先从右计算车道(公路)"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-        </com.google.android.flexbox.FlexboxLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:id="@+id/cbLayoutNaviMode"
-            android:layout_marginTop="0dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="领航模式: "
-                android:textSize="13sp"
-                android:textColor="#000000"/>
-
-            <RadioGroup
-                android:id="@+id/rgNavMode"
-                android:orientation="horizontal"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content">
-
-                <RadioButton
-                    android:id="@+id/rbNavFastMode"
-                    android:text="激进"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-
-                <RadioButton
-                    android:id="@+id/rbNavNormalMode"
-                    android:text="标准"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checked="true" />
-
-                <RadioButton
-                    android:id="@+id/rbNavSlowMode"
-                    android:text="保守"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </RadioGroup>
-
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/etLayoutNaviMinSpeed"
-            android:visibility="gone"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="0dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="车道领航最低车速: "
-                android:textSize="13sp"
-                android:textColor="#000000"/>
-
-            <EditText
-                android:id="@+id/etNaviMinSpeed"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:inputType="number"
-                android:gravity="start|center_vertical"
-                android:text="0"
-                android:textSize="13sp"
-                android:textColor="#000000"
-                android:backgroundTint="#888888"
-                android:background="@android:color/white"
-                android:paddingStart="4dp"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="km/h"
-                android:textSize="13sp"
-                android:textColor="#000000"
-                android:layout_marginStart="8dp"/>
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:layout_weight="1"/>
-
-            <Button
-                android:id="@+id/btnMinusNaviMinSpeed"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:text="-"
-                android:layout_marginStart="8dp"/>
-
-            <Button
-                android:id="@+id/btnPlusNaviMinSpeed"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:text="+"
-                android:layout_marginStart="8dp"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/etLayoutAtcDistH"
-            android:visibility="gone"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="0dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="高速提前靠边距离: "
-                android:textSize="13sp"
-                android:textColor="#000000"/>
-
-            <EditText
-                android:id="@+id/etAtcDistH"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:inputType="number"
-                android:gravity="start|center_vertical"
-                android:text="0"
-                android:textSize="13sp"
-                android:textColor="#000000"
-                android:backgroundTint="#888888"
-                android:background="@android:color/white"
-                android:paddingStart="4dp"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="米"
-                android:textSize="13sp"
-                android:textColor="#000000"
-                android:layout_marginStart="8dp"/>
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:layout_weight="1"/>
-
-            <Button
-                android:id="@+id/btnMinusAtcDistH"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:text="-"
-                android:layout_marginStart="8dp"/>
-
-            <Button
-                android:id="@+id/btnPlusAtcDistH"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:text="+"
-                android:layout_marginStart="8dp"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/etLayoutForkDistH"
-            android:visibility="gone"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="0dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="高速进匝道距离: "
-                android:textSize="13sp"
-                android:textColor="#000000"/>
-
-            <EditText
-                android:id="@+id/etForkDistH"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:inputType="number"
-                android:gravity="start|center_vertical"
-                android:text="0"
-                android:textSize="13sp"
-                android:textColor="#000000"
-                android:backgroundTint="#888888"
-                android:background="@android:color/white"
-                android:paddingStart="4dp"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="米"
-                android:textSize="13sp"
-                android:textColor="#000000"
-                android:layout_marginStart="8dp"/>
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:layout_weight="1"/>
-
-            <Button
-                android:id="@+id/btnMinusForkDistH"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:text="-"
-                android:layout_marginStart="8dp"/>
-
-            <Button
-                android:id="@+id/btnPlusForkDistH"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:text="+"
-                android:layout_marginStart="8dp"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/etLayoutAtcDistL"
-            android:visibility="gone"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="0dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="公路提前靠边距离: "
-                android:textSize="13sp"
-                android:textColor="#000000"/>
-
-            <EditText
-                android:id="@+id/etAtcDistL"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:inputType="number"
-                android:gravity="start|center_vertical"
-                android:text="0"
-                android:textSize="13sp"
-                android:textColor="#000000"
-                android:backgroundTint="#888888"
-                android:background="@android:color/white"
-                android:paddingStart="4dp"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="米"
-                android:textSize="13sp"
-                android:textColor="#000000"
-                android:layout_marginStart="8dp"/>
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:layout_weight="1"/>
-
-            <Button
-                android:id="@+id/btnMinusAtcDistL"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:text="-"
-                android:layout_marginStart="8dp"/>
-
-            <Button
-                android:id="@+id/btnPlusAtcDistL"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:text="+"
-                android:layout_marginStart="8dp"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/etLayoutForkDistL"
-            android:visibility="gone"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="0dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="公路进匝道距离: "
-                android:textSize="13sp"
-                android:textColor="#000000"/>
-
-            <EditText
-                android:id="@+id/etForkDistL"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:inputType="number"
-                android:gravity="start|center_vertical"
-                android:text="0"
-                android:textSize="13sp"
-                android:textColor="#000000"
-                android:backgroundTint="#888888"
-                android:background="@android:color/white"
-                android:paddingStart="4dp"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="米"
-                android:textSize="13sp"
-                android:textColor="#000000"
-                android:layout_marginStart="8dp"/>
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:layout_weight="1"/>
-
-            <Button
-                android:id="@+id/btnMinusForkDistL"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:text="-"
-                android:layout_marginStart="8dp"/>
-
-            <Button
-                android:id="@+id/btnPlusForkDistL"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:text="+"
-                android:layout_marginStart="8dp"/>
-        </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#DDDDDD"/>
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -931,68 +469,6 @@
 
                 <RadioButton
                     android:id="@+id/rbVisionLaneSlowMode"
-                    android:text="保守"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </RadioGroup>
-
-        </LinearLayout>
-
-        <com.google.android.flexbox.FlexboxLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:flexDirection="row"
-            app:flexWrap="wrap">
-
-            <!-- 超车相关设置已移到"超车设置"页面(入口在超车诊断页里) -->
-
-            <CheckBox
-                android:id="@+id/cbLaneOvertake"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="超车融合导航"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-        </com.google.android.flexbox.FlexboxLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:id="@+id/cbLayoutOvertakeMode"
-            android:layout_marginTop="0dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="超车模式: "
-                android:textSize="13sp"
-                android:textColor="#000000"/>
-
-            <RadioGroup
-                android:id="@+id/rgOvertakeMode"
-                android:orientation="horizontal"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content">
-
-                <RadioButton
-                    android:id="@+id/rbOvertakeFastMode"
-                    android:text="激进"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-
-                <RadioButton
-                    android:id="@+id/rbOvertakeNormalMode"
-                    android:text="标准"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checked="true" />
-
-                <RadioButton
-                    android:id="@+id/rbOvertakeSlowMode"
                     android:text="保守"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />

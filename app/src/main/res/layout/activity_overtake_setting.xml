@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 超车功能专用设置页：入口在"超车"诊断页里 -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/overtakeSettingScrollView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#FFFFFF">
 
     <LinearLayout
+        android:id="@+id/overtakeSettingContent"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="16dp">
 
         <!-- 设置分页入口 -->
         <LinearLayout
@@ -21,34 +25,40 @@
             <Button
                 android:id="@+id/btnGotoGeneral"
                 android:layout_width="0dp"
-                android:layout_height="32dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:minHeight="0dp"
+                android:minHeight="42dp"
                 android:minWidth="0dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
                 android:text="通用参数"
-                android:textSize="13sp" />
+                android:textSize="14sp" />
 
             <Button
                 android:id="@+id/btnGotoNav"
                 android:layout_width="0dp"
-                android:layout_height="32dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
-                android:minHeight="0dp"
+                android:minHeight="42dp"
                 android:minWidth="0dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
                 android:text="领航参数"
-                android:textSize="13sp" />
+                android:textSize="14sp" />
 
             <Button
                 android:id="@+id/btnGotoOvertake"
                 android:layout_width="0dp"
-                android:layout_height="32dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
-                android:minHeight="0dp"
+                android:minHeight="42dp"
                 android:minWidth="0dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
                 android:text="超车参数"
-                android:textSize="13sp" />
+                android:textSize="14sp" />
         </LinearLayout>
 
         <TextView
@@ -146,6 +156,16 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="阈值跟随CP(关掉则用App内置默认值)"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <CheckBox
+            android:id="@+id/cbOvertakeSettingLaneOvertake"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="超车融合导航(把车道信息发给CP)"
             android:textSize="14sp"
             android:textColor="#000000"
             android:padding="0dp" />

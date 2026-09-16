@@ -3,6 +3,7 @@ package com.carrot.amapnavi
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -30,6 +31,8 @@ class NavSettingActivity : AppCompatActivity() {
     private lateinit var cbRoadMedian: CheckBox
     private lateinit var cbRightFirst: CheckBox
     private lateinit var cbNavTurn: CheckBox
+    private lateinit var cbVisionKeepRight: CheckBox
+    private lateinit var cbLaneProb: CheckBox
 
     private lateinit var etNaviMinSpeed: EditText
     private lateinit var etAtcDistH: EditText
@@ -56,6 +59,8 @@ class NavSettingActivity : AppCompatActivity() {
         cbRoadMedian = findViewById(R.id.cbNavSettingRoadMedian)
         cbRightFirst = findViewById(R.id.cbNavSettingRightFirst)
         cbNavTurn = findViewById(R.id.cbNavSettingNavTurn)
+        cbVisionKeepRight = findViewById(R.id.cbNavSettingVisionKeepRight)
+        cbLaneProb = findViewById(R.id.cbNavSettingLaneProb)
         etNaviMinSpeed = findViewById(R.id.etNavNaviMinSpeed)
         etAtcDistH = findViewById(R.id.etNavAtcDistH)
         etAtcDistL = findViewById(R.id.etNavAtcDistL)
@@ -70,13 +75,25 @@ class NavSettingActivity : AppCompatActivity() {
         bindStep(R.id.btnMinusForkDistH, R.id.btnPlusForkDistH, etForkDistH, 10, 0, 100000)
         bindStep(R.id.btnMinusForkDistL, R.id.btnPlusForkDistL, etForkDistL, 10, 0, 100000)
 
-        // 分页入口
+        // 分页入口（跳走时关闭本页，保证一次返回回到主界面）
         findViewById<Button>(R.id.btnGotoGeneral).setOnClickListener {
             startActivity(Intent(this, SettingActivity::class.java))
+            finish()
         }
         findViewById<Button>(R.id.btnGotoOvertake).setOnClickListener {
             startActivity(Intent(this, OvertakeSettingActivity::class.java))
+            finish()
         }
+
+        // 顶部留空：与车机适配参数 top_pad_dp 保持一致
+        setTopPaddingDp(
+                findViewById(R.id.navSettingContent),
+                getSharedPreferences(prefsName, Context.MODE_PRIVATE).getInt("top_pad_dp", 5))
+    }
+
+    private fun setTopPaddingDp(view: View, dp: Int) {
+        val px = (dp * resources.displayMetrics.density).toInt()
+        view.setPadding(view.paddingLeft, px, view.paddingRight, view.paddingBottom)
 
         findViewById<Button>(R.id.btnSaveNavSetting).setOnClickListener {
             save()
@@ -116,6 +133,8 @@ class NavSettingActivity : AppCompatActivity() {
                 .putBoolean("road_median", cbRoadMedian.isChecked)
                 .putBoolean("road_right_first", cbRightFirst.isChecked)
                 .putBoolean("nav_turn", cbNavTurn.isChecked)
+                .putBoolean("vision_keep_right", cbVisionKeepRight.isChecked)
+                .putBoolean("lane_prob_enable", cbLaneProb.isChecked)
                 .putInt("navi_min_speed", etNaviMinSpeed.text.toString().toIntOrNull() ?: 20)
                 .putInt("atc_dist_h", etAtcDistH.text.toString().toIntOrNull() ?: 2000)
                 .putInt("atc_dist_l", etAtcDistL.text.toString().toIntOrNull() ?: 500)
@@ -143,6 +162,8 @@ class NavSettingActivity : AppCompatActivity() {
         cbRoadMedian.isChecked = prefs.getBoolean("road_median", true)
         cbRightFirst.isChecked = prefs.getBoolean("road_right_first", true)
         cbNavTurn.isChecked = prefs.getBoolean("nav_turn", false)
+        cbVisionKeepRight.isChecked = prefs.getBoolean("vision_keep_right", false)
+        cbLaneProb.isChecked = prefs.getBoolean("lane_prob_enable", false)
         etNaviMinSpeed.setText(prefs.getInt("navi_min_speed", 20).toString())
         etAtcDistH.setText(prefs.getInt("atc_dist_h", 2000).toString())
         etAtcDistL.setText(prefs.getInt("atc_dist_l", 500).toString())

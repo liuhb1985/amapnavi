@@ -337,6 +337,9 @@ fun MainActivity.setOvertakeDebugPanelVisible(visible: Boolean) {
         layoutOvertakeDebug.visibility = if (visible) View.VISIBLE else View.GONE
         if (!visible) {
             tvOvertakeDebug.text = ""
+        } else {
+            // 顶部留空：与车机适配参数 top_pad_dp 保持一致
+            setTopPaddingDp(layoutOvertakeDebug, top_pad_dp)
         }
     }
 

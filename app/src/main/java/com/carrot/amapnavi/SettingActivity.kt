@@ -17,43 +17,13 @@ class SettingActivity : AppCompatActivity() {
     private lateinit var cbLayoutNaviTrafficAssistTime : LinearLayout
     private lateinit var etLayoutLaneDetectInterval : LinearLayout
 
-    private lateinit var etLayoutAtcDistH : LinearLayout
-    private lateinit var etLayoutForkDistH : LinearLayout
-    private lateinit var etLayoutAtcDistL : LinearLayout
-    private lateinit var etLayoutForkDistL : LinearLayout
-
     private lateinit var cbTunnelDecSpeed: CheckBox
     private lateinit var cbSmoothSpeedLimit: CheckBox
-    private lateinit var cbLaneOvertake: CheckBox
-    private lateinit var cbAppNavi: CheckBox
-    private lateinit var cbAppRoadNavi: CheckBox
-    private lateinit var cbNaviSpeak: CheckBox
-    private lateinit var cbNaviSpeakFirst: CheckBox
-    private lateinit var cbNaviBlindDecSpeed: CheckBox
-
-    private lateinit var cbSuggestLaneEn: CheckBox
-    private lateinit var cbDisLaneEn: CheckBox
-    private lateinit var cbKeepLeftEn: CheckBox
-    private lateinit var cbKeepRightEn: CheckBox
-
-    private lateinit var cbLayoutNaviMode : LinearLayout
 
     private lateinit var cbLayoutVisionLaneMode : LinearLayout
     private lateinit var rgVisionLaneMode: RadioGroup
-    private lateinit var cbLayoutOvertakeMode : LinearLayout
-    private lateinit var rgOvertakeMode: RadioGroup
     // 超车相关设置已移到 OvertakeSettingActivity（入口在超车诊断页里）
 
-    private lateinit var etLayoutNaviMinSpeed : LinearLayout
-    private lateinit var etNaviMinSpeed: EditText
-    private lateinit var btnMinusNaviMinSpeed: Button
-    private lateinit var btnPlusNaviMinSpeed: Button
-
-    private lateinit var cbRoadMeidan: CheckBox
-    private lateinit var cbRoadRightFirst: CheckBox
-    private lateinit var cbLaneProb: CheckBox
-    private lateinit var cbVisionKeepRight: CheckBox
-    private lateinit var cbNavTurn: CheckBox
     private lateinit var cbAppSpeak: CheckBox
     private lateinit var cbAppLog: CheckBox
     private lateinit var cbLaneShow: CheckBox
@@ -121,24 +91,6 @@ class SettingActivity : AppCompatActivity() {
     private lateinit var btnSaveSetting: Button
     private lateinit var btnCancelSetting: Button
 
-    private lateinit var etAtcDistH: EditText
-    private lateinit var btnMinusAtcDistH: Button
-    private lateinit var btnPlusAtcDistH: Button
-
-    private lateinit var etAtcDistL: EditText
-    private lateinit var btnMinusAtcDistL: Button
-    private lateinit var btnPlusAtcDistL: Button
-
-    private lateinit var etForkDistH: EditText
-    private lateinit var btnMinusForkDistH: Button
-    private lateinit var btnPlusForkDistH: Button
-
-    private lateinit var etForkDistL: EditText
-    private lateinit var btnMinusForkDistL: Button
-    private lateinit var btnPlusForkDistL: Button
-
-    private lateinit var rgNavMode: RadioGroup
-
     private val prefsName = "user_settings"
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -154,44 +106,15 @@ class SettingActivity : AppCompatActivity() {
         cbLayoutNaviTrafficAssistTime = findViewById(R.id.cbLayoutNaviTrafficAssistTime)
         etLayoutLaneDetectInterval = findViewById(R.id.etLayoutLaneDetectInterval)
 
-        etLayoutAtcDistH = findViewById(R.id.etLayoutAtcDistH)
-        etLayoutForkDistH = findViewById(R.id.etLayoutForkDistH)
-        etLayoutAtcDistL = findViewById(R.id.etLayoutAtcDistL)
-        etLayoutForkDistL = findViewById(R.id.etLayoutForkDistL)
-
         cbTunnelDecSpeed = findViewById(R.id.cbTunnelDecSpeed)
         cbAppSpeak = findViewById(R.id.cbAppSpeak)
         cbAppLog = findViewById(R.id.cbAppLog)
-        cbAppNavi = findViewById(R.id.cbAppNavi)
-        cbAppRoadNavi = findViewById(R.id.cbAppRoadNavi)
-        cbNaviSpeak = findViewById(R.id.cbNaviSpeak)
-        cbNaviSpeakFirst = findViewById(R.id.cbNaviSpeakFirst)
-        cbNaviBlindDecSpeed = findViewById(R.id.cbNaviBlindDecSpeed)
-
-        cbSuggestLaneEn = findViewById(R.id.cbSuggestLaneEn)
-        cbDisLaneEn = findViewById(R.id.cbDisLaneEn)
-        cbKeepLeftEn = findViewById(R.id.cbKeepLeftEn)
-        cbKeepRightEn = findViewById(R.id.cbKeepRightEn)
-
-        cbLayoutNaviMode = findViewById(R.id.cbLayoutNaviMode)
-        etLayoutNaviMinSpeed = findViewById(R.id.etLayoutNaviMinSpeed)
-        etNaviMinSpeed = findViewById(R.id.etNaviMinSpeed)
-        btnMinusNaviMinSpeed = findViewById(R.id.btnMinusNaviMinSpeed)
-        btnPlusNaviMinSpeed = findViewById(R.id.btnPlusNaviMinSpeed)
 
         cbLayoutVisionLaneMode = findViewById(R.id.cbLayoutVisionLaneMode)
         rgVisionLaneMode = findViewById(R.id.rgVisionLaneMode)
-        cbLayoutOvertakeMode = findViewById(R.id.cbLayoutOvertakeMode)
-        rgOvertakeMode = findViewById(R.id.rgOvertakeMode)
         // (超车设置在 OvertakeSettingActivity)
 
-        cbRoadMeidan = findViewById(R.id.cbRoadMeidan)
-        cbRoadRightFirst = findViewById(R.id.cbRoadRightFirst)
-        cbLaneProb = findViewById(R.id.cbLaneProb)
-        cbVisionKeepRight = findViewById(R.id.cbVisionKeepRight)
-        cbNavTurn = findViewById(R.id.cbNavTurn)
         cbSmoothSpeedLimit = findViewById(R.id.cbSmoothSpeedLimit)
-        cbLaneOvertake = findViewById(R.id.cbLaneOvertake)
         cbLaneShow = findViewById(R.id.cbLaneShow)
         cbVideoShow = findViewById(R.id.cbVideoShow)
         cbVideoShowFast = findViewById(R.id.cbVideoShowFast)
@@ -257,24 +180,6 @@ class SettingActivity : AppCompatActivity() {
         btnSaveSetting = findViewById(R.id.btnSaveSetting)
         btnCancelSetting = findViewById(R.id.btnCancelSetting)
 
-        etAtcDistH = findViewById(R.id.etAtcDistH)
-        btnMinusAtcDistH = findViewById(R.id.btnMinusAtcDistH)
-        btnPlusAtcDistH = findViewById(R.id.btnPlusAtcDistH)
-
-        etAtcDistL = findViewById(R.id.etAtcDistL)
-        btnMinusAtcDistL = findViewById(R.id.btnMinusAtcDistL)
-        btnPlusAtcDistL = findViewById(R.id.btnPlusAtcDistL)
-
-        etForkDistH = findViewById(R.id.etForkDistH)
-        btnMinusForkDistH = findViewById(R.id.btnMinusForkDistH)
-        btnPlusForkDistH = findViewById(R.id.btnPlusForkDistH)
-
-        etForkDistL = findViewById(R.id.etForkDistL)
-        btnMinusForkDistL = findViewById(R.id.btnMinusForkDistL)
-        btnPlusForkDistL = findViewById(R.id.btnPlusForkDistL)
-
-        rgNavMode = findViewById(R.id.rgNavMode)
-
         loadSettings()
         setupButtons()
     }
@@ -285,21 +190,6 @@ class SettingActivity : AppCompatActivity() {
             val newValue = (current + delta).coerceIn(min, max)
             editText.setText(newValue.toString())
         }
-
-        btnMinusNaviMinSpeed.setOnClickListener { changeValue(etNaviMinSpeed, -1) }
-        btnPlusNaviMinSpeed.setOnClickListener { changeValue(etNaviMinSpeed, 1) }
-
-        btnMinusAtcDistH.setOnClickListener { changeValue(etAtcDistH, -100, -200) }
-        btnPlusAtcDistH.setOnClickListener { changeValue(etAtcDistH, 100, -200) }
-
-        btnMinusForkDistH.setOnClickListener { changeValue(etForkDistH, -10, -100) }
-        btnPlusForkDistH.setOnClickListener { changeValue(etForkDistH, 10, -100) }
-
-        btnMinusAtcDistL.setOnClickListener { changeValue(etAtcDistL, -50, -100) }
-        btnPlusAtcDistL.setOnClickListener { changeValue(etAtcDistL, 50, -100) }
-
-        btnMinusForkDistL.setOnClickListener { changeValue(etForkDistL, -10, -100) }
-        btnPlusForkDistL.setOnClickListener { changeValue(etForkDistL, 10, -100) }
 
         btnMinusMinSpeedLimit.setOnClickListener { changeValue(etMinSpeedLimit, -5) }
         btnPlusMinSpeedLimit.setOnClickListener { changeValue(etMinSpeedLimit, 5) }
@@ -402,160 +292,16 @@ class SettingActivity : AppCompatActivity() {
             }
         }
 
-        cbNaviSpeak.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) {
-                SoundPlayer.play(this, "engage")
-            } else {
-                SoundPlayer.play(this, "disengage")
-            }
-        }
-
-        cbAppNavi.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked && (cbKeepLeftEn.isChecked || cbKeepRightEn.isChecked)) {
-                etLayoutAtcDistH.visibility = View.VISIBLE
-            } else {
-                etLayoutAtcDistH.visibility = View.GONE
-            }
-
-            if(isChecked || cbAppRoadNavi.isChecked){
-                etLayoutNaviMinSpeed.visibility = View.VISIBLE
-            }else{
-                etLayoutNaviMinSpeed.visibility = View.GONE
-
-                cbNaviSpeak.visibility = View.GONE
-                cbNaviSpeakFirst.visibility = View.GONE
-                cbNaviBlindDecSpeed.visibility = View.GONE
-                cbSuggestLaneEn.visibility = View.GONE
-                cbDisLaneEn.visibility = View.GONE
-                cbKeepLeftEn.visibility = View.GONE
-                cbKeepRightEn.visibility = View.GONE
-                cbVisionKeepRight.visibility = View.GONE
-                cbLayoutNaviMode.visibility = View.GONE
-                cbLaneProb.visibility = View.GONE
-
-                cbRoadMeidan.visibility = View.GONE
-                cbRoadRightFirst.visibility = View.GONE
-            }
-
-            if(isChecked){
-                etLayoutForkDistH.visibility = View.VISIBLE
-
-                cbNaviSpeak.visibility = View.VISIBLE
-                cbNaviSpeakFirst.visibility = View.VISIBLE
-                cbNaviBlindDecSpeed.visibility = View.VISIBLE
-                cbSuggestLaneEn.visibility = View.VISIBLE
-                cbDisLaneEn.visibility = View.VISIBLE
-                cbKeepLeftEn.visibility = View.VISIBLE
-                cbKeepRightEn.visibility = View.VISIBLE
-                cbVisionKeepRight.visibility = View.VISIBLE
-                cbLayoutNaviMode.visibility = View.VISIBLE
-                //cbLaneProb.visibility = View.VISIBLE
-            }else{
-                etLayoutForkDistH.visibility = View.GONE
-            }
-        }
-
-        cbAppRoadNavi.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked && (cbKeepLeftEn.isChecked || cbKeepRightEn.isChecked)) {
-                etLayoutAtcDistL.visibility = View.VISIBLE
-            } else {
-                etLayoutAtcDistL.visibility = View.GONE
-            }
-
-            if(isChecked || cbAppNavi.isChecked){
-                etLayoutNaviMinSpeed.visibility = View.VISIBLE
-            }else{
-                etLayoutNaviMinSpeed.visibility = View.GONE
-
-                cbNaviSpeak.visibility = View.GONE
-                cbNaviSpeakFirst.visibility = View.GONE
-                cbNaviBlindDecSpeed.visibility = View.GONE
-                cbSuggestLaneEn.visibility = View.GONE
-                cbDisLaneEn.visibility = View.GONE
-                cbKeepLeftEn.visibility = View.GONE
-                cbKeepRightEn.visibility = View.GONE
-                cbVisionKeepRight.visibility = View.GONE
-                cbLayoutNaviMode.visibility = View.GONE
-                cbLaneProb.visibility = View.GONE
-
-                cbRoadMeidan.visibility = View.GONE
-                cbRoadRightFirst.visibility = View.GONE
-            }
-
-            if(isChecked){
-                etLayoutForkDistL.visibility = View.VISIBLE
-
-                cbNaviSpeak.visibility = View.VISIBLE
-                cbNaviSpeakFirst.visibility = View.VISIBLE
-                cbNaviBlindDecSpeed.visibility = View.VISIBLE
-                cbSuggestLaneEn.visibility = View.VISIBLE
-                cbDisLaneEn.visibility = View.VISIBLE
-                cbKeepLeftEn.visibility = View.VISIBLE
-                cbKeepRightEn.visibility = View.VISIBLE
-                cbVisionKeepRight.visibility = View.VISIBLE
-                cbLayoutNaviMode.visibility = View.VISIBLE
-                //cbLaneProb.visibility = View.VISIBLE
-
-                cbRoadMeidan.visibility = View.VISIBLE
-                cbRoadRightFirst.visibility = View.VISIBLE
-            }else{
-                etLayoutForkDistL.visibility = View.GONE
-
-                cbRoadMeidan.visibility = View.GONE
-                cbRoadRightFirst.visibility = View.GONE
-                cbLaneProb.visibility = View.GONE
-            }
-        }
-
-        cbKeepLeftEn.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked && cbAppRoadNavi.isChecked) {
-                etLayoutAtcDistL.visibility = View.VISIBLE
-            } else if(!cbKeepRightEn.isChecked) {
-                etLayoutAtcDistL.visibility = View.GONE
-            }
-
-            if (isChecked && cbAppNavi.isChecked) {
-                etLayoutAtcDistH.visibility = View.VISIBLE
-            } else if(!cbKeepRightEn.isChecked){
-                etLayoutAtcDistH.visibility = View.GONE
-            }
-        }
-
-        cbKeepRightEn.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked && cbAppRoadNavi.isChecked) {
-                etLayoutAtcDistL.visibility = View.VISIBLE
-            } else if(!cbKeepLeftEn.isChecked) {
-                etLayoutAtcDistL.visibility = View.GONE
-            }
-
-            if (isChecked && cbAppNavi.isChecked) {
-                etLayoutAtcDistH.visibility = View.VISIBLE
-            } else if(!cbKeepLeftEn.isChecked) {
-                etLayoutAtcDistH.visibility = View.GONE
-            }
-
-            if (!isChecked) {
-                cbVisionKeepRight.isChecked = false
-            }
-        }
-
-        cbVisionKeepRight.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) {
-                cbKeepRightEn.isChecked = true
-                //勾选纯视觉靠右后自动关闭禁止车道和推荐车道
-                cbSuggestLaneEn.isChecked = false
-                cbDisLaneEn.isChecked = false
-            }
-        }
-
         btnCancelSetting.setOnClickListener { finish() }
 
-        // 顶部一排分页入口
+        // 顶部一排分页入口（跳走时关闭本页，保证一次返回回到主界面）
         findViewById<Button>(R.id.btnGotoNav).setOnClickListener {
             startActivity(android.content.Intent(this, NavSettingActivity::class.java))
+            finish()
         }
         findViewById<Button>(R.id.btnGotoOvertake).setOnClickListener {
             startActivity(android.content.Intent(this, OvertakeSettingActivity::class.java))
+            finish()
         }
     }
 
@@ -568,34 +314,12 @@ class SettingActivity : AppCompatActivity() {
                 .putBoolean("tunnel_dec_speed", cbTunnelDecSpeed.isChecked)
                 .putBoolean("app_speak", cbAppSpeak.isChecked)
                 .putBoolean("app_log", cbAppLog.isChecked)
-                .putBoolean("app_navi", cbAppNavi.isChecked)
-                .putBoolean("app_road_navi", cbAppRoadNavi.isChecked)
-                .putBoolean("navi_speak", cbNaviSpeak.isChecked)
-                .putBoolean("navi_speak_first", cbNaviSpeakFirst.isChecked)
-                .putBoolean("navi_blind_dec_speed", cbNaviBlindDecSpeed.isChecked)
-                .putBoolean("suggest_lane_en", cbSuggestLaneEn.isChecked)
-                .putBoolean("dis_lane_en", cbDisLaneEn.isChecked)
-                .putBoolean("keep_left_en", cbKeepLeftEn.isChecked)
-                .putBoolean("keep_right_en", cbKeepRightEn.isChecked)
-                .putBoolean("road_median", cbRoadMeidan.isChecked)
-                .putBoolean("road_right_first", cbRoadRightFirst.isChecked)
-                .putBoolean("lane_prob_enable", cbLaneProb.isChecked)
-                .putBoolean("vision_keep_right", cbVisionKeepRight.isChecked)
-                .putBoolean("nav_turn", cbNavTurn.isChecked)
-                .putInt("nav_mode", when (rgNavMode.checkedRadioButtonId) {
-                    R.id.rbNavFastMode -> 1
-                    R.id.rbNavNormalMode -> 2
-                    R.id.rbNavSlowMode -> 3
-                    else -> 2   // 默认标准
-                })
                 .putBoolean("smooth_speed_limit", cbSmoothSpeedLimit.isChecked)
-                .putBoolean("lane_overtake", cbLaneOvertake.isChecked)
                 .putBoolean("lane_show", cbLaneShow.isChecked)
                 .putBoolean("video_show", cbVideoShow.isChecked)
                 .putBoolean("video_show_fast", cbVideoShowFast.isChecked)
                 .putBoolean("lane_detect", cbLaneDetect.isChecked)
                 .putBoolean("lane_color", cbLaneColor.isChecked)
-                .putInt("navi_min_speed", etNaviMinSpeed.text.toString().toIntOrNull() ?: 20)
                 .putInt("red_light_min_speed_limit", etRedLightMinSpeedLimt.text.toString().toIntOrNull() ?: 1)
                 .putInt("cp_min_speed_limit", etCpMinSpeedLimt.text.toString().toIntOrNull() ?: 20)
                 .putInt("road_speed_limit_percent", etRoadSpeedLimitPercent.text.toString().toIntOrNull() ?: 0)
@@ -610,17 +334,7 @@ class SettingActivity : AppCompatActivity() {
                 .putInt("lane_detect_interval", etLaneDetectInterval.text.toString().toIntOrNull() ?: 500)
                 .putInt("station_keep_time", etStationKeepTime.text.toString().toIntOrNull() ?: 0)
                 .putInt("navi_traffic_assist_time", etNaviTrafficAssistTime.text.toString().toIntOrNull() ?: 10)
-                .putInt("atc_dist_h", etAtcDistH.text.toString().toIntOrNull() ?: 2000)
-                .putInt("atc_dist_l", etAtcDistL.text.toString().toIntOrNull() ?: 500)
-                .putInt("fork_dist_h", etForkDistH.text.toString().toIntOrNull() ?: 80)
-                .putInt("fork_dist_l", etForkDistL.text.toString().toIntOrNull() ?: 30)
 
-                .putInt("overtake_mode", when (rgOvertakeMode.checkedRadioButtonId) {
-                    R.id.rbOvertakeFastMode -> 1
-                    R.id.rbOvertakeNormalMode -> 2
-                    R.id.rbOvertakeSlowMode -> 3
-                    else -> 2   // 默认标准
-                })
                 .putInt("vision_lane_mode", when (rgVisionLaneMode.checkedRadioButtonId) {
                     R.id.rbVisionLaneFastMode -> 1
                     R.id.rbVisionLaneNormalMode -> 2
@@ -640,28 +354,12 @@ class SettingActivity : AppCompatActivity() {
         cbTunnelDecSpeed.isChecked = prefs.getBoolean("tunnel_dec_speed", true)
         cbAppSpeak.isChecked = prefs.getBoolean("app_speak", false)
         cbAppLog.isChecked = prefs.getBoolean("app_log", false)
-        cbAppNavi.isChecked = prefs.getBoolean("app_navi", false)
-        cbAppRoadNavi.isChecked = prefs.getBoolean("app_road_navi", false)
-        cbNaviSpeak.isChecked = prefs.getBoolean("navi_speak", true)
-        cbNaviSpeakFirst.isChecked = prefs.getBoolean("navi_speak_first", true)
-        cbNaviBlindDecSpeed.isChecked = prefs.getBoolean("navi_blind_dec_speed", false)
-        cbSuggestLaneEn.isChecked = prefs.getBoolean("suggest_lane_en", false)
-        cbDisLaneEn.isChecked = prefs.getBoolean("dis_lane_en", false)
-        cbKeepLeftEn.isChecked = prefs.getBoolean("keep_left_en", false)
-        cbKeepRightEn.isChecked = prefs.getBoolean("keep_right_en", false)
-        cbRoadMeidan.isChecked = prefs.getBoolean("road_median", true)
-        cbRoadRightFirst.isChecked = prefs.getBoolean("road_right_first", true)
-        cbLaneProb.isChecked = prefs.getBoolean("lane_prob_enable", false)
-        cbVisionKeepRight.isChecked = prefs.getBoolean("vision_keep_right", false)
-        cbNavTurn.isChecked = prefs.getBoolean("nav_turn", false)
         cbSmoothSpeedLimit.isChecked = prefs.getBoolean("smooth_speed_limit", false)
-        cbLaneOvertake.isChecked = prefs.getBoolean("lane_overtake", false)
         cbLaneShow.isChecked = prefs.getBoolean("lane_show", false)
         cbVideoShow.isChecked = prefs.getBoolean("video_show", false)
         cbVideoShowFast.isChecked = prefs.getBoolean("video_show_fast", false)
         cbLaneDetect.isChecked = prefs.getBoolean("lane_detect", true)
         cbLaneColor.isChecked = prefs.getBoolean("lane_color", false)
-        etNaviMinSpeed.setText(prefs.getInt("navi_min_speed", 20).toString())
         etRedLightMinSpeedLimt.setText(prefs.getInt("red_light_min_speed_limit", 1).toString())
         etCpMinSpeedLimt.setText(prefs.getInt("cp_min_speed_limit", 20).toString())
         etRoadSpeedLimitPercent.setText(prefs.getInt("road_speed_limit_percent", 0).toString())
@@ -676,24 +374,6 @@ class SettingActivity : AppCompatActivity() {
         etLaneDetectInterval.setText(prefs.getInt("lane_detect_interval", 500).toString())
         etStationKeepTime.setText(prefs.getInt("station_keep_time", 15).toString())
         etNaviTrafficAssistTime.setText(prefs.getInt("navi_traffic_assist_time", 10).toString())
-        etAtcDistH.setText(prefs.getInt("atc_dist_h", 2000).toString())
-        etAtcDistL.setText(prefs.getInt("atc_dist_l", 500).toString())
-        etForkDistH.setText(prefs.getInt("fork_dist_h", 80).toString())
-        etForkDistL.setText(prefs.getInt("fork_dist_l", 30).toString())
-
-        val navMode = prefs.getInt("nav_mode", 2) // 默认标准
-        when (navMode) {
-            1 -> rgNavMode.check(R.id.rbNavFastMode)
-            2 -> rgNavMode.check(R.id.rbNavNormalMode)
-            3 -> rgNavMode.check(R.id.rbNavSlowMode)
-        }
-
-        val overtakeMode = prefs.getInt("overtake_mode", 2) // 默认标准
-        when (overtakeMode) {
-            1 -> rgOvertakeMode.check(R.id.rbOvertakeFastMode)
-            2 -> rgOvertakeMode.check(R.id.rbOvertakeNormalMode)
-            3 -> rgOvertakeMode.check(R.id.rbOvertakeSlowMode)
-        }
 
         val visionLaneMode = prefs.getInt("vision_lane_mode", 1) // 默认标准
         when (visionLaneMode) {
@@ -703,53 +383,10 @@ class SettingActivity : AppCompatActivity() {
         }
         // (超车设置在 OvertakeSettingActivity 里加载)
 
-        if(cbAppNavi.isChecked){
-            if(cbKeepLeftEn.isChecked || cbKeepRightEn.isChecked){
-                etLayoutAtcDistH.visibility = View.VISIBLE
-            }else{
-                etLayoutAtcDistH.visibility = View.GONE
-            }
-            etLayoutForkDistH.visibility = View.VISIBLE
-        }else{
-            etLayoutForkDistH.visibility = View.GONE
-        }
-
-        if(cbAppRoadNavi.isChecked){
-            if(cbKeepLeftEn.isChecked || cbKeepRightEn.isChecked){
-                etLayoutAtcDistL.visibility = View.VISIBLE
-            }else{
-                etLayoutAtcDistL.visibility = View.GONE
-            }
-            etLayoutForkDistL.visibility = View.VISIBLE
-        }else{
-            etLayoutForkDistL.visibility = View.GONE
-            cbRoadMeidan.visibility = View.GONE
-            cbRoadRightFirst.visibility = View.GONE
-        }
-
-        if(cbAppNavi.isChecked || cbAppRoadNavi.isChecked){
-            etLayoutNaviMinSpeed.visibility = View.VISIBLE
-        }else{
-            etLayoutNaviMinSpeed.visibility = View.GONE
-
-            cbNaviSpeak.visibility = View.GONE
-            cbNaviSpeakFirst.visibility = View.GONE
-            cbNaviBlindDecSpeed.visibility = View.GONE
-            cbSuggestLaneEn.visibility = View.GONE
-            cbDisLaneEn.visibility = View.GONE
-            cbKeepLeftEn.visibility = View.GONE
-            cbKeepRightEn.visibility = View.GONE
-            cbVisionKeepRight.visibility = View.GONE
-            cbLayoutNaviMode.visibility = View.GONE
-            cbLaneProb.visibility = View.GONE
-
-            cbRoadMeidan.visibility = View.GONE
-            cbRoadRightFirst.visibility = View.GONE
-        }
-
-        val scrollView = findViewById<ScrollView>(R.id.settingScrollView)
+        // 顶部留空加到内容布局上(车机适配)：值取"顶部留空"参数，与另外两个设置页一致
+        val content = findViewById<LinearLayout>(R.id.settingContentLayout)
         val top_pad_dp = etTopPad.text.toString().toIntOrNull() ?: 5
-        setTopPaddingDp(scrollView, top_pad_dp)
+        setTopPaddingDp(content, top_pad_dp)
     }
 
     fun setTopPaddingDp(view: View, dp: Int) {

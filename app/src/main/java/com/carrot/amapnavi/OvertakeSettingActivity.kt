@@ -3,6 +3,7 @@ package com.carrot.amapnavi
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -22,6 +23,7 @@ class OvertakeSettingActivity : AppCompatActivity() {
     private lateinit var cbRoad: CheckBox
     private lateinit var cbLidarSelfCheck: CheckBox
     private lateinit var cbThreshFollowCp: CheckBox
+    private lateinit var cbLaneOvertake: CheckBox
     private lateinit var etReverseCooldown: EditText
 
     private val prefsName = "user_settings"
@@ -35,6 +37,7 @@ class OvertakeSettingActivity : AppCompatActivity() {
         cbRoad = findViewById(R.id.cbOvertakeSettingRoad)
         cbLidarSelfCheck = findViewById(R.id.cbOvertakeSettingLidarSelfCheck)
         cbThreshFollowCp = findViewById(R.id.cbOvertakeSettingThreshFollowCp)
+        cbLaneOvertake = findViewById(R.id.cbOvertakeSettingLaneOvertake)
         etReverseCooldown = findViewById(R.id.etReverseCooldown)
 
         load()
@@ -51,13 +54,25 @@ class OvertakeSettingActivity : AppCompatActivity() {
         }
         findViewById<Button>(R.id.btnCancelOvertakeSetting).setOnClickListener { finish() }
 
-        // 顶部一排分页入口
+        // 顶部一排分页入口（跳走时关闭本页，保证一次返回回到主界面）
         findViewById<Button>(R.id.btnGotoGeneral).setOnClickListener {
             startActivity(Intent(this, SettingActivity::class.java))
+            finish()
         }
         findViewById<Button>(R.id.btnGotoNav).setOnClickListener {
             startActivity(Intent(this, NavSettingActivity::class.java))
+            finish()
         }
+
+        // 顶部留空：与车机适配参数 top_pad_dp 保持一致
+        setTopPaddingDp(
+                findViewById(R.id.overtakeSettingContent),
+                getSharedPreferences(prefsName, Context.MODE_PRIVATE).getInt("top_pad_dp", 5))
+    }
+
+    private fun setTopPaddingDp(view: View, dp: Int) {
+        val px = (dp * resources.displayMetrics.density).toInt()
+        view.setPadding(view.paddingLeft, px, view.paddingRight, view.paddingBottom)
     }
 
     private fun changeValue(view: EditText, delta: Int) {
@@ -79,6 +94,7 @@ class OvertakeSettingActivity : AppCompatActivity() {
                 .putBoolean("app_road_overtake", cbRoad.isChecked)
                 .putBoolean("app_lidar_self_check", cbLidarSelfCheck.isChecked)
                 .putBoolean("app_thresh_follow_cp", cbThreshFollowCp.isChecked)
+                .putBoolean("lane_overtake", cbLaneOvertake.isChecked)
                 .putInt("overtake_reverse_cooldown_s", cooldown.coerceIn(0, 120))
                 .apply()
     }
@@ -94,6 +110,7 @@ class OvertakeSettingActivity : AppCompatActivity() {
         cbRoad.isChecked = prefs.getBoolean("app_road_overtake", false)
         cbLidarSelfCheck.isChecked = prefs.getBoolean("app_lidar_self_check", true)
         cbThreshFollowCp.isChecked = prefs.getBoolean("app_thresh_follow_cp", true)
+        cbLaneOvertake.isChecked = prefs.getBoolean("lane_overtake", false)
         etReverseCooldown.setText(
             prefs.getInt("overtake_reverse_cooldown_s", 20).toString()
         )

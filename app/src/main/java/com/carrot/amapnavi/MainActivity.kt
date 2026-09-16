@@ -826,10 +826,13 @@ class MainActivity : AppCompatActivity() {
         // 自动化测试入口：直接打开雷达诊断页
         //   adb shell am start -n com.carrot.amapnavi/.MainActivity --ez radar true
         // 原因：uiautomator 在本界面永远拿不到 idle(数据 200ms 刷新)，靠 dump 找按钮点击不可靠
-        if (intent?.getBooleanExtra("radar", false) == true) {
+        // 只在"本次显式启动"时生效：系统重建 Activity 会保留 intent，
+        // 否则每次开机/恢复都会自动跳到超车诊断页
+        if (savedInstanceState == null && intent?.getBooleanExtra("radar", false) == true) {
             setOvertakeDebugPanelVisible(true)
             btnOvertakeDebug.text = "隐藏"
         }
+        intent?.removeExtra("radar")
 
         //超车专用日志：独立文件夹(AmapNavi/overtake/日期_0001.log)，与主日志(AmapNavi/app/)无关
         OvertakeLogger.init(this)
