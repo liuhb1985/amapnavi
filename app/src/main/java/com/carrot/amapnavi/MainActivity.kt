@@ -109,15 +109,21 @@ class MainActivity : AppCompatActivity() {
     internal lateinit var tvOvertakeDebug: TextView
     internal lateinit var tvOvertakeDebugHead: TextView
     internal lateinit var tvRadarFront: TextView
-    internal lateinit var tvRadarLeftFront: TextView
-    internal lateinit var tvRadarRightFront: TextView
-    internal lateinit var tvRadarLeftRear: TextView
-    internal lateinit var tvRadarRightRear: TextView
+    internal lateinit var tvRadarMmwLeft: TextView
+    internal lateinit var tvRadarMmwRight: TextView
+    internal lateinit var tvRadarLidarLeftFront: TextView
+    internal lateinit var tvRadarLidarRightFront: TextView
+    internal lateinit var tvRadarLidarLeftRear: TextView
+    internal lateinit var tvRadarLidarRightRear: TextView
+    internal lateinit var tvRadarLeftBlock: TextView
+    internal lateinit var tvRadarRightBlock: TextView
     internal lateinit var tvRadarEgo: TextView
     internal lateinit var layoutOvertakeDebug: LinearLayout
     internal lateinit var btnOvertakeDebug: Button
     internal lateinit var btnOvertakeDebugClose: Button
     internal var overtakeDebugRefreshJob: Job? = null
+    // 雷达卡片文本的上一次输出(内容没变就不重复写日志，避免刷屏)
+    internal var radarCardsLogLast: String = ""
     internal lateinit var btnAppOverTake: Button
     //private lateinit var btnLaneDetect: Button
     internal lateinit var btnNavSetting: Button
@@ -252,6 +258,9 @@ class MainActivity : AppCompatActivity() {
     internal var vision_lane_mode = 1
     internal var app_overtake = false
     internal var app_road_overtake = false
+    // 侧向变道安全：App 自算判据(默认开) / 阈值跟随 CP(默认开, 关则用 App 内置默认值)
+    internal var app_lidar_self_check = true
+    internal var app_thresh_follow_cp = true
 
     var tunnelEnterTime: Long? = null  // 毫秒时间戳
     var tunnelKeepTime: Long? = null  // 毫秒时间戳
@@ -514,10 +523,14 @@ class MainActivity : AppCompatActivity() {
         tvOvertakeDebug = findViewById(R.id.tvOvertakeDebug)
         tvOvertakeDebugHead = findViewById(R.id.tvOvertakeDebugHead)
         tvRadarFront = findViewById(R.id.tvRadarFront)
-        tvRadarLeftFront = findViewById(R.id.tvRadarLeftFront)
-        tvRadarRightFront = findViewById(R.id.tvRadarRightFront)
-        tvRadarLeftRear = findViewById(R.id.tvRadarLeftRear)
-        tvRadarRightRear = findViewById(R.id.tvRadarRightRear)
+        tvRadarMmwLeft = findViewById(R.id.tvRadarMmwLeft)
+        tvRadarMmwRight = findViewById(R.id.tvRadarMmwRight)
+        tvRadarLidarLeftFront = findViewById(R.id.tvRadarLidarLeftFront)
+        tvRadarLidarRightFront = findViewById(R.id.tvRadarLidarRightFront)
+        tvRadarLidarLeftRear = findViewById(R.id.tvRadarLidarLeftRear)
+        tvRadarLidarRightRear = findViewById(R.id.tvRadarLidarRightRear)
+        tvRadarLeftBlock = findViewById(R.id.tvRadarLeftBlock)
+        tvRadarRightBlock = findViewById(R.id.tvRadarRightBlock)
         tvRadarEgo = findViewById(R.id.tvRadarEgo)
         btnOvertakeDebug = findViewById(R.id.btnOvertakeDebug)
         btnOvertakeDebugClose = findViewById(R.id.btnOvertakeDebugClose)
@@ -794,13 +807,21 @@ class MainActivity : AppCompatActivity() {
         btnOvertakeDebug.setOnClickListener {
             val show = !overtakeDebugEnable
             setOvertakeDebugPanelVisible(show)
-            btnOvertakeDebug.text = if (show) "隐藏" else "超车"
+            btnOvertakeDebug.text = if (show) "隐藏" else "超车调试"
         }
 
         //诊断页内的关闭按钮
         btnOvertakeDebugClose.setOnClickListener {
             setOvertakeDebugPanelVisible(false)
-            btnOvertakeDebug.text = "超车"
+            btnOvertakeDebug.text = "超车调试"
+        }
+
+        // 自动化测试入口：直接打开雷达诊断页
+        //   adb shell am start -n com.carrot.amapnavi/.MainActivity --ez radar true
+        // 原因：uiautomator 在本界面永远拿不到 idle(数据 200ms 刷新)，靠 dump 找按钮点击不可靠
+        if (intent?.getBooleanExtra("radar", false) == true) {
+            setOvertakeDebugPanelVisible(true)
+            btnOvertakeDebug.text = "隐藏"
         }
 
         //超车专用日志：独立文件夹(AmapNavi/overtake/日期_0001.log)，与主日志(AmapNavi/app/)无关

@@ -337,6 +337,18 @@ fun MainActivity.loadUserSettings() {
         editor.putBoolean("app_road_overtake", false)
         false
     }
+    app_lidar_self_check = if (prefs.contains("app_lidar_self_check")) {
+        prefs.getBoolean("app_lidar_self_check", true)
+    } else {
+        editor.putBoolean("app_lidar_self_check", true)
+        true
+    }
+    app_thresh_follow_cp = if (prefs.contains("app_thresh_follow_cp")) {
+        prefs.getBoolean("app_thresh_follow_cp", true)
+    } else {
+        editor.putBoolean("app_thresh_follow_cp", true)
+        true
+    }
 
     // 提交默认值（如果有写入的话）
     editor.apply()

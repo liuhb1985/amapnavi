@@ -143,6 +143,20 @@ private val OP_FIELD_TABLE = listOf(
         BoolField("blind_l", { s, v -> s.blind_l = v }),
         BoolField("blind_r", { s, v -> s.blind_r = v }),
 
+        //综合盲区的分解来源：摄像头 / 车身 / 车道实线
+        BoolField("blind_camera_l", { s, v -> s.blind_camera_l = v }),
+        BoolField("blind_camera_r", { s, v -> s.blind_camera_r = v }),
+        BoolField("blind_car_l", { s, v -> s.blind_car_l = v }),
+        BoolField("blind_car_r", { s, v -> s.blind_car_r = v }),
+        BoolField("blind_lane_l", { s, v -> s.blind_lane_l = v }),
+        BoolField("blind_lane_r", { s, v -> s.blind_lane_r = v }),
+
+        //侧向判定阈值(配置类: 断流后沿用上次的值)
+        IntField("lidar_front_vdist_time", { s, v -> s.lidar_front_vdist_time = v }, resetOnTimeout = false),
+        IntField("lidar_front_vrel_time", { s, v -> s.lidar_front_vrel_time = v }, resetOnTimeout = false),
+        IntField("lidar_behind_vdist_time", { s, v -> s.lidar_behind_vdist_time = v }, resetOnTimeout = false),
+        IntField("lidar_behind_vrel_time", { s, v -> s.lidar_behind_vrel_time = v }, resetOnTimeout = false),
+
         IntField("lf_drel", { s, v -> s.lf_drel = v }),
         IntField("lb_drel", { s, v -> s.lb_drel = v }),
         IntField("rf_drel", { s, v -> s.rf_drel = v }),

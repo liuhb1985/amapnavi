@@ -93,6 +93,139 @@ fun MainActivity.sendLaneActionCmd(action: LaneChangeAction) {
     showLaneDebug(msg)
 }
 
+/* =========================================================
+ * 激光雷达侧向安全判定（App 侧自算，与 CP 侧同一口径）
+ *
+ * CP 下发的四角距离/相对速度之外，App 自己也做一遍判定：
+ *
+ *   危险 = 外推距离 < 危险距离  或  当前距离 < 危险距离  或  TTC < 阈值
+ *   外推距离 = |d| - 接近速度 × 安全时距（相对速度时距）
+ *   危险距离 = 绝对速度时距：正值 = 基准速度 × 时距；负值 = 绝对值(m)
+ *   基准速度 = 前方 本车速度 / 后方 对方速度(vEgo + vrel)
+ *
+ * 只在对应侧激光雷达在线时启用（离线时无法确认侧后方，仍只依赖原车标志）。
+ * ========================================================= */
+object LidarSideSafety {
+    const val TTC_LIMIT_S = 2.5f        // 碰撞时间下限
+    const val MIN_CLEARANCE_M = 4.0f    // 最小净空兜底
+    const val FRONT_DIST_TIME_S = -5f   // 前方：负值=绝对 5m（兜底）
+    const val REAR_DIST_TIME_S = -10f   // 后方：负值=绝对 10m（兜底）
+    const val FRONT_VREL_TIME_S = 4.0f  // 前方安全时距（相对速度 × 4s）
+    const val REAR_VREL_TIME_S = 4.0f   // 后方安全时距
+    const val RELEASE_MARGIN = 1.4f     // 迟滞：已判危险时要退到 危险距离×该值 才清除
+    const val LATERAL_MAX_M = 5.5f      // 横向口径：超过该值的目标视为路外，不参与判定
+}
+
+// 迟滞锁存：key = "L-front"/"L-rear"/"R-front"/"R-rear"（与 CP 侧的 latch 同口径，
+// 避免距离在阈值附近抖动时卡片来回闪）
+private val lidarHazardLatch = mutableMapOf<String, Boolean>()
+
+// 横向超出判定区域(路外)的目标不参与判定（CP 侧按侧面车道宽屏蔽，App 侧用固定上限兜底）
+private fun lateralOutOfRange(xrelMm: Int?): Boolean {
+    if (xrelMm == null) return false
+    return kotlin.math.abs(xrelMm) / 1000f > LidarSideSafety.LATERAL_MAX_M
+}
+
+// 单个侧向目标是否危险：dM>0 前方 / dM<0 后方；vRelKmh = 目标速度 - 本车速度
+fun lidarTargetRisky(dM: Float, vRelKmh: Int?, vEgoMs: Float,
+                     distTimeS: Float, vRelTimeS: Float,
+                     latch: Boolean = false): Boolean {
+    if (dM == 0f) return false
+    val vRel = (vRelKmh ?: 0).toFloat() / 3.6f
+    val basis = if (dM > 0f) vEgoMs else maxOf(0f, vEgoMs + vRel)
+    val dangerRaw = if (distTimeS > 0f) {
+        maxOf(basis * distTimeS, LidarSideSafety.MIN_CLEARANCE_M)
+    } else {
+        maxOf(kotlin.math.abs(distTimeS), LidarSideSafety.MIN_CLEARANCE_M)
+    }
+    // 迟滞：已判危险时放宽清除条件（与 CP 侧一致）
+    val dangerDist = if (latch) dangerRaw * LidarSideSafety.RELEASE_MARGIN else dangerRaw
+    val closing = if (dM > 0f) maxOf(-vRel, 0f) else maxOf(vRel, 0f)
+    val dAbs = kotlin.math.abs(dM)
+    val future = maxOf(0f, dAbs - closing * vRelTimeS)
+    val ttcRisky = closing > 0.05f && dAbs / closing < LidarSideSafety.TTC_LIMIT_S
+    return future < dangerDist || dAbs < dangerDist || ttcRisky
+}
+
+// 激光雷达自算的该侧危险（激光不在线 / 无目标 / 安全 → null）
+fun MainActivity.lidarSideHazard(action: LaneChangeAction): BlockCause? {
+    val s = opStateManager.state
+    val left = action == LaneChangeAction.LEFT
+    if (!app_lidar_self_check) return null                   // 设置里关掉了自算判据
+    if (!(if (left) s.lidar_l else s.lidar_r)) return null   // 激光离线：交给原车标志
+    val vEgoMs = (s.vEgo ?: 0).toFloat() / 3.6f
+
+    val key = if (left) "L" else "R"
+
+    // 前方：激光前角（横向超出路外范围的目标不参与判定）
+    val fd = (if (left) s.lf_drel else s.rf_drel)?.takeIf { it > 0 }?.let { it / 1000f }
+    val fWide = lateralOutOfRange(if (left) s.lf_xrel else s.rf_xrel)
+    if (fd != null && !fWide) {
+        val risky = lidarTargetRisky(fd, if (left) s.lf_vrel else s.rf_vrel, vEgoMs,
+            frontDistTime(), frontVrelTime(), lidarHazardLatch[key + "-front"] == true)
+        lidarHazardLatch[key + "-front"] = risky
+        if (risky) return BlockCause(-32, "侧前危险·激光${"%.1f".format(fd)}m")
+    } else {
+        lidarHazardLatch[key + "-front"] = false
+    }
+
+    // 后方：激光后角（drel<0 表示在后方）
+    val rd = (if (left) s.lb_drel else s.rb_drel)?.takeIf { it < 0 }?.let { -it / 1000f }
+    val rWide = lateralOutOfRange(if (left) s.lb_xrel else s.rb_xrel)
+    if (rd != null && !rWide) {
+        val risky = lidarTargetRisky(-rd, if (left) s.lb_vrel else s.rb_vrel, vEgoMs,
+            rearDistTime(), rearVrelTime(), lidarHazardLatch[key + "-rear"] == true)
+        lidarHazardLatch[key + "-rear"] = risky
+        if (risky) return BlockCause(-64, "侧后逼近·激光${"%.1f".format(rd)}m")
+    } else {
+        lidarHazardLatch[key + "-rear"] = false
+    }
+    return null
+}
+
+// 阈值：优先用 CP 下发的(与 CP 同源，只在一处调参)，CP 没给就用本地常量兜底
+private fun MainActivity.frontDistTime(): Float =
+    if (!app_thresh_follow_cp) LidarSideSafety.FRONT_DIST_TIME_S
+    else opStateManager.state.lidar_front_vdist_time?.let { it / 10f } ?: LidarSideSafety.FRONT_DIST_TIME_S
+
+private fun MainActivity.frontVrelTime(): Float =
+    if (!app_thresh_follow_cp) LidarSideSafety.FRONT_VREL_TIME_S
+    else opStateManager.state.lidar_front_vrel_time?.let { it / 10f } ?: LidarSideSafety.FRONT_VREL_TIME_S
+
+private fun MainActivity.rearDistTime(): Float =
+    if (!app_thresh_follow_cp) LidarSideSafety.REAR_DIST_TIME_S
+    else opStateManager.state.lidar_behind_vdist_time?.let { it / 10f } ?: LidarSideSafety.REAR_DIST_TIME_S
+
+private fun MainActivity.rearVrelTime(): Float =
+    if (!app_thresh_follow_cp) LidarSideSafety.REAR_VREL_TIME_S
+    else opStateManager.state.lidar_behind_vrel_time?.let { it / 10f } ?: LidarSideSafety.REAR_VREL_TIME_S
+
+// 某一个激光角是否危险（仅供卡片着色查询，不改迟滞状态：
+//  迟滞锁存由 lidarSideHazard() 在算"该侧禁止原因"时统一更新）
+fun MainActivity.lidarCornerRisky(left: Boolean, front: Boolean): Boolean {
+    val s = opStateManager.state
+    if (!app_lidar_self_check) return false                     // 设置里关掉了自算判据
+    if (!(if (left) s.lidar_l else s.lidar_r)) return false     // 激光离线：不自算
+    val vEgoMs = (s.vEgo ?: 0).toFloat() / 3.6f
+    val drel = if (left) (if (front) s.lf_drel else s.lb_drel)
+               else (if (front) s.rf_drel else s.rb_drel)
+    val xrel = if (left) (if (front) s.lf_xrel else s.lb_xrel)
+               else (if (front) s.rf_xrel else s.rb_xrel)
+    val vrel = if (left) (if (front) s.lf_vrel else s.lb_vrel)
+               else (if (front) s.rf_vrel else s.rb_vrel)
+    if (drel == null || lateralOutOfRange(xrel)) return false
+    val key = (if (left) "L" else "R") + (if (front) "-front" else "-rear")
+    return if (front) {
+        val d = drel.takeIf { it > 0 }?.let { it / 1000f } ?: return false
+        lidarTargetRisky(d, vrel, vEgoMs, frontDistTime(), frontVrelTime(),
+            lidarHazardLatch[key] == true)
+    } else {
+        val d = drel.takeIf { it < 0 }?.let { -it / 1000f } ?: return false
+        lidarTargetRisky(-d, vrel, vEgoMs, rearDistTime(), rearVrelTime(),
+            lidarHazardLatch[key] == true)
+    }
+}
+
 //检查盲区是否安全
 //  返回码(0=允许变道；<0=禁止，供卡片显示原因)：
 //    0    允许
@@ -101,6 +234,8 @@ fun MainActivity.sendLaneActionCmd(action: LaneChangeAction) {
 //   -4    原车后盲区(BSD, left_blindspot/right_blindspot)
 //   -8    外挂激光雷达盲区(纯激光: 侧方/前角/后角)
 //  -16    综合盲区里的其它来源(摄像头等, blind_l/blind_r)
+//  -32    激光自算：侧前方不安全(时距/TTC)
+//  -64    激光自算：侧后方不安全(时距/TTC)
 fun MainActivity.LaneChangeSafetyCheck(action: LaneChangeAction): Int {
     val s = opStateManager.state
     if (action == LaneChangeAction.LEFT) {
@@ -116,6 +251,8 @@ fun MainActivity.LaneChangeSafetyCheck(action: LaneChangeAction): Int {
         } else if (s.blind_l) { //综合盲区里的其它来源(摄像头等)
             return -16
         }
+        // 激光在线时，App 自算的时距/TTC 判据（侧前/侧后逼近）
+        lidarSideHazard(LaneChangeAction.LEFT)?.let { return it.code }
     } else if (action == LaneChangeAction.RIGHT) {
         //右侧盲区有车
         if (s.r_front_blind) {
@@ -129,6 +266,7 @@ fun MainActivity.LaneChangeSafetyCheck(action: LaneChangeAction): Int {
         } else if (s.blind_r) {
             return -16
         }
+        lidarSideHazard(LaneChangeAction.RIGHT)?.let { return it.code }
     }
 
     if (action == LaneChangeAction.LEFT_TURN) {
@@ -146,36 +284,32 @@ fun MainActivity.LaneChangeSafetyCheck(action: LaneChangeAction): Int {
     return 0
 }
 
-//一张卡片"禁止变道"的原因(供卡片显示)：原因文字 + 判据来源
+//该侧"禁止变道"的原因(供第4行的变道卡片显示)：原因文字 + 判据来源
 data class BlockCause(val code: Int, val text: String)
 
-//  判据集合与 LaneChangeSafetyCheck 完全一致（任何一条成立就一定返回 <0），显示按方位分工：
-//    front=true  (左前/右前卡片)：只显示"前"相关盲区；没有前向盲区时，才显示不分方位的综合盲区
-//    front=false (左后/右后卡片)：只显示"后"相关盲区；没有后向盲区时，才显示不分方位的综合盲区
-//  即：前盲区只出现在前面的卡片、后盲区只出现在后面的卡片，综合盲区也不会叠加在
-//  已经有方位性盲区的卡片上。
-fun MainActivity.cardBlockCause(action: LaneChangeAction, front: Boolean): BlockCause? {
+//  判据集合与 LaneChangeSafetyCheck 完全一致（任何一条成立就一定返回 <0），
+//  显示顺序按方位：前(前雷达/激光前角) -> 后(BSD/激光后角) -> 侧方激光 -> 实线 -> 摄像头
+fun MainActivity.sideBlockCause(action: LaneChangeAction): BlockCause? {
     val s = opStateManager.state
     val left = action == LaneChangeAction.LEFT
 
-    val directional = if (front) {
-        listOf(
-            (if (left) s.l_front_blind else s.r_front_blind) to BlockCause(-2, "前侧盲区·前雷达"),
-            (if (left) s.lidar_lfblind else s.lidar_rfblind) to BlockCause(-8, "激光盲区·前角"),
-        )
-    } else {
-        listOf(
-            (if (left) s.left_blindspot else s.right_blindspot) to BlockCause(-4, "后方盲区·BSD"),
-            (if (left) s.lidar_lbblind else s.lidar_rbblind) to BlockCause(-8, "激光盲区·后角"),
-        )
-    }
-    // 不分方位的综合类：激光侧方 / 车道线实线 / 摄像头盲区
-    val generic = listOf(
+    val causes = mutableListOf(
+        (if (left) s.l_front_blind else s.r_front_blind) to BlockCause(-2, "前侧盲区·前雷达"),
+        (if (left) s.left_blindspot else s.right_blindspot) to BlockCause(-4, "后方盲区·BSD"),
+        (if (left) s.lidar_lfblind else s.lidar_rfblind) to BlockCause(-8, "激光盲区·前角"),
+        (if (left) s.lidar_lbblind else s.lidar_rbblind) to BlockCause(-8, "激光盲区·后角"),
         (if (left) s.lidar_lblind else s.lidar_rblind) to BlockCause(-8, "激光盲区·侧方"),
-        ((if (left) left_lane_type else right_lane_type) == 1) to BlockCause(-1, "车道实线"),
-        (if (left) s.blind_l else s.blind_r) to BlockCause(-16, "摄像头盲区"),
+        // 车道实线：CP 判的实线 或 App 自己的车道线类型(两套来源取或，更保守)
+        (((if (left) s.blind_lane_l else s.blind_lane_r) ||
+            ((if (left) left_lane_type else right_lane_type) == 1))) to BlockCause(-1, "车道实线"),
+        // 综合盲区按分解来源分别显示，避免一律标成"摄像头盲区"
+        (if (left) s.blind_camera_l else s.blind_camera_r) to BlockCause(-16, "摄像头盲区"),
+        (if (left) s.blind_car_l else s.blind_car_r) to BlockCause(-16, "车身盲区"),
+        (if (left) s.blind_l else s.blind_r) to BlockCause(-16, "综合盲区"),
     )
-    return directional.firstOrNull { it.first }?.second ?: generic.firstOrNull { it.first }?.second
+    // 激光自算的时距/TTC 判据（激光在线时才有，与 LaneChangeSafetyCheck 的判据集合一致）
+    lidarSideHazard(action)?.let { causes += (true to it) }
+    return causes.firstOrNull { it.first }?.second
 }
 
 fun MainActivity.SendBlinkerControl(action: LaneChangeAction) {

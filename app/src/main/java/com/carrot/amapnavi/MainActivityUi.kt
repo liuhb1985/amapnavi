@@ -364,11 +364,16 @@ fun MainActivity.renderOvertakeDebugPage() {
     val detail = buildOvertakeDebugText(stage, decision, reason)
 
     val front = radarFrontCard()
-    val leftFront = radarLeftFrontCard()
-    val rightFront = radarRightFrontCard()
-    val leftRear = radarLeftRearCard()
-    val rightRear = radarRightRearCard()
-    val ego = "自车 " + (opStateManager.state.vEgo ?: 0) + " km/h"
+    val mmwLeft = radarMmwCard(left = true)
+    val mmwRight = radarMmwCard(left = false)
+    val lidarLf = radarLidarCard(left = true, front = true)
+    val lidarRf = radarLidarCard(left = false, front = true)
+    val lidarLr = radarLidarCard(left = true, front = false)
+    val lidarRr = radarLidarCard(left = false, front = false)
+    val blockLeft = radarBlockCard(left = true)
+    val blockRight = radarBlockCard(left = false)
+    // 本车卡片两行： 自车 / 速度
+    val ego = "自车\n" + (opStateManager.state.vEgo ?: 0) + "km/h"
     val nowMs = System.currentTimeMillis()
 
     lifecycleScope.launch(Dispatchers.Main) {
@@ -380,10 +385,16 @@ fun MainActivity.renderOvertakeDebugPage() {
         }
 
         applyRadarCard(tvRadarFront, front)
-        applyRadarCard(tvRadarLeftFront, leftFront)
-        applyRadarCard(tvRadarRightFront, rightFront)
-        applyRadarCard(tvRadarLeftRear, leftRear)
-        applyRadarCard(tvRadarRightRear, rightRear)
+        applyRadarCard(tvRadarMmwLeft, mmwLeft)
+        applyRadarCard(tvRadarMmwRight, mmwRight)
+        applyRadarCard(tvRadarLidarLeftFront, lidarLf)
+        applyRadarCard(tvRadarLidarRightFront, lidarRf)
+        applyRadarCard(tvRadarLidarLeftRear, lidarLr)
+        applyRadarCard(tvRadarLidarRightRear, lidarRr)
+        applyRadarCard(tvRadarLeftBlock, blockLeft)
+        applyRadarCard(tvRadarRightBlock, blockRight)
+        // 中列很窄(约容纳"100km/h")，本车卡片和正前车卡片同字号
+        tvRadarEgo.textSize = 14f
         tvRadarEgo.text = ego
 
         // 详情里带实时数值(车速/距离/计时)，每帧都在变；限速到 400ms 刷新一次，
@@ -394,18 +405,54 @@ fun MainActivity.renderOvertakeDebugPage() {
             tvOvertakeDebug.text = detail
         }
     }
+
+    // 供自动化/现场排查回读：把卡片文本压成一行输出（不依赖 uiautomator 的 idle）
+    //   adb logcat -d -s RadarCards      或 /sdcard/AmapNavi/app/<date>.log
+    logRadarCardsOnce(listOf(
+        "tvRadarMmwLeft" to mmwLeft.asText(),
+        "tvRadarLidarLeftFront" to lidarLf.asText(),
+        "tvRadarLidarLeftRear" to lidarLr.asText(),
+        "tvRadarFront" to front.asText(),
+        "tvRadarEgo" to ego,
+        "tvRadarMmwRight" to mmwRight.asText(),
+        "tvRadarLidarRightFront" to lidarRf.asText(),
+        "tvRadarLidarRightRear" to lidarRr.asText(),
+        "tvRadarLeftBlock" to blockLeft.asText(),
+        "tvRadarRightBlock" to blockRight.asText(),
+    ))
+}
+
+// 卡片显示文本（与 applyRadarCard 一致：空行列表显示"无目标"）
+private fun RadarCard.asText(): String =
+    (if (lines.isEmpty()) listOf("无目标") else lines).joinToString("\n")
+
+// 文本变化时才输出一行，格式：
+//   RADARCARDS tvRadarMmwLeft=15.0m/(-1km/h) tvRadarFront=前车/30.0m/45km/h/(-3km/h) ...
+private fun MainActivity.logRadarCardsOnce(cards: List<Pair<String, String>>) {
+    val line = cards.joinToString(" ") { (name, text) -> "$name=${text.replace("\n", "/")}" }
+    if (line == radarCardsLogLast) return
+    radarCardsLogLast = line
+    android.util.Log.i("RadarCards", "RADARCARDS $line")
+    AppLogger.log(this, "RadarCards", line)
 }
 
 // -----------------------------
-// 方位雷达卡片
-//   颜色只表达"这一侧能不能变道"：
-//     level 3 = 禁止变道 / 盲区(红)     level 2 = 注意(橙，仅正前方按距离分级)
-//     level 1 = 允许变道(绿)
-//   卡片不再写"左前方"等方位标题（方位由位置本身表达），省下的行用来放数据。
+// 超车页雷达卡片
+//   level: 0=雷达数据(中性底) 1=允许变道(绿) 2=无目标(灰) 3=禁止变道(红)
+//   前 3 行只显示雷达数据；是否禁止变道只由第 4 行的左右两个卡片表达
 // -----------------------------
 internal data class RadarCard(
-    val level: Int = 1,
-    val lines: List<String> = emptyList()
+    val level: Int = 0,
+    val lines: List<String> = emptyList(),
+    val textSize: Float = 16f,
+    val distLine: Int = 0,
+    val distScale: Float = 1.3f,
+    // 只有 level=0(有目标的雷达数据)用得到：淡色背景 + 配对的深色文字
+    val bg: String? = null,
+    val fg: String? = null,
+    // 该角"盲区成立"（CP 下发的该角盲区标志 或 App 自算判据命中）→ 底变红，
+    // 这样第 4 行只说"禁止变道"，是哪个方向阻止的看哪张卡片是红的就知道了
+    val danger: Boolean = false
 )
 
 // 距离格式：>=100m 取整，否则保留1位小数
@@ -418,115 +465,121 @@ private fun distM(m: Float?): String = when {
 // 相对速度格式(带符号)
 private fun relKmh(v: Int?): String = if (v == null) "-" else "%+d".format(v)
 
-// 数据行: [来源]距离/[相对速度]kph
-//   来源: 波=毫米波(前角), 光=激光雷达；只在同一角有两个来源时才加
-//   相对速度带正负号(负=正在接近)
-private fun dataLine(tag: String, d: Float?, vr: Int?): String {
-    val sb = StringBuilder(tag).append(distM(d))
-    if (vr != null) sb.append('/').append(relKmh(vr)).append("kph")
-    return sb.toString()
-}
+// 横向距离格式(取绝对值)
+private fun latM(latMm: Int?): String =
+    if (latMm == null) "-" else "%.1fm".format(kotlin.math.abs(latMm) / 1000f)
 
-// 横向距离行(只有激光雷达会报)：单独一行，避免和上面的距离/速度挤成一行被折断
-private fun xLine(latMm: Int?): String? =
-    latMm?.let { "X:%.1fm".format(kotlin.math.abs(it) / 1000f) }
-
-// 侧向卡片外壳：该角没有"禁止变道"的原因=绿(只显示数据)；有原因=红(原因+来源)
-private fun MainActivity.sideRadarCard(action: LaneChangeAction, front: Boolean,
-                                       lines: List<String>): RadarCard {
-    val cause = cardBlockCause(action, front) ?: return RadarCard(1, lines)
-    val out = mutableListOf("禁止变道", cause.text)
-    out += lines
-    return RadarCard(3, out)
-}
-
-// 正前方(毫米波前雷达)：与变道无关，仍按距离分级
+// 正前车(中列)：前车 / 距离 / 速度 / (相对)
 private fun MainActivity.radarFrontCard(): RadarCard {
+    // 前车 / 距离m / 速度km/h / (相对km/h)
     val s = opStateManager.state
-    if (!s.lead1) return RadarCard(1, listOf("无目标"))
+    if (!s.lead1) return RadarCard(2, listOf("无目标"), textSize = 14f)
 
-    val d = s.drel?.toFloat()
-    val level = when {
-        d == null -> 1
-        d < 20f -> 3
-        d < 40f -> 2
-        else -> 1
-    }
-    val lines = mutableListOf(distM(d) + (s.vlead?.let { "/${it}kph" } ?: ""))
-    s.vrel?.let { lines += "相对" + relKmh(it) + "kph" }
-    return RadarCard(level, lines)
+    val lines = mutableListOf("前车", distM(s.drel?.toFloat()))
+    s.vlead?.let { lines += "${it}km/h" }
+    s.vrel?.let { lines += "(" + relKmh(it) + "km/h)" }
+    // 有目标时淡绿底(无目标走 level=2 灰底)
+    return RadarCard(0, lines, textSize = 14f, distLine = 1, bg = "#E8F5E9", fg = "#1B5E20")
 }
 
-// 左前方：毫米波(前角) + 激光(前角)；两者同时有时用 波/光 前缀区分
-private fun MainActivity.radarLeftFrontCard(): RadarCard {
+// 原车毫米波雷达(前角)：只有距离/相对速度，没目标则"无目标"
+private fun MainActivity.radarMmwCard(left: Boolean): RadarCard {
     val s = opStateManager.state
-    val lines = mutableListOf<String>()
+    val has = if (left) s.l_lead else s.r_lead
+    if (!has) return RadarCard(2, listOf("无目标"))
 
-    // 激光前角：drel 为毫米，>0 表示目标在前方
-    val lfM = s.lf_drel?.takeIf { it > 0 }?.let { it / 1000f }
-    val both = s.l_lead && lfM != null
-    if (s.l_lead) {
-        lines += dataLine(if (both) "波" else "", s.l_drel?.toFloat(), s.l_vrel)
-    }
-    if (lfM != null) {
-        lines += dataLine(if (both) "光" else "", lfM, s.lf_vrel)
-    }
-    return sideRadarCard(LaneChangeAction.LEFT, front = true, lines)
+    // 前雷达: 距离m / (相对km/h)；有目标时淡黄底
+    val d = (if (left) s.l_drel else s.r_drel)?.toFloat()
+    val vr = if (left) s.l_vrel else s.r_vrel
+    val lines = mutableListOf(distM(d))
+    vr?.let { lines += "(" + relKmh(it) + "km/h)" }
+    // 原车前雷达的侧前盲区标志成立 → 卡面变红
+    val danger = if (left) s.l_front_blind else s.r_front_blind
+    return RadarCard(0, lines, bg = "#FFF8E1", fg = "#5D4037", danger = danger)
 }
 
-// 右前方：毫米波(前角) + 激光(前角)
-private fun MainActivity.radarRightFrontCard(): RadarCard {
+// 激光雷达目标(前角/后角)：  前方距离m/横向距离m / 相对: x km/h
+//   front=true 取前角(数据>0 表示在前方)，front=false 取后角(数据<0 表示在后方)
+private fun MainActivity.radarLidarCard(left: Boolean, front: Boolean): RadarCard {
     val s = opStateManager.state
-    val lines = mutableListOf<String>()
+    val mm = when {
+        front && left -> s.lf_drel
+        front -> s.rf_drel
+        left -> s.lb_drel
+        else -> s.rb_drel
+    }
+    val xrel = when {
+        front && left -> s.lf_xrel
+        front -> s.rf_xrel
+        left -> s.lb_xrel
+        else -> s.rb_xrel
+    }
+    val vr = when {
+        front && left -> s.lf_vrel
+        front -> s.rf_vrel
+        left -> s.lb_vrel
+        else -> s.rb_vrel
+    }
 
-    val rfM = s.rf_drel?.takeIf { it > 0 }?.let { it / 1000f }
-    val both = s.r_lead && rfM != null
-    if (s.r_lead) {
-        lines += dataLine(if (both) "波" else "", s.r_drel?.toFloat(), s.r_vrel)
+    val d = if (front) mm?.takeIf { it > 0 }?.let { it / 1000f }
+            else mm?.takeIf { it < 0 }?.let { -it / 1000f }
+    if (d == null) return RadarCard(2, listOf("无目标"))
+
+    // 激光雷达: 距离m/横向m / (相对km/h)；有目标时淡蓝底
+    val lines = mutableListOf(distM(d) + (xrel?.let { "/" + latM(it) } ?: ""))
+    vr?.let { lines += "(" + relKmh(it) + "km/h)" }
+    // 该角盲区成立：CP 下发的该角激光盲区标志 或 App 自算判据命中 → 卡面变红
+    val cpBlind = when {
+        front && left -> s.lidar_lfblind
+        front -> s.lidar_rfblind
+        left -> s.lidar_lbblind
+        else -> s.lidar_rbblind
     }
-    if (rfM != null) {
-        lines += dataLine(if (both) "光" else "", rfM, s.rf_vrel)
-    }
-    return sideRadarCard(LaneChangeAction.RIGHT, front = true, lines)
+    return RadarCard(0, lines, bg = "#E3F2FD", fg = "#0D47A1",
+                     danger = cpBlind || lidarCornerRisky(left, front))
 }
 
-// 左后方(仅激光后角，drel<0 表示在后方)
-private fun MainActivity.radarLeftRearCard(): RadarCard {
-    val s = opStateManager.state
-    val d = s.lb_drel?.takeIf { it < 0 }?.let { -it / 1000f }
-    val lines = mutableListOf<String>()
-    if (d != null) {
-        lines += dataLine("", d, s.lb_vrel)
-        xLine(s.lb_xrel)?.let { lines += it }
-    }
-    return sideRadarCard(LaneChangeAction.LEFT, front = false, lines)
+// 第 4 行：该侧是否禁止变道 + 原因
+private fun MainActivity.radarBlockCard(left: Boolean): RadarCard {
+    val side = if (left) LaneChangeAction.LEFT else LaneChangeAction.RIGHT
+    val who = if (left) "左" else "右"
+    val cause = sideBlockCause(side)
+    return if (cause == null) RadarCard(1, listOf("可${who}变道"))
+    else RadarCard(3, listOf("禁止${who}变道", cause.text))
 }
 
-// 右后方(仅激光后角，drel<0 表示在后方)
-private fun MainActivity.radarRightRearCard(): RadarCard {
-    val s = opStateManager.state
-    val d = s.rb_drel?.takeIf { it < 0 }?.let { -it / 1000f }
-    val lines = mutableListOf<String>()
-    if (d != null) {
-        lines += dataLine("", d, s.rb_vrel)
-        xLine(s.rb_xrel)?.let { lines += it }
-    }
-    return sideRadarCard(LaneChangeAction.RIGHT, front = false, lines)
-}
-
-// 把卡片数据刷到界面上(配色只表达能否变道)
+// 把卡片数据刷到界面上
+//   level: 0=雷达数据(中性) 1=允许变道(绿) 2=无目标(灰) 3=禁止变道(红)
+//   距离数字(行首数字)用 RelativeSizeSpan 再放大一档
 private fun applyRadarCard(tv: TextView, card: RadarCard) {
     val (bg, fg) = when {
-        card.level >= 3 -> "#FFCDD2" to "#B71C1C"        // 禁止变道 / 危险：红
-        card.level == 2 -> "#FFE0B2" to "#E65100"        // 注意：橙
-        else -> "#C8E6C9" to "#1B5E20"                   // 允许变道：绿
+        // 该角盲区成立(有数据时)：红底 —— 一眼看出是哪个方向阻止了变道
+        card.danger && card.level != 2 -> "#FFCDD2" to "#B71C1C"
+        card.level == 3 -> "#FFCDD2" to "#B71C1C"           // 禁止变道：红
+        card.level == 1 -> "#C8E6C9" to "#1B5E20"           // 允许变道：绿
+        card.level == 2 -> "#EEEEEE" to "#9E9E9E"           // 无目标：灰
+        else -> (card.bg ?: "#ECEFF1") to (card.fg ?: "#263238")  // 雷达数据：按来源淡色
     }
     tv.setBackgroundColor(Color.parseColor(bg))
     tv.setTextColor(Color.parseColor(fg))
-    // 卡片要放"禁止变道 + 原因 + 两个来源的数据"最多 6 行，字号比常规小一号(13sp)，
-    // 否则"波15.0m 相对-1"这种行会折行、原因行会被拆成"前雷/达"。
-    tv.textSize = 13f
-    tv.text = if (card.lines.isEmpty()) "无目标" else card.lines.joinToString("\n")
+    tv.textSize = card.textSize
+
+    val text = android.text.SpannableStringBuilder()
+    val lines = if (card.lines.isEmpty()) listOf("无目标") else card.lines
+    lines.forEachIndexed { index, line ->
+        if (index > 0) text.append('\n')
+        val start = text.length
+        text.append(line)
+        if (index == card.distLine && card.distScale > 1f) {
+            val m = Regex("^[0-9]+(\\.[0-9]+)?").find(line)
+            if (m != null) {
+                text.setSpan(android.text.style.RelativeSizeSpan(card.distScale),
+                             start, start + m.value.length,
+                             android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+        }
+    }
+    tv.text = text
 }
 
 fun MainActivity.updateDriveWayTextOnUI(text: String, show: Boolean) {

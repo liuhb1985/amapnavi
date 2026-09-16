@@ -199,7 +199,7 @@
             android:id="@+id/btnOvertakeDebug"
             android:layout_width="0dp"
             android:layout_height="30dp"
-            android:text="超车"
+            android:text="超车调试"
             android:textSize="14sp"
             android:background="@drawable/btn_blue"
             android:textColor="#FFFFFF"
@@ -738,57 +738,99 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
 
-                <!-- 方位雷达示意图：
-                     左前  正前  右前
-                     左后  自车  右后
-                     两排各 3 格等宽(weight=1)，上下天然对齐，且比原来少一行高度 -->
+                <!-- 超车页雷达示意图（4 行，中列较窄）：
+                     [原车前雷达] [正前车] [原车前雷达]     <- 左右列上下两格合计高度 = 正前车卡片
+                     [激光前目标] [正前车] [激光前目标]
+                     [激光后目标] [ 本 车 ] [激光后目标]
+                     [禁止变道+原因]    [禁止变道+原因]
+                     前 3 行只显示雷达数据；能否变道只放在第 4 行 -->
                 <LinearLayout
                     android:orientation="horizontal"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:baselineAligned="false">
 
-                    <TextView
-                        android:id="@+id/tvRadarLeftFront"
+                    <LinearLayout
+                        android:orientation="vertical"
                         android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_weight="1"
-                        android:layout_margin="3dp"
-                        android:padding="6dp"
-                        android:gravity="center"
-                        android:textSize="15sp"
-                        android:textColor="#757575"
-                        android:background="#EEEEEE"
-                        android:text="左前方"/>
+                        android:layout_height="132dp"
+                        android:layout_weight="1">
+
+                        <TextView
+                            android:id="@+id/tvRadarMmwLeft"
+                            android:layout_width="match_parent"
+                            android:layout_height="0dp"
+                            android:layout_weight="1"
+                            android:layout_margin="3dp"
+                            android:padding="4dp"
+                            android:gravity="center"
+                            android:textSize="15sp"
+                            android:textColor="#757575"
+                            android:background="#EEEEEE"
+                            android:text="原车雷达"/>
+
+                        <TextView
+                            android:id="@+id/tvRadarLidarLeftFront"
+                            android:layout_width="match_parent"
+                            android:layout_height="0dp"
+                            android:layout_weight="1"
+                            android:layout_margin="3dp"
+                            android:padding="4dp"
+                            android:gravity="center"
+                            android:textSize="15sp"
+                            android:textColor="#757575"
+                            android:background="#EEEEEE"
+                            android:text="激光前"/>
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/tvRadarFront"
                         android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_weight="1"
+                        android:layout_height="132dp"
+                        android:layout_weight="0.55"
                         android:layout_margin="3dp"
-                        android:padding="6dp"
+                        android:padding="4dp"
                         android:gravity="center"
                         android:textSize="15sp"
                         android:textColor="#757575"
                         android:background="#EEEEEE"
-                        android:text="正前方"/>
+                        android:text="正前车"/>
 
-                    <TextView
-                        android:id="@+id/tvRadarRightFront"
+                    <LinearLayout
+                        android:orientation="vertical"
                         android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_weight="1"
-                        android:layout_margin="3dp"
-                        android:padding="6dp"
-                        android:gravity="center"
-                        android:textSize="15sp"
-                        android:textColor="#757575"
-                        android:background="#EEEEEE"
-                        android:text="右前方"/>
+                        android:layout_height="132dp"
+                        android:layout_weight="1">
+
+                        <TextView
+                            android:id="@+id/tvRadarMmwRight"
+                            android:layout_width="match_parent"
+                            android:layout_height="0dp"
+                            android:layout_weight="1"
+                            android:layout_margin="3dp"
+                            android:padding="4dp"
+                            android:gravity="center"
+                            android:textSize="15sp"
+                            android:textColor="#757575"
+                            android:background="#EEEEEE"
+                            android:text="原车雷达"/>
+
+                        <TextView
+                            android:id="@+id/tvRadarLidarRightFront"
+                            android:layout_width="match_parent"
+                            android:layout_height="0dp"
+                            android:layout_weight="1"
+                            android:layout_margin="3dp"
+                            android:padding="4dp"
+                            android:gravity="center"
+                            android:textSize="15sp"
+                            android:textColor="#757575"
+                            android:background="#EEEEEE"
+                            android:text="激光前"/>
+                    </LinearLayout>
                 </LinearLayout>
 
-                <!-- 第二排：左后 - 自车 - 右后（自车居中，两侧与上排左前/右前同列） -->
+                <!-- 第三行：激光后目标 - 本车 - 激光后目标 -->
                 <LinearLayout
                     android:orientation="horizontal"
                     android:layout_width="match_parent"
@@ -796,23 +838,23 @@
                     android:baselineAligned="false">
 
                     <TextView
-                        android:id="@+id/tvRadarLeftRear"
+                        android:id="@+id/tvRadarLidarLeftRear"
                         android:layout_width="0dp"
-                        android:layout_height="120dp"
+                        android:layout_height="72dp"
                         android:layout_weight="1"
                         android:layout_margin="3dp"
-                        android:padding="6dp"
+                        android:padding="4dp"
                         android:gravity="center"
                         android:textSize="15sp"
                         android:textColor="#757575"
                         android:background="#EEEEEE"
-                        android:text="左后方"/>
+                        android:text="激光后"/>
 
                     <TextView
                         android:id="@+id/tvRadarEgo"
                         android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_weight="1"
+                        android:layout_height="72dp"
+                        android:layout_weight="0.55"
                         android:layout_margin="3dp"
                         android:padding="4dp"
                         android:gravity="center"
@@ -824,17 +866,51 @@
                         android:text="自车"/>
 
                     <TextView
-                        android:id="@+id/tvRadarRightRear"
+                        android:id="@+id/tvRadarLidarRightRear"
                         android:layout_width="0dp"
-                        android:layout_height="120dp"
+                        android:layout_height="72dp"
                         android:layout_weight="1"
                         android:layout_margin="3dp"
-                        android:padding="6dp"
+                        android:padding="4dp"
                         android:gravity="center"
                         android:textSize="15sp"
                         android:textColor="#757575"
                         android:background="#EEEEEE"
-                        android:text="右后方"/>
+                        android:text="激光后"/>
+                </LinearLayout>
+
+                <!-- 第四行：左/右 是否禁止变道与原因（各占半屏宽） -->
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:baselineAligned="false">
+
+                    <TextView
+                        android:id="@+id/tvRadarLeftBlock"
+                        android:layout_width="0dp"
+                        android:layout_height="64dp"
+                        android:layout_weight="1"
+                        android:layout_margin="3dp"
+                        android:padding="4dp"
+                        android:gravity="center"
+                        android:textSize="15sp"
+                        android:textColor="#757575"
+                        android:background="#EEEEEE"
+                        android:text="左变道"/>
+
+                    <TextView
+                        android:id="@+id/tvRadarRightBlock"
+                        android:layout_width="0dp"
+                        android:layout_height="64dp"
+                        android:layout_weight="1"
+                        android:layout_margin="3dp"
+                        android:padding="4dp"
+                        android:gravity="center"
+                        android:textSize="15sp"
+                        android:textColor="#757575"
+                        android:background="#EEEEEE"
+                        android:text="右变道"/>
                 </LinearLayout>
 
                 <!-- 决策详情 -->

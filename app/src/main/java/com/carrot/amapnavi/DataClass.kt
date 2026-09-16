@@ -109,6 +109,20 @@ data class OpState(
         var blind_l: Boolean = false,
         var blind_r: Boolean = false,
 
+        //综合盲区的分解来源(CP 下发)，用于精确显示到底是哪一种
+        var blind_camera_l: Boolean = false,
+        var blind_camera_r: Boolean = false,
+        var blind_car_l: Boolean = false,
+        var blind_car_r: Boolean = false,
+        var blind_lane_l: Boolean = false,
+        var blind_lane_r: Boolean = false,
+
+        //侧向判定阈值(CP 下发, x0.1: 正=时距s / 负=绝对距离m)，App 自算判据与 CP 同源
+        var lidar_front_vdist_time: Int? = null,
+        var lidar_front_vrel_time: Int? = null,
+        var lidar_behind_vdist_time: Int? = null,
+        var lidar_behind_vrel_time: Int? = null,
+
         //distance, mm
         var lf_drel: Int? = null,
         var lb_drel: Int? = null,

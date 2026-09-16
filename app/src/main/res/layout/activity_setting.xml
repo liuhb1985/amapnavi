@@ -923,6 +923,24 @@
                 android:padding="0dp"/>
 
             <CheckBox
+                android:id="@+id/cbAppLidarSelfCheck"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="激光自算判据"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
+                android:id="@+id/cbAppThreshFollowCp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="阈值跟随CP"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <CheckBox
                 android:id="@+id/cbLaneOvertake"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
