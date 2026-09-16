@@ -480,6 +480,11 @@ fun MainActivity.decideOvertakeLane(
 private const val OVERTAKE_RADAR_MAX_RANGE = 100f     // 毫米波雷达最大探测距离(m)
 private const val OVERTAKE_LIDAR_MAX_RANGE = 50f      // 激光雷达最大探测距离(m)，40m稳定/50m左右有时可达
 
+// 反向变道冷却：刚往一侧超完车后，这段时间内不允许往反方向再超车变道。
+// 目的：侧向"没有数据"被当成"没有车"时，会出现"变过去发现前车慢 → 又变回来"的来回变道；
+//       有了这个冷却，回程方向在该窗口内直接判不安全，必须等冷却结束才可能再变。
+private const val OVERTAKE_REVERSE_COOLDOWN_MS = 20_000L
+
 // -----------------------------
 // 超车模式参数集：1=激进 2=常规 3=保守
 //   overtake_mode 由设置界面写入(SettingActivity: rbOvertakeFast/Normal/SlowMode)
@@ -587,6 +592,16 @@ fun MainActivity.evaluateOvertakeSide(side: LaneChangeAction): OvertakeSideEval 
     val p = currentOvertakeParams()
     val sideStr = if (side == LaneChangeAction.LEFT) "左" else "右"
 
+    //0) 反向变道冷却：刚往一侧超完车，窗口内不允许往反方向再超车变道
+    //   （避免"侧向无数据=无车"导致的"变过去又变回来"来回变道）
+    if (overtakeLastDirection != LaneChangeAction.KEEP && overtakeLastDirection != side) {
+        val passed = System.currentTimeMillis() - overtakeLastDirectionTime
+        if (passed < OVERTAKE_REVERSE_COOLDOWN_MS) {
+            return OvertakeSideEval(side, false, 0,
+                "${sideStr}侧反向冷却中(剩${(OVERTAKE_REVERSE_COOLDOWN_MS - passed) / 1000}s)")
+        }
+    }
+
     //1) 目标方向是否存在可行驶车道
     if (side == LaneChangeAction.LEFT) {
         if (vLaneResult.leftLaneId <= 1 && vLaneResult.leftLaneCnt <= 0) {
@@ -664,7 +679,8 @@ fun MainActivity.evaluateOvertakeSide(side: LaneChangeAction): OvertakeSideEval 
             reasons.add("侧前车过近(${sideFrontDist.toInt()}m<${p.sideFrontMinDist.toInt()}m)")
         }
     } else {
-        reasons.add("侧前方无车(雷达${OVERTAKE_RADAR_MAX_RANGE.toInt()}m内)")
+        // 注意：没有数据只代表"量程内没有"，量程之外属于未知，不能当成"确定无车"
+        reasons.add("侧前方无数据(超量程未知)")
     }
 
     if (sideVrel != null && sideVrel < -p.sideVrelThreshold) {

@@ -57,6 +57,7 @@ var disableOvertakeSuggestLane = false
 var overtakeCooldownUntil = 0L                         // 超车冷却截止时间(ms)
 var overtakeCooldownDuration = 0L                      // 本次冷却时长(ms)
 var overtakeLastDirection = LaneChangeAction.KEEP      // 上次超车方向
+var overtakeLastDirectionTime = 0L                     // 上次超车方向的时间(ms)，用于反向变道冷却
 var overtakeInProgress = false                         // 超车变道进行中
 var overtakeTriggerStableTime = 0L                     // 触发条件连续满足起始时间(ms)
 var overtakeLastReason = ""                            // 上次记录的决策原因(用于去重日志)

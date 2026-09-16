@@ -105,6 +105,11 @@ fun MainActivity.doOvertakeAction(action: LaneChangeAction) {
             lastOvertakeCmdSendTime = now
             overtakeCmdSent = true
             overtakeAction = action
+            // 记录本次超车方向，用于反向变道冷却(见 MainActivityLaneDecision)
+            if (action == LaneChangeAction.LEFT || action == LaneChangeAction.RIGHT) {
+                overtakeLastDirection = action
+                overtakeLastDirectionTime = now
+            }
             overtakeCmdSentRetryCnt = 0
             lastOvertakeAtcStateChangeTime = now
         }

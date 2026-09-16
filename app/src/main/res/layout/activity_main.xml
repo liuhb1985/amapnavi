@@ -199,7 +199,7 @@
             android:id="@+id/btnOvertakeDebug"
             android:layout_width="0dp"
             android:layout_height="30dp"
-            android:text="超车调试"
+            android:text="超车"
             android:textSize="14sp"
             android:background="@drawable/btn_blue"
             android:textColor="#FFFFFF"

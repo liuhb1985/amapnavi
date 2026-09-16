@@ -807,13 +807,13 @@ class MainActivity : AppCompatActivity() {
         btnOvertakeDebug.setOnClickListener {
             val show = !overtakeDebugEnable
             setOvertakeDebugPanelVisible(show)
-            btnOvertakeDebug.text = if (show) "隐藏" else "超车调试"
+            btnOvertakeDebug.text = if (show) "隐藏" else "超车"
         }
 
         //诊断页内的关闭按钮
         btnOvertakeDebugClose.setOnClickListener {
             setOvertakeDebugPanelVisible(false)
-            btnOvertakeDebug.text = "超车调试"
+            btnOvertakeDebug.text = "超车"
         }
 
         // 自动化测试入口：直接打开雷达诊断页
