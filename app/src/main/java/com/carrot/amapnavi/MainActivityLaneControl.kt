@@ -183,18 +183,26 @@ fun MainActivity.lidarSideHazard(action: LaneChangeAction): BlockCause? {
     return null
 }
 
-// 阈值：优先用 CP 下发的(与 CP 同源，只在一处调参)，CP 没给就用本地常量兜底
+// 阈值：优先用 CP 下发的(与 CP 同源，只在一处调参)，关掉"阈值跟随CP"则用超车参数页里
+// 用户自己选的口径：固定距离(m，用负值表示绝对距离) 或 绝对速度时距(s，正值)
 private fun MainActivity.frontDistTime(): Float =
-    if (!app_thresh_follow_cp) LidarSideSafety.FRONT_DIST_TIME_S
-    else opStateManager.state.lidar_front_vdist_time?.let { it / 10f } ?: LidarSideSafety.FRONT_DIST_TIME_S
+    if (!app_thresh_follow_cp) localFrontDistTime()
+    else opStateManager.state.lidar_front_vdist_time?.let { it / 10f } ?: localFrontDistTime()
+
+private fun MainActivity.rearDistTime(): Float =
+    if (!app_thresh_follow_cp) localRearDistTime()
+    else opStateManager.state.lidar_behind_vdist_time?.let { it / 10f } ?: localRearDistTime()
+
+// 本地口径：时距模式返回正秒数(速度×秒)，固定距离模式返回负米数(绝对值=距离)
+private fun MainActivity.localFrontDistTime(): Float =
+    if (lidar_front_dist_mode == 1) lidar_front_time_s else -lidar_front_dist_m
+
+private fun MainActivity.localRearDistTime(): Float =
+    if (lidar_rear_dist_mode == 1) lidar_rear_time_s else -lidar_rear_dist_m
 
 private fun MainActivity.frontVrelTime(): Float =
     if (!app_thresh_follow_cp) LidarSideSafety.FRONT_VREL_TIME_S
     else opStateManager.state.lidar_front_vrel_time?.let { it / 10f } ?: LidarSideSafety.FRONT_VREL_TIME_S
-
-private fun MainActivity.rearDistTime(): Float =
-    if (!app_thresh_follow_cp) LidarSideSafety.REAR_DIST_TIME_S
-    else opStateManager.state.lidar_behind_vdist_time?.let { it / 10f } ?: LidarSideSafety.REAR_DIST_TIME_S
 
 private fun MainActivity.rearVrelTime(): Float =
     if (!app_thresh_follow_cp) LidarSideSafety.REAR_VREL_TIME_S

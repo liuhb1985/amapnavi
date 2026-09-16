@@ -260,6 +260,13 @@ class MainActivity : AppCompatActivity() {
     // 侧向变道安全：App 自算判据(默认开) / 阈值跟随 CP(默认开, 关则用 App 内置默认值)
     internal var app_lidar_self_check = true
     internal var app_thresh_follow_cp = true
+    // 侧向危险阈值(不跟随 CP 时使用)：mode 0=固定距离(m) 1=绝对速度时距(s)
+    internal var lidar_front_dist_mode = 0
+    internal var lidar_front_dist_m = 5f
+    internal var lidar_front_time_s = 1.2f
+    internal var lidar_rear_dist_mode = 0
+    internal var lidar_rear_dist_m = 10f
+    internal var lidar_rear_time_s = 1.5f
     // 超车反向变道冷却(ms)：刚往一侧超完车后，这段时间内不允许往反方向再超车变道
     internal var overtake_reverse_cooldown_ms = 20_000L
 

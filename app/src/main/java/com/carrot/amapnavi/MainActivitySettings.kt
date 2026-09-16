@@ -343,6 +343,13 @@ fun MainActivity.loadUserSettings() {
         editor.putBoolean("app_thresh_follow_cp", true)
         true
     }
+    lidar_front_dist_mode = prefs.getInt("lidar_front_dist_mode", 0)
+    lidar_front_dist_m = prefs.getFloat("lidar_front_dist_m", 5f)
+    lidar_front_time_s = prefs.getFloat("lidar_front_time_s", 1.2f)
+    lidar_rear_dist_mode = prefs.getInt("lidar_rear_dist_mode", 0)
+    lidar_rear_dist_m = prefs.getFloat("lidar_rear_dist_m", 10f)
+    lidar_rear_time_s = prefs.getFloat("lidar_rear_time_s", 1.5f)
+
     overtake_reverse_cooldown_ms = (if (prefs.contains("overtake_reverse_cooldown_s")) {
         prefs.getInt("overtake_reverse_cooldown_s", 20)
     } else {

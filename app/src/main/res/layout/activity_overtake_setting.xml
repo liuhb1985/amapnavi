@@ -155,11 +155,181 @@
             android:id="@+id/cbOvertakeSettingThreshFollowCp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="阈值跟随CP(关掉则用App内置默认值)"
+            android:text="阈值跟随CP(关掉则用下面自己设的阈值)"
             android:textSize="14sp"
             android:textColor="#000000"
             android:padding="0dp" />
 
+        <!-- 侧向危险阈值：固定距离(m) 或 绝对速度时距(s)，前后分别设置 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="侧向危险阈值(关掉'阈值跟随CP'后生效)"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="4dp">
+
+            <TextView
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="前方"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <RadioGroup
+                android:id="@+id/rgFrontThreshMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:id="@+id/rbFrontThreshFix"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="固定距离"
+                    android:textSize="13sp"
+                    android:textColor="#000000" />
+
+                <RadioButton
+                    android:id="@+id/rbFrontThreshTime"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="速度时距"
+                    android:textSize="13sp"
+                    android:textColor="#000000" />
+            </RadioGroup>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+
+            <Button
+                android:id="@+id/btnMinusFrontThresh"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etFrontThresh"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="numberDecimal"
+                android:gravity="center"
+                android:text="5.0"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusFrontThresh"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="+"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvFrontThreshUnit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="m"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="10dp">
+
+            <TextView
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="后方"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <RadioGroup
+                android:id="@+id/rgRearThreshMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:id="@+id/rbRearThreshFix"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="固定距离"
+                    android:textSize="13sp"
+                    android:textColor="#000000" />
+
+                <RadioButton
+                    android:id="@+id/rbRearThreshTime"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="速度时距"
+                    android:textSize="13sp"
+                    android:textColor="#000000" />
+            </RadioGroup>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+
+            <Button
+                android:id="@+id/btnMinusRearThresh"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etRearThresh"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="numberDecimal"
+                android:gravity="center"
+                android:text="10.0"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusRearThresh"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="+"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvRearThreshUnit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="m"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"
