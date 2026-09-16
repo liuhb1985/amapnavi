@@ -596,9 +596,9 @@ fun MainActivity.evaluateOvertakeSide(side: LaneChangeAction): OvertakeSideEval 
     //   （避免"侧向无数据=无车"导致的"变过去又变回来"来回变道）
     if (overtakeLastDirection != LaneChangeAction.KEEP && overtakeLastDirection != side) {
         val passed = System.currentTimeMillis() - overtakeLastDirectionTime
-        if (passed < OVERTAKE_REVERSE_COOLDOWN_MS) {
+        if (passed < overtake_reverse_cooldown_ms) {
             return OvertakeSideEval(side, false, 0,
-                "${sideStr}侧反向冷却中(剩${(OVERTAKE_REVERSE_COOLDOWN_MS - passed) / 1000}s)")
+                "${sideStr}侧反向冷却中(剩${(overtake_reverse_cooldown_ms - passed) / 1000}s)")
         }
     }
 

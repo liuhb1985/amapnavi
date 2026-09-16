@@ -42,11 +42,7 @@ class SettingActivity : AppCompatActivity() {
     private lateinit var rgVisionLaneMode: RadioGroup
     private lateinit var cbLayoutOvertakeMode : LinearLayout
     private lateinit var rgOvertakeMode: RadioGroup
-    private lateinit var cbAppOvertake: CheckBox
-    private lateinit var cbAppRoadOvertake: CheckBox
-    // 侧向变道安全：App 自算判据开关 / 阈值是否跟随 CP(关闭则用 App 内置默认值)
-    private lateinit var cbAppLidarSelfCheck: CheckBox
-    private lateinit var cbAppThreshFollowCp: CheckBox
+    // 超车相关设置已移到 OvertakeSettingActivity（入口在超车诊断页里）
 
     private lateinit var etLayoutNaviMinSpeed : LinearLayout
     private lateinit var etNaviMinSpeed: EditText
@@ -187,10 +183,7 @@ class SettingActivity : AppCompatActivity() {
         rgVisionLaneMode = findViewById(R.id.rgVisionLaneMode)
         cbLayoutOvertakeMode = findViewById(R.id.cbLayoutOvertakeMode)
         rgOvertakeMode = findViewById(R.id.rgOvertakeMode)
-        cbAppOvertake = findViewById(R.id.cbAppOvertake)
-        cbAppRoadOvertake = findViewById(R.id.cbAppRoadOvertake)
-        cbAppLidarSelfCheck = findViewById(R.id.cbAppLidarSelfCheck)
-        cbAppThreshFollowCp = findViewById(R.id.cbAppThreshFollowCp)
+        // (超车设置在 OvertakeSettingActivity)
 
         cbRoadMeidan = findViewById(R.id.cbRoadMeidan)
         cbRoadRightFirst = findViewById(R.id.cbRoadRightFirst)
@@ -626,10 +619,7 @@ class SettingActivity : AppCompatActivity() {
                     R.id.rbVisionLaneSlowMode -> 3
                     else -> 1   // 默认保守
                 })
-                .putBoolean("app_overtake", cbAppOvertake.isChecked)
-                .putBoolean("app_road_overtake", cbAppRoadOvertake.isChecked)
-                .putBoolean("app_lidar_self_check", cbAppLidarSelfCheck.isChecked)
-                .putBoolean("app_thresh_follow_cp", cbAppThreshFollowCp.isChecked)
+                // (超车相关设置由 OvertakeSettingActivity 保存)
 
                 .apply()
     }
@@ -703,10 +693,7 @@ class SettingActivity : AppCompatActivity() {
             2 -> rgVisionLaneMode.check(R.id.rbVisionLaneNormalMode)
             3 -> rgVisionLaneMode.check(R.id.rbVisionLaneSlowMode)
         }
-        cbAppOvertake.isChecked = prefs.getBoolean("app_overtake", false)
-        cbAppRoadOvertake.isChecked = prefs.getBoolean("app_road_overtake", false)
-        cbAppLidarSelfCheck.isChecked = prefs.getBoolean("app_lidar_self_check", true)
-        cbAppThreshFollowCp.isChecked = prefs.getBoolean("app_thresh_follow_cp", true)
+        // (超车设置在 OvertakeSettingActivity 里加载)
 
         if(cbAppNavi.isChecked){
             if(cbKeepLeftEn.isChecked || cbKeepRightEn.isChecked){

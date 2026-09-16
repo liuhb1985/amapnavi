@@ -904,41 +904,7 @@
             app:flexDirection="row"
             app:flexWrap="wrap">
 
-            <CheckBox
-                android:id="@+id/cbAppOvertake"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="高速超车"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbAppRoadOvertake"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="公路超车"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbAppLidarSelfCheck"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="激光自算判据"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
-
-            <CheckBox
-                android:id="@+id/cbAppThreshFollowCp"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="阈值跟随CP"
-                android:textSize="14sp"
-                android:textColor="#000000"
-                android:padding="0dp"/>
+            <!-- 超车相关设置已移到"超车设置"页面(入口在超车诊断页里) -->
 
             <CheckBox
                 android:id="@+id/cbLaneOvertake"

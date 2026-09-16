@@ -714,6 +714,20 @@
                 android:ellipsize="end"/>
 
             <Button
+                android:id="@+id/btnOvertakeSetting"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:layout_marginEnd="6dp"
+                android:text="超车设置"
+                android:textSize="14sp"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/btn_green"/>
+
+            <Button
                 android:id="@+id/btnOvertakeDebugClose"
                 android:layout_width="wrap_content"
                 android:layout_height="32dp"

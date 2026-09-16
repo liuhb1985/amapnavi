@@ -349,6 +349,12 @@ fun MainActivity.loadUserSettings() {
         editor.putBoolean("app_thresh_follow_cp", true)
         true
     }
+    overtake_reverse_cooldown_ms = (if (prefs.contains("overtake_reverse_cooldown_s")) {
+        prefs.getInt("overtake_reverse_cooldown_s", 20)
+    } else {
+        editor.putInt("overtake_reverse_cooldown_s", 20)
+        20
+    }).coerceIn(0, 120) * 1000L
 
     // 提交默认值（如果有写入的话）
     editor.apply()

@@ -452,7 +452,10 @@ internal data class RadarCard(
     val fg: String? = null,
     // 该角"盲区成立"（CP 下发的该角盲区标志 或 App 自算判据命中）→ 底变红，
     // 这样第 4 行只说"禁止变道"，是哪个方向阻止的看哪张卡片是红的就知道了
-    val danger: Boolean = false
+    val danger: Boolean = false,
+    // 标题行单独放大（如"前车"两个字）：headLine=该行下标，headScale=放大倍数
+    val headLine: Int = -1,
+    val headScale: Float = 1f
 )
 
 // 距离格式：>=100m 取整，否则保留1位小数
@@ -478,8 +481,9 @@ private fun MainActivity.radarFrontCard(): RadarCard {
     val lines = mutableListOf("前车", distM(s.drel?.toFloat()))
     s.vlead?.let { lines += "${it}km/h" }
     s.vrel?.let { lines += "(" + relKmh(it) + "km/h)" }
-    // 有目标时淡绿底(无目标走 level=2 灰底)
-    return RadarCard(0, lines, textSize = 14f, distLine = 1, bg = "#E8F5E9", fg = "#1B5E20")
+    // 有目标时淡绿底(无目标走 level=2 灰底)；"前车"两字单独放大一档
+    return RadarCard(0, lines, textSize = 14f, distLine = 1, bg = "#E8F5E9", fg = "#1B5E20",
+                     headLine = 0, headScale = 1.6f)
 }
 
 // 原车毫米波雷达(前角)：只有距离/相对速度，没目标则"无目标"
@@ -577,6 +581,12 @@ private fun applyRadarCard(tv: TextView, card: RadarCard) {
                              start, start + m.value.length,
                              android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
+        }
+        // 标题行整行放大（如"前车"）
+        if (index == card.headLine && card.headScale > 1f) {
+            text.setSpan(android.text.style.RelativeSizeSpan(card.headScale),
+                         start, text.length,
+                         android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
     }
     tv.text = text

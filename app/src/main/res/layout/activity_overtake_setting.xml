@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 超车功能专用设置页：入口在"超车"诊断页里 -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="超车设置"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#000000" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="超车模式"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <RadioGroup
+            android:id="@+id/rgOvertakeSettingMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/rbOvertakeSettingFastMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="激进"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <RadioButton
+                android:id="@+id/rbOvertakeSettingNormalMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="常规"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <RadioButton
+                android:id="@+id/rbOvertakeSettingSlowMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="保守"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+        </RadioGroup>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <CheckBox
+                android:id="@+id/cbOvertakeSettingHighway"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="高速超车"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+
+            <CheckBox
+                android:id="@+id/cbOvertakeSettingRoad"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="公路超车"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="侧向变道安全(激光雷达)"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <CheckBox
+            android:id="@+id/cbOvertakeSettingLidarSelfCheck"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="激光自算判据(关掉则只用CP下发的标志)"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <CheckBox
+            android:id="@+id/cbOvertakeSettingThreshFollowCp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="阈值跟随CP(关掉则用App内置默认值)"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="反向变道冷却(秒)：防止刚变过去又变回来"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnMinusReverseCooldown"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etReverseCooldown"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="number"
+                android:gravity="center"
+                android:text="20"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusReverseCooldown"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="+"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnSaveOvertakeSetting"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="保存"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnCancelOvertakeSetting"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="12dp"
+                android:text="返回"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

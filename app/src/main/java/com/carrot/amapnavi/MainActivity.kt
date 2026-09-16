@@ -261,6 +261,8 @@ class MainActivity : AppCompatActivity() {
     // 侧向变道安全：App 自算判据(默认开) / 阈值跟随 CP(默认开, 关则用 App 内置默认值)
     internal var app_lidar_self_check = true
     internal var app_thresh_follow_cp = true
+    // 超车反向变道冷却(ms)：刚往一侧超完车后，这段时间内不允许往反方向再超车变道
+    internal var overtake_reverse_cooldown_ms = 20_000L
 
     var tunnelEnterTime: Long? = null  // 毫秒时间戳
     var tunnelKeepTime: Long? = null  // 毫秒时间戳
@@ -814,6 +816,11 @@ class MainActivity : AppCompatActivity() {
         btnOvertakeDebugClose.setOnClickListener {
             setOvertakeDebugPanelVisible(false)
             btnOvertakeDebug.text = "超车"
+        }
+
+        //诊断页内的"超车设置"入口：跳到超车专用设置页
+        findViewById<Button>(R.id.btnOvertakeSetting).setOnClickListener {
+            startActivity(android.content.Intent(this, OvertakeSettingActivity::class.java))
         }
 
         // 自动化测试入口：直接打开雷达诊断页
