@@ -751,7 +751,7 @@
                     <TextView
                         android:id="@+id/tvRadarLeftFront"
                         android:layout_width="0dp"
-                        android:layout_height="96dp"
+                        android:layout_height="120dp"
                         android:layout_weight="1"
                         android:layout_margin="3dp"
                         android:padding="6dp"
@@ -764,7 +764,7 @@
                     <TextView
                         android:id="@+id/tvRadarFront"
                         android:layout_width="0dp"
-                        android:layout_height="96dp"
+                        android:layout_height="120dp"
                         android:layout_weight="1"
                         android:layout_margin="3dp"
                         android:padding="6dp"
@@ -777,7 +777,7 @@
                     <TextView
                         android:id="@+id/tvRadarRightFront"
                         android:layout_width="0dp"
-                        android:layout_height="96dp"
+                        android:layout_height="120dp"
                         android:layout_weight="1"
                         android:layout_margin="3dp"
                         android:padding="6dp"
@@ -798,7 +798,7 @@
                     <TextView
                         android:id="@+id/tvRadarLeftRear"
                         android:layout_width="0dp"
-                        android:layout_height="96dp"
+                        android:layout_height="120dp"
                         android:layout_weight="1"
                         android:layout_margin="3dp"
                         android:padding="6dp"
@@ -811,7 +811,7 @@
                     <TextView
                         android:id="@+id/tvRadarEgo"
                         android:layout_width="0dp"
-                        android:layout_height="96dp"
+                        android:layout_height="120dp"
                         android:layout_weight="1"
                         android:layout_margin="3dp"
                         android:padding="4dp"
@@ -826,7 +826,7 @@
                     <TextView
                         android:id="@+id/tvRadarRightRear"
                         android:layout_width="0dp"
-                        android:layout_height="96dp"
+                        android:layout_height="120dp"
                         android:layout_weight="1"
                         android:layout_margin="3dp"
                         android:padding="6dp"

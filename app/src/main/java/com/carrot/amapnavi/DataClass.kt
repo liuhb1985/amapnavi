@@ -99,6 +99,16 @@ data class OpState(
         var lidar_lblind: Boolean = false,
         var lidar_rblind: Boolean = false,
 
+        //激光雷达四角盲区(纯激光雷达自己的信号)
+        var lidar_lfblind: Boolean = false,
+        var lidar_lbblind: Boolean = false,
+        var lidar_rfblind: Boolean = false,
+        var lidar_rbblind: Boolean = false,
+
+        //综合盲区(车道线/车身/激光/摄像头合并，CP 侧 *_blindspot_combined)
+        var blind_l: Boolean = false,
+        var blind_r: Boolean = false,
+
         //distance, mm
         var lf_drel: Int? = null,
         var lb_drel: Int? = null,

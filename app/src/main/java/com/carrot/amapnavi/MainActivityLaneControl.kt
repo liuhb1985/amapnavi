@@ -94,44 +94,88 @@ fun MainActivity.sendLaneActionCmd(action: LaneChangeAction) {
 }
 
 //检查盲区是否安全
+//  返回码(0=允许变道；<0=禁止，供卡片显示原因)：
+//    0    允许
+//   -1    本侧车道线为实线
+//   -2    原车前雷达的侧前盲区(l_front_blind/r_front_blind)
+//   -4    原车后盲区(BSD, left_blindspot/right_blindspot)
+//   -8    外挂激光雷达盲区(纯激光: 侧方/前角/后角)
+//  -16    综合盲区里的其它来源(摄像头等, blind_l/blind_r)
 fun MainActivity.LaneChangeSafetyCheck(action: LaneChangeAction): Int {
+    val s = opStateManager.state
     if (action == LaneChangeAction.LEFT) {
         //左侧盲区有车
-        if (opStateManager.state.l_front_blind) { //原车左侧前方
+        if (s.l_front_blind) { //原车左侧前方
             return -2
-        } else if (opStateManager.state.left_blindspot) { //原车左侧后方
+        } else if (s.left_blindspot) { //原车左侧后方
             return -4
-        } else if (opStateManager.state.lidar_lblind) { //激光雷达或摄像头左侧
+        } else if (s.lidar_lblind || s.lidar_lfblind || s.lidar_lbblind) { //激光雷达(纯激光)
             return -8
         } else if (left_lane_type == 1) { //左侧实线
             return -1
+        } else if (s.blind_l) { //综合盲区里的其它来源(摄像头等)
+            return -16
         }
     } else if (action == LaneChangeAction.RIGHT) {
         //右侧盲区有车
-        if (opStateManager.state.r_front_blind) {
+        if (s.r_front_blind) {
             return -2
-        } else if (opStateManager.state.right_blindspot) {
+        } else if (s.right_blindspot) {
             return -4
-        } else if (opStateManager.state.lidar_rblind) {
+        } else if (s.lidar_rblind || s.lidar_rfblind || s.lidar_rbblind) {
             return -8
         } else if (right_lane_type == 1) { //实线
             return -1
+        } else if (s.blind_r) {
+            return -16
         }
     }
 
     if (action == LaneChangeAction.LEFT_TURN) {
         //左侧盲区有车
-        if (opStateManager.state.l_front_blind) { //原车左侧前方
+        if (s.l_front_blind) { //原车左侧前方
             return -2
         }
     } else if (action == LaneChangeAction.RIGHT_TURN) {
         //右侧盲区有车
-        if (opStateManager.state.r_front_blind) {
+        if (s.r_front_blind) {
             return -2
         }
     }
 
     return 0
+}
+
+//一张卡片"禁止变道"的原因(供卡片显示)：原因文字 + 判据来源
+data class BlockCause(val code: Int, val text: String)
+
+//  判据集合与 LaneChangeSafetyCheck 完全一致（任何一条成立就一定返回 <0），显示按方位分工：
+//    front=true  (左前/右前卡片)：只显示"前"相关盲区；没有前向盲区时，才显示不分方位的综合盲区
+//    front=false (左后/右后卡片)：只显示"后"相关盲区；没有后向盲区时，才显示不分方位的综合盲区
+//  即：前盲区只出现在前面的卡片、后盲区只出现在后面的卡片，综合盲区也不会叠加在
+//  已经有方位性盲区的卡片上。
+fun MainActivity.cardBlockCause(action: LaneChangeAction, front: Boolean): BlockCause? {
+    val s = opStateManager.state
+    val left = action == LaneChangeAction.LEFT
+
+    val directional = if (front) {
+        listOf(
+            (if (left) s.l_front_blind else s.r_front_blind) to BlockCause(-2, "前侧盲区·前雷达"),
+            (if (left) s.lidar_lfblind else s.lidar_rfblind) to BlockCause(-8, "激光盲区·前角"),
+        )
+    } else {
+        listOf(
+            (if (left) s.left_blindspot else s.right_blindspot) to BlockCause(-4, "后方盲区·BSD"),
+            (if (left) s.lidar_lbblind else s.lidar_rbblind) to BlockCause(-8, "激光盲区·后角"),
+        )
+    }
+    // 不分方位的综合类：激光侧方 / 车道线实线 / 摄像头盲区
+    val generic = listOf(
+        (if (left) s.lidar_lblind else s.lidar_rblind) to BlockCause(-8, "激光盲区·侧方"),
+        ((if (left) left_lane_type else right_lane_type) == 1) to BlockCause(-1, "车道实线"),
+        (if (left) s.blind_l else s.blind_r) to BlockCause(-16, "摄像头盲区"),
+    )
+    return directional.firstOrNull { it.first }?.second ?: generic.firstOrNull { it.first }?.second
 }
 
 fun MainActivity.SendBlinkerControl(action: LaneChangeAction) {

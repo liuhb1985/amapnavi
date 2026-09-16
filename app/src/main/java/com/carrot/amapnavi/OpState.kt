@@ -131,8 +131,17 @@ private val OP_FIELD_TABLE = listOf(
         BoolField("l_front_blind", { s, v -> s.l_front_blind = v }),
         BoolField("r_front_blind", { s, v -> s.r_front_blind = v }),
 
+        //激光雷达自身盲区(纯激光)
         BoolField("lidar_lblind", { s, v -> s.lidar_lblind = v }),
         BoolField("lidar_rblind", { s, v -> s.lidar_rblind = v }),
+        BoolField("lidar_lfblind", { s, v -> s.lidar_lfblind = v }),
+        BoolField("lidar_lbblind", { s, v -> s.lidar_lbblind = v }),
+        BoolField("lidar_rfblind", { s, v -> s.lidar_rfblind = v }),
+        BoolField("lidar_rbblind", { s, v -> s.lidar_rbblind = v }),
+
+        //综合盲区(车道线/车身/激光/摄像头)
+        BoolField("blind_l", { s, v -> s.blind_l = v }),
+        BoolField("blind_r", { s, v -> s.blind_r = v }),
 
         IntField("lf_drel", { s, v -> s.lf_drel = v }),
         IntField("lb_drel", { s, v -> s.lb_drel = v }),
