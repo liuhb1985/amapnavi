@@ -303,6 +303,8 @@ class SettingActivity : AppCompatActivity() {
             startActivity(android.content.Intent(this, OvertakeSettingActivity::class.java))
             finish()
         }
+
+        highlightSettingTab(R.id.btnGotoGeneral)
     }
 
     private fun saveSettings() {
@@ -456,5 +458,20 @@ class SettingActivity : AppCompatActivity() {
                     "vision_lane_mode" to prefs.getInt("vision_lane_mode", 1),
             )
         }
+    }
+}
+
+/**
+ * 三个设置页(通用/领航/超车)顶部的分页按钮：把当前页对应的按钮高亮(蓝底白字)，
+ * 并让它自己点了不再重复打开。必须在设置完其它按钮的跳转监听之后调用。
+ */
+internal fun androidx.appcompat.app.AppCompatActivity.highlightSettingTab(currentTabId: Int) {
+    val tabIds = intArrayOf(R.id.btnGotoGeneral, R.id.btnGotoNav, R.id.btnGotoOvertake)
+    for (id in tabIds) {
+        if (id != currentTabId) continue
+        val btn = findViewById<Button>(id) ?: continue
+        btn.setBackgroundResource(R.drawable.btn_blue)
+        btn.setTextColor(android.graphics.Color.WHITE)
+        btn.setOnClickListener { }      // 已在当前页，点了不做任何事
     }
 }

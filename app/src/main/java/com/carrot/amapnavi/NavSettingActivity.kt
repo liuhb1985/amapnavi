@@ -85,6 +85,8 @@ class NavSettingActivity : AppCompatActivity() {
             finish()
         }
 
+        highlightSettingTab(R.id.btnGotoNav)
+
         // 顶部留空：与车机适配参数 top_pad_dp 保持一致
         setTopPaddingDp(
                 findViewById(R.id.navSettingContent),

@@ -1006,6 +1006,18 @@ class MainActivity : AppCompatActivity() {
         loadUserSettings()
     }
 
+    // 返回键：超车诊断页显示时先关掉诊断页回主界面，而不是直接退出 App
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (overtakeDebugEnable) {
+            setOvertakeDebugPanelVisible(false)
+            btnOvertakeDebug.text = "超车"
+            return
+        }
+        @Suppress("DEPRECATION")
+        super.onBackPressed()
+    }
+
     //------------------------绑定Service-------------------------------
     var keepAliveService: KeepAliveService? = null
     private var bound = false

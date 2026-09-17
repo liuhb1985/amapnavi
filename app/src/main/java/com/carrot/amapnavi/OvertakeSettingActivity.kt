@@ -112,6 +112,8 @@ class OvertakeSettingActivity : AppCompatActivity() {
             finish()
         }
 
+        highlightSettingTab(R.id.btnGotoOvertake)
+
         // 顶部留空：与车机适配参数 top_pad_dp 保持一致
         setTopPaddingDp(
                 findViewById(R.id.overtakeSettingContent),
