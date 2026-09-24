@@ -88,8 +88,8 @@ fun MainActivity.handleCarrotManUdpJson(json: JSONObject, packetAddress: String,
     val hasIsOnroad = json.has("IsOnroad")
 
     if (resp == "app_param") {
-        lane_detect_enable = json.optInt("lane_detect", 0)
-        lane_show_enable = json.optInt("lane_show", 0)
+        lane_detect_enable = json.optInt("lane_detect", 1)
+        lane_show_enable = json.optInt("lane_show", 1)
     } else if (hasIsOnroad && device == "") {
         // -----------------------------
         // 解析车辆状态数据

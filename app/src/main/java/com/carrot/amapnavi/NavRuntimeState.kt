@@ -8,8 +8,8 @@ var video_show = false
 var video_show_fast = false
 var lane_detect = false
 var lane_color = false
-var lane_detect_enable = 0
-var lane_show_enable = 0
+var lane_detect_enable = 1
+var lane_show_enable = 1
 var lane_detect_interval = 500
 
 var show_param_log = true
