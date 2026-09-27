@@ -50,6 +50,8 @@ class DebugReceiver : BroadcastReceiver() {
             "lane_prob_enable" to Spec("lane_prob_enable", 'b'),
             // 车道线判据不可用时是否拦截变道(默认拦截)：视觉线型长期=-1 时可关掉
             "lane_unknown_block" to Spec("lane_unknown_block", 'b'),
+            // 变道安全门"手写版兼容"总开关(默认开)：打开=回到 9-13 手写版的判据集合+零延时
+            "safety_legacy_mode" to Spec("safety_legacy_mode", 'b'),
             "navi_speak" to Spec("navi_speak", 'b'),
             "navi_speak_first" to Spec("navi_speak_first", 'b'),
             "navi_blind_dec_speed" to Spec("navi_blind_dec_speed", 'b'),
@@ -59,6 +61,8 @@ class DebugReceiver : BroadcastReceiver() {
             "nav_mode" to Spec("nav_mode", 'i'),
             // 侧向安全去抖确认帧数(约 ×100ms)：调大更保守、调小更灵敏
             "safe_confirm_frames" to Spec("safe_confirm_frames", 'i'),
+            // 导航变道(靠边/进匝道)专用的去抖确认帧数：默认比超车小，避免错过路口
+            "safe_confirm_frames_navi" to Spec("safe_confirm_frames_navi", 'i'),
             "overtake_mode" to Spec("overtake_mode", 'i'),
             "vision_lane_mode" to Spec("vision_lane_mode", 'i'),
             "navi_min_speed" to Spec("navi_min_speed", 'i'),
@@ -439,6 +443,7 @@ class DebugReceiver : BroadcastReceiver() {
                 val v = raw == "1" || raw.equals("true", true) || raw.equals("on", true)
                 // 全局开关，不依赖 MainActivity 实例
                 if (key == "lane_unknown_block") lane_unknown_block = v
+                if (key == "safety_legacy_mode") safety_legacy_mode = v
                 if (a != null) when (key) {
                     "app_navi" -> a.app_navi = v
                     "app_road_navi" -> a.app_road_navi = v
@@ -466,6 +471,7 @@ class DebugReceiver : BroadcastReceiver() {
                 val v = raw.toIntOrNull() ?: return false
                 // 侧向安全去抖帧数(全局变量，不依赖 MainActivity 实例)
                 if (key == "safe_confirm_frames") { safeConfirmFrames = v.coerceIn(1, 30) }
+                if (key == "safe_confirm_frames_navi") { safeConfirmFramesNavi = v.coerceIn(1, 30) }
                 if (a != null) when (key) {
                     "nav_mode" -> a.nav_mode = v
                     "overtake_mode" -> a.overtake_mode = v
@@ -527,6 +533,7 @@ class DebugReceiver : BroadcastReceiver() {
                 "vision_keep_right" -> a.vision_keep_right
                 "lane_prob_enable" -> a.lane_prob_enable
                 "lane_unknown_block" -> lane_unknown_block
+                "safety_legacy_mode" -> safety_legacy_mode
                 "navi_speak" -> a.navi_speak
                 "navi_speak_first" -> a.navi_speak_first
                 "navi_blind_dec_speed" -> a.navi_blind_dec_speed
@@ -537,6 +544,7 @@ class DebugReceiver : BroadcastReceiver() {
             }).toString()
             'i' -> run {
                 if (key == "safe_confirm_frames") return@run safeConfirmFrames.toString()
+                if (key == "safe_confirm_frames_navi") return@run safeConfirmFramesNavi.toString()
                 (if (a == null) prefs.getInt(spec.prefKey, 0) else when (key) {
                 "nav_mode" -> a.nav_mode
                 "overtake_mode" -> a.overtake_mode

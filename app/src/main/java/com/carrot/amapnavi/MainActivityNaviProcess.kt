@@ -713,7 +713,8 @@ fun MainActivity.AmapNavi(lane_line_valid: Boolean): Boolean {
                     lastValidLaneAction = action
                     prevLaneAction = action
                     validLaneActionDbTime = now
-                    Log.d("LaneDecision", "targetIdxInvalid, ${validLaneActionDbTime}")
+                    // 原此处每 100ms 打印一次 "targetIdxInvalid"，把日志刷到 MB 级且无信息量
+                    // (状态变化时上面那句 Log.w 已经记过一次)，故只保留状态变化日志。
                 }
                 //目标车道有效
                 else {
@@ -862,7 +863,19 @@ fun MainActivity.AmapNavi(lane_line_valid: Boolean): Boolean {
         blindSafeTime = 0
     }
 
-    return (app_navi_valid > 0) && (laneChangeEdge != LaneChangeAction.KEEP || laneCmdSent)
+    // ============ 导航接管判定(带粘滞窗口) ============
+    //  原实现只看"当前这一帧"的靠边意图(laneChangeEdge/laneCmdSent)，而导航引导
+    //  会在 KEEP 与 变道 之间反复抖动(日志里"引导KEEP->LEFT变化/稳定"反复出现)，
+    //  抖回 KEEP 的那一帧 naviFlag 变 false，超车就"乘虚而入"把命令发出去，
+    //  表现为"有导航引导时超车也在生效"、"同一方向连续两条变道命令"。
+    //  这里加粘滞：导航一旦有变道意图/已发命令/正在变道中，之后的
+    //  NAVI_TAKEOVER_HOLD_MS 内持续压制超车；导航变道完成后也留一段缓冲。
+    val naviIntent = laneChangeEdge != LaneChangeAction.KEEP || laneCmdSent ||
+            (atc_state_curr in PreLaneChange..LaneChangeFinishing)
+    if (app_navi_valid > 0 && naviIntent) {
+        naviTakeoverUntil = System.currentTimeMillis() + NAVI_TAKEOVER_HOLD_MS
+    }
+    return (app_navi_valid > 0) && (naviIntent || naviTakeoverActive())
 }
 
 fun MainActivity.autoOvertake(naviFlag: Boolean) {
@@ -878,13 +891,10 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
         overtakeMinSpeed = 60
     }
 
-    // KT超车开关已打开时，接管并关闭Python侧超车控制器，避免两套逻辑同时下发变道命令
-    if ((!bHighWay && app_road_overtake) || (bHighWay && app_overtake)) {
-        if (!py_overtake_disable) {
-            py_overtake_disable = true
-            py_overtake_disable_reason = "KT超车已接管"
-        }
-    }
+    // (已移除)原"KT 超车开关打开时把 py_overtake_disable 置真并提示'KT超车已接管'"的段落：
+    //   Python 侧超车控制器已删除，该标志当前没有任何消费方，保留提示反而误导
+    //   (日志里显示"超车功能关闭"，但超车实际仍在工作)。
+    //   超车与导航的互斥现在只在 naviFlag 为真时生效(见 AmapNavi 返回处)。
 
     // ============ 1. 基础条件判断(激光雷达在线/OP定速/超车开关/领航未接管) ============
     if (!(s.lidar_l && s.lidar_r                       //激光雷达在线
@@ -1061,16 +1071,17 @@ fun MainActivity.naviProcess() {
         //超车功能
         autoOvertake(naviFlag)
 
-        //是否关闭超车功能（Python 版已移除，这里只在状态变化时打日志）
+        //导航变道场景标志(遗留)：靠边/岔路/转弯/推荐车道/禁行车道时会被置真。
+        //  注：Python 侧超车控制器已删除，该标志当前无消费方，这里只作场景变化日志用；
+        //      原文案"超车功能关闭/打开"会误导(超车并未被关闭)，故去掉。
         if (py_overtake_disable_prev != py_overtake_disable) {
             py_overtake_disable_prev = py_overtake_disable
 
-            val now = System.currentTimeMillis()
             val nowTime = nowTimeStr()
             val msg = if (py_overtake_disable) {
-                "$nowTime ${py_overtake_disable_reason},超车功能关闭"
+                "$nowTime ${py_overtake_disable_reason}"
             } else {
-                "$nowTime 超车功能打开"
+                "$nowTime 导航变道场景结束"
             }
             Log.d("LaneState", msg)
             showLaneDebug(msg)

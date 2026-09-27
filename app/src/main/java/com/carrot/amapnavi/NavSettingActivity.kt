@@ -35,6 +35,7 @@ class NavSettingActivity : AppCompatActivity() {
     private lateinit var cbNavTurn: CheckBox
     private lateinit var cbVisionKeepRight: CheckBox
     private lateinit var cbLaneProb: CheckBox
+    private lateinit var cbSafetyLegacy: CheckBox
     private lateinit var cbRampSlowdown: CheckBox
 
     private lateinit var etNaviMinSpeed: EditText
@@ -77,6 +78,7 @@ class NavSettingActivity : AppCompatActivity() {
         cbNavTurn = findViewById(R.id.cbNavSettingNavTurn)
         cbVisionKeepRight = findViewById(R.id.cbNavSettingVisionKeepRight)
         cbLaneProb = findViewById(R.id.cbNavSettingLaneProb)
+        cbSafetyLegacy = findViewById(R.id.cbNavSettingSafetyLegacy)
         etNaviMinSpeed = findViewById(R.id.etNavNaviMinSpeed)
         etAtcDistH = findViewById(R.id.etNavAtcDistH)
         etAtcDistL = findViewById(R.id.etNavAtcDistL)
@@ -189,6 +191,7 @@ class NavSettingActivity : AppCompatActivity() {
                 .putBoolean("nav_turn", cbNavTurn.isChecked)
                 .putBoolean("vision_keep_right", cbVisionKeepRight.isChecked)
                 .putBoolean("lane_prob_enable", cbLaneProb.isChecked)
+                .putBoolean("safety_legacy_mode", cbSafetyLegacy.isChecked)
                 .putInt("navi_min_speed", etNaviMinSpeed.text.toString().toIntOrNull() ?: 20)
                 .putInt("atc_dist_h", etAtcDistH.text.toString().toIntOrNull() ?: 2000)
                 .putInt("atc_dist_l", etAtcDistL.text.toString().toIntOrNull() ?: 500)
@@ -201,6 +204,9 @@ class NavSettingActivity : AppCompatActivity() {
                 .putInt("ramp_slowdown_speed_l", etRampSpeedL.text.toString().toIntOrNull() ?: 45)
                 .putInt("ramp_hold_time", etRampHold.text.toString().toIntOrNull() ?: 6)
                 .apply()
+
+        // 变道判据旧版逻辑开关：立即生效，不必重启 App
+        safety_legacy_mode = cbSafetyLegacy.isChecked
     }
 
     private fun load() {
@@ -224,6 +230,7 @@ class NavSettingActivity : AppCompatActivity() {
         cbNavTurn.isChecked = prefs.getBoolean("nav_turn", false)
         cbVisionKeepRight.isChecked = prefs.getBoolean("vision_keep_right", false)
         cbLaneProb.isChecked = prefs.getBoolean("lane_prob_enable", false)
+        cbSafetyLegacy.isChecked = prefs.getBoolean("safety_legacy_mode", true)
         etNaviMinSpeed.setText(prefs.getInt("navi_min_speed", 20).toString())
         etAtcDistH.setText(prefs.getInt("atc_dist_h", 2000).toString())
         etAtcDistL.setText(prefs.getInt("atc_dist_l", 500).toString())

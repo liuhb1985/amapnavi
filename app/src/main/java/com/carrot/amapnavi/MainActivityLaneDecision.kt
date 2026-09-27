@@ -126,17 +126,25 @@ fun MainActivity.decideLaneWithAction(
     if (nav_cnt <= 0 || nav_lanes.isEmpty() || (!suggest_lane_en && !dis_lane_en && vision_keep_right && edgeType == LaneChangeAction.RIGHT)) {
         inSuggestLaneTime = System.currentTimeMillis()
 
-        //导航要求靠右行驶+设置了纯视觉靠右
-        if(vision_keep_right && edgeType == LaneChangeAction.RIGHT && vLaneResult.leftLaneId >= 1){
-            val rightLaneId = vLaneResult.rightLaneId
-            if(highWay){
-                if(rightLaneId > 2){ //车辆不在最右车道(应急车道除外)
-                    return Triple(-1, LaneChangeAction.RIGHT, 1)
+        // ===== 无导航车道级数据时的视觉回退(修复"导航一直不靠边") =====
+        //  高德的车道级引导通常只在临近路口(<1km)才下发，而靠边/进匝道的准备
+        //  从 atc_dist(默认 2000m) 就要开始。若此时因为"没有导航车道数据"直接保持，
+        //  就会表现为"导航要求靠边但车一直不动"，直到很近才变、甚至错过出口。
+        //  这里退化为纯视觉：导航要求往哪一侧靠，就变到视觉上该侧的相邻车道。
+        //  (不再要求 vision_keep_right 开关；原开关行为作为其中一种情形保留)
+        //  注：仍会经过安全门(实线/盲区/激光)检查后才能下发命令。
+        if (vLaneResult.laneCnt > 0 && vLaneResult.leftLaneId > 0 && vLaneResult.rightLaneId > 0) {
+            if (edgeType == LaneChangeAction.RIGHT) {
+                val rightLaneId = vLaneResult.rightLaneId
+                if (highWay) {
+                    // 高速最右车道是应急车道：至少留一条 → rightLaneId>2 才往右
+                    if (rightLaneId > 2) return Triple(-1, LaneChangeAction.RIGHT, 1)
+                } else {
+                    if (rightLaneId > 1) return Triple(-1, LaneChangeAction.RIGHT, 0)
                 }
-            }else{
-                if(rightLaneId > 1){ //车辆不在最右车道
-                    return Triple(-1, LaneChangeAction.RIGHT, 0)
-                }
+            } else if (edgeType == LaneChangeAction.LEFT) {
+                // 左侧还有可通行车道就往左靠
+                if (vLaneResult.leftLaneId > 1) return Triple(-1, LaneChangeAction.LEFT, 0)
             }
         }
 

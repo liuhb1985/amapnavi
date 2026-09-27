@@ -366,12 +366,29 @@ fun MainActivity.loadUserSettings() {
         true
     }
 
+    //变道安全门"手写版兼容"总开关(默认开)：设置页"宽松变道条件"默认勾选
+    safety_legacy_mode = if (prefs.contains("safety_legacy_mode")) {
+        prefs.getBoolean("safety_legacy_mode", true)
+    } else {
+        editor.putBoolean("safety_legacy_mode", true)
+        true
+    }
+
+
     //侧向安全去抖确认帧数(约 = 帧数 × 100ms)：调大更保守/反应慢，调小更灵敏/可能误放行
     safeConfirmFrames = if (prefs.contains("safe_confirm_frames")) {
         prefs.getInt("safe_confirm_frames", 5)
     } else {
         editor.putInt("safe_confirm_frames", 5)
         5
+    }.coerceIn(1, 30)
+
+    //导航变道(靠边/进匝道)专用的去抖帧数：错过路口代价大，默认比超车更快放行
+    safeConfirmFramesNavi = if (prefs.contains("safe_confirm_frames_navi")) {
+        prefs.getInt("safe_confirm_frames_navi", 2)
+    } else {
+        editor.putInt("safe_confirm_frames_navi", 2)
+        2
     }.coerceIn(1, 30)
 
     top_pad_dp = if (prefs.contains("top_pad_dp")) {

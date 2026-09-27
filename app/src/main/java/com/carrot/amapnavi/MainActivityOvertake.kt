@@ -22,6 +22,9 @@ private const val OVERTAKE_PRE_KEEPALIVE_MS = 250L
 fun MainActivity.sendOvertakeActionCmd(action: LaneChangeAction) {
     val dir = if (action == LaneChangeAction.LEFT || action == LaneChangeAction.LEFT_TURN) "LEFT" else "RIGHT"
 
+    // 序号统一从全局递增源取，避免与导航链路撞号(见 nextLaneCmdIndex 注释)
+    overtakeCmdIndex = nextLaneCmdIndex()
+
     val nowTime = nowTimeStr()
     var msg = ""
     if (action == LaneChangeAction.LEFT || action == LaneChangeAction.RIGHT) {
@@ -106,6 +109,20 @@ fun MainActivity.doOvertakeAction(action: LaneChangeAction) {
                         else -> "盲区有车"
                     }
                     val msg = "${nowTime} 发送前二次检查不通过($why,$recheck)，暂不下发超车命令 $action"
+                    Log.w("OvertakeCmd", msg)
+                    showLaneDebug(msg)
+                }
+                return
+            }
+
+            // ---- 导航接管硬互斥 ----
+            // 导航正在靠边/进匝道/变道中(含粘滞窗口)时，超车不得下发命令，
+            // 否则会出现"同一方向连续两条变道命令"或与导航变道互相抢车道。
+            if (naviTakeoverActive()) {
+                overtakeSpeak = false
+                if (now - lastOvertakeRecheckLogTime >= BLIND_SPEAK_INTERVAL) {
+                    lastOvertakeRecheckLogTime = now
+                    val msg = "${nowTime} 导航接管中，取消本次超车下发 $action"
                     Log.w("OvertakeCmd", msg)
                     showLaneDebug(msg)
                 }

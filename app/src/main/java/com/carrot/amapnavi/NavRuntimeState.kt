@@ -106,6 +106,47 @@ var cutInReason = ""                                   // 最近一次 cut-in �
 var overtakeLastReason = ""                            // 上次记录的决策原因(用于去重日志)
 var overtakeLastLogTime = 0L                           // 上次记录决策原因的时间(ms)
 
+// -----------------------------
+// 导航(车道领航)接管粘滞窗口
+//   导航一旦有靠边/变道意图(或已发命令、或变道状态机在动作)，就获得一段优先权，
+//   期间超车变道不得下发命令。
+//   原因(实车证据)：导航引导会在 KEEP/变道 之间反复抖动，原实现只看当前一帧的意图，
+//   抖动回 KEEP 的那一帧超车就会"乘虚而入"发命令，出现导航变道与超车变道
+//   各自下发命令、互相打架(同一方向连续两条变道命令)。
+// -----------------------------
+var naviTakeoverUntil = 0L
+const val NAVI_TAKEOVER_HOLD_MS = 3000L
+
+// 当前是否处于"导航接管"(含粘滞窗口)
+fun naviTakeoverActive(): Boolean = System.currentTimeMillis() < naviTakeoverUntil
+
+// -----------------------------
+// 变道命令序号(导航与超车共用同一个递增源)
+//   CP 侧按 carrotIndex 是否变化判断"这是新命令"，值相同会被当成重复命令丢弃。
+//   导航(laneChangeCmdIndex)与超车(overtakeCmdIndex)原来各维护一套计数器，
+//   且都用时间戳低位初始化(启动时间接近就撞号)，实车日志里出现过两条链路使用
+//   同一个 index 的情况(导航 17:03:51 index=...155，超车 17:04:09 index=...155)。
+//   这里统一到一个递增源，彻底避免撞号。
+// -----------------------------
+private var laneCmdIndexSeq = (System.currentTimeMillis() % 1_000_000_000L).toInt()
+private val laneCmdIndexLock = Any()
+
+fun nextLaneCmdIndex(): Int = synchronized(laneCmdIndexLock) { ++laneCmdIndexSeq }
+
+// -----------------------------
+// 变道安全门"手写版兼容"总开关(默认开，设置页"宽松变道条件"默认勾选)
+//   打开后，变道安全门使用 9-13 手写版(提交 65982ce1)的判据集合，一条命令回到原来的手感：
+//     原车前侧雷达(-2) / 原车 BSD 后盲区(-4) / 激光侧方(-8，不含前角·后角)
+//     / 视觉明确实线(-1，按 left_lane_type==1 直接采信)
+//   并且：
+//     · 不做侧向去抖(判安全立即放行，旧版是零延时)
+//     · 不含"车道线判据不可用(-128)"
+//     · 不含"综合盲区(-16)"(blind_l/r 及摄像头/车身分解来源)
+//     · 不含激光自算时距/TTC(-32/-64)
+//   用途：与当前严格版做 A/B 对比，定位到底哪条新判据让变道变迟钝。
+// -----------------------------
+var safety_legacy_mode = true
+
 // 全量逐帧记录(调试用，默认关)：开启后每个决策周期把一帧现场写到 logcat(OvtFrame) 和超车日志文件
 //   由调试后门 adb broadcast 控制：--es cmd frame --es val on/200ms
 var overtakeFullFrameLog = false

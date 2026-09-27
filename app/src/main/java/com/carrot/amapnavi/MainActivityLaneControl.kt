@@ -20,11 +20,22 @@ import org.json.JSONObject
 // 侧向安全去抖的确认帧数(约 = 帧数 × 100ms)。做成变量，便于车上实时调：
 //   调大 = 更保守(更少误放行，但变道反应变慢)；调小 = 更灵敏(抖动时可能误放行)。
 //   调试后门可热改：--es cmd set --es key safe_confirm_frames --es val 3
-var safeConfirmFrames = 5          // 默认约 0.5s(控制周期 100ms)
+var safeConfirmFrames = 5          // 超车：默认约 0.5s(控制周期 100ms)
+var safeConfirmFramesNavi = 2      // 导航：约 0.2s(要进匝道/切高速，不能等太久)
 private const val SAFETY_TICK_MS = 100L
-private val sideSafeStreak = HashMap<LaneChangeAction, Int>()
-private val sideBlockCode = HashMap<LaneChangeAction, Int>()
+
+// 变道用途：决定安全门的严格度
+//   OVERTAKE = 超车变道。错过只是少超一次，代价小 → 判据从严(fail-safe)
+//   NAVI     = 导航变道(靠边/进匝道/切换高速)。错过路口要绕行甚至走错高速，代价大 → 判据从宽
+// 两者共用一个安全门，但"判据不可用"这类保守拦截只对超车生效
+enum class LaneChangePurpose { OVERTAKE, NAVI }
+
+private val sideSafeStreak = HashMap<String, Int>()
+private val sideBlockCode = HashMap<String, Int>()
 private var lastSafetyTickTime = 0L
+
+private fun debounceKey(purpose: LaneChangePurpose, dir: LaneChangeAction) =
+    purpose.name + "_" + dir.name
 
 // 复位侧向安全去抖状态(场景切换 / 调试复位时调用)
 fun resetSideSafetyDebounce() {
@@ -34,24 +45,34 @@ fun resetSideSafetyDebounce() {
 }
 
 // 带去抖的安全门入口：同一控制周期内多次调用不会重复推进计数
-fun MainActivity.LaneChangeSafetyCheck(action: LaneChangeAction): Int {
+fun MainActivity.LaneChangeSafetyCheck(
+    action: LaneChangeAction,
+    purpose: LaneChangePurpose = LaneChangePurpose.OVERTAKE
+): Int {
+    // 手写版兼容模式：不做侧向去抖，直接用原始判据(9-13 版是判安全立即放行)
+    if (safety_legacy_mode) return LaneChangeSafetyCheckRaw(action, purpose)
+
     val now = System.currentTimeMillis()
     if (now - lastSafetyTickTime >= SAFETY_TICK_MS) {
         lastSafetyTickTime = now
-        for (dir in arrayOf(LaneChangeAction.LEFT, LaneChangeAction.RIGHT)) {
-            val raw = LaneChangeSafetyCheckRaw(dir)
-            if (raw < 0) {                    // 不安全：立即生效
-                sideSafeStreak[dir] = 0
-                sideBlockCode[dir] = raw
-            } else {                          // 安全：连续若干帧才恢复
-                val n = (sideSafeStreak[dir] ?: 0) + 1
-                sideSafeStreak[dir] = n
-                if (n >= safeConfirmFrames) sideBlockCode[dir] = 0
+        for (p in LaneChangePurpose.values()) {
+            for (dir in arrayOf(LaneChangeAction.LEFT, LaneChangeAction.RIGHT)) {
+                val k = debounceKey(p, dir)
+                val raw = LaneChangeSafetyCheckRaw(dir, p)
+                if (raw < 0) {                    // 不安全：立即生效
+                    sideSafeStreak[k] = 0
+                    sideBlockCode[k] = raw
+                } else {                          // 安全：连续若干帧才恢复
+                    val n = (sideSafeStreak[k] ?: 0) + 1
+                    sideSafeStreak[k] = n
+                    val need = if (p == LaneChangePurpose.NAVI) safeConfirmFramesNavi else safeConfirmFrames
+                    if (n >= need) sideBlockCode[k] = 0
+                }
             }
         }
     }
     // 转弯动作只查侧前盲区，不做去抖
-    return sideBlockCode[action] ?: LaneChangeSafetyCheckRaw(action)
+    return sideBlockCode[debounceKey(purpose, action)] ?: LaneChangeSafetyCheckRaw(action, purpose)
 }
 
 // 车道线判据的三态结果
@@ -77,21 +98,33 @@ private const val LANE_PRE_KEEPALIVE_MS = 250L
 //   原因：无法区分"CP 确认该侧不是实线"和"CP 没有车道线判据、字段恰好为 false"。
 //         若把 CP 的 false 当成许可，一旦本机视觉检测停摆(相机断流/推理掉帧)，
 //         实线拦截会整体失效并静默放行 —— 这正是"实线有时也变道"的隐患之一。
-fun laneLineJudgement(left: Boolean): LaneLineJudgement {
+fun laneLineJudgement(
+    left: Boolean,
+    purpose: LaneChangePurpose = LaneChangePurpose.OVERTAKE
+): LaneLineJudgement {
     val s = opStateManager.state
     val cpSolid = if (left) s.blind_lane_l else s.blind_lane_r
     val cpFresh = (System.currentTimeMillis() - s.blindLaneTs) < BLIND_LANE_FRESH_MS
     val appType = if (left) left_lane_type else right_lane_type
-    val appValid = laneTypeDetectValid() && appType >= 0
+    // 关键区分："视觉检测是否在跑" 与 "这一帧有没有得出线型结论" 是两件事。
+    //   appRunning=true 且 appType<0 只表示这一帧没识别出线型(线不清晰/虚线/噪声)，
+    //   在实车上是常态，绝不能当成"判据不可用"，否则会大范围拦掉变道
+    //   (曾造成"以前好用的领航突然不好用")。
+    val appRunning = laneTypeDetectValid()
+    val appValid = appRunning && appType >= 0
 
     // 任一来源判实线 → 实线
     if ((cpFresh && cpSolid) || (appValid && appType == 1)) return LaneLineJudgement.SOLID
-    // 只有本机视觉判据能给出"非实线"的许可
+    // 本机视觉明确给出"非实线" → 许可
     if (appValid) return LaneLineJudgement.CLEAR
-    // 视觉判据不可用 → 未知(不采信 CP 的 false)
+    // 检测在跑、只是没得出线型结论 → 按"未识别出实线"处理(不放行也不拦)
+    if (appRunning) return LaneLineJudgement.CLEAR
+    // 导航变道：不能因为"线型判据不可用"就错过路口/错过高速出口
+    //   (代价: 走错路绕行；超车错过只是少超一次) → 导航一律不因判据不可用而拦
+    if (purpose == LaneChangePurpose.NAVI) return LaneLineJudgement.CLEAR
+    // 到这里才是真的"判据不可用"(检测关/掉帧/长时间无结果)，仅超车从严：
     //   lane_unknown_block=true(默认)：fail-safe 禁止变道
-    //   lane_unknown_block=false：按"未知=不拦"处理(只在明确实线时拦)，用于视觉线型
-    //     长期识别不出(-1)导致变道功能整体不可用的场合，可车上热调
+    //   lane_unknown_block=false：按"未知=不拦"处理，可车上热调
     if (!lane_unknown_block) return LaneLineJudgement.CLEAR
     return LaneLineJudgement.UNKNOWN
 }
@@ -164,6 +197,9 @@ fun MainActivity.sendBlinkerCtrlComm(index: Int, ctrl: String, state: String) {
 fun MainActivity.sendLaneActionCmd(action: LaneChangeAction) {
     val dir = if (action == LaneChangeAction.LEFT || action == LaneChangeAction.LEFT_TURN) "LEFT" else "RIGHT"
 
+    // 序号统一从全局递增源取，避免与超车链路撞号(见 nextLaneCmdIndex 注释)
+    laneChangeCmdIndex = nextLaneCmdIndex()
+
     val nowTime = nowTimeStr()
     var msg = ""
     if (action == LaneChangeAction.LEFT || action == LaneChangeAction.RIGHT) {
@@ -213,6 +249,19 @@ private val lidarHazardLatch = mutableMapOf<String, Boolean>()
 private fun lateralOutOfRange(xrelMm: Int?): Boolean {
     if (xrelMm == null) return false
     return kotlin.math.abs(xrelMm) / 1000f > LidarSideSafety.LATERAL_MAX_M
+}
+
+// 该侧激光盲区是否成立：只看侧方(lidar_lblind / lidar_rblind)
+//   注：2026-09-27 曾尝试"前角/后角也参与 + 横向/纵向过滤"，已废弃：
+//   该过滤依据"drel==0 表示无效/路侧结构"不成立 —— 纵向≈0 且横向≈相邻车道中心
+//   更可能是**并排行驶的车**(最危险的变道场景)，过滤掉会造成漏拦。
+//   而且 9-13 手写版的激光判据本来就只有侧方 lidar_lblind，不含前后角。
+//   若以后还要区分"路沿 vs 并排车"，须先用实车数据验证(路沿的可靠特征是
+//   横向长期恒定 且 与视觉路沿距离 edge_dist 重合)，不要用 drel==0 近似。
+fun MainActivity.lidarSideBlind(action: LaneChangeAction): Boolean {
+    val s = opStateManager.state
+    val left = action == LaneChangeAction.LEFT
+    return if (left) s.lidar_lblind else s.lidar_rblind
 }
 
 // 单个侧向目标是否危险：dM>0 前方 / dM<0 后方；vRelKmh = 目标速度 - 本车速度
@@ -335,19 +384,45 @@ fun MainActivity.lidarCornerRisky(left: Boolean, front: Boolean): Boolean {
 //  -32    激光自算：侧前方不安全(时距/TTC)
 //  -64    激光自算：侧后方不安全(时距/TTC)
 // -128    车道线判据不可用(视觉检测停摆 且 CP 未下发车道线判据) → fail-safe 禁止
-private fun MainActivity.LaneChangeSafetyCheckRaw(action: LaneChangeAction): Int {
+private fun MainActivity.LaneChangeSafetyCheckRaw(
+    action: LaneChangeAction,
+    purpose: LaneChangePurpose = LaneChangePurpose.OVERTAKE
+): Int {
     val s = opStateManager.state
+
+    // ===== 手写版兼容模式：9-13 版(65982ce1)的判据集合，零延时 =====
+    //   原车前侧雷达 / 原车 BSD / 激光侧方 / 视觉明确实线，仅此四条。
+    if (safety_legacy_mode) {
+        if (action == LaneChangeAction.LEFT) {
+            if (s.l_front_blind) return -2
+            else if (s.left_blindspot) return -4
+            else if (s.lidar_lblind) return -8
+            else if (left_lane_type == 1) return -1
+        } else if (action == LaneChangeAction.RIGHT) {
+            if (s.r_front_blind) return -2
+            else if (s.right_blindspot) return -4
+            else if (s.lidar_rblind) return -8
+            else if (right_lane_type == 1) return -1
+        }
+        if (action == LaneChangeAction.LEFT_TURN) {
+            if (s.l_front_blind) return -2
+        } else if (action == LaneChangeAction.RIGHT_TURN) {
+            if (s.r_front_blind) return -2
+        }
+        return 0
+    }
+
     if (action == LaneChangeAction.LEFT) {
         //左侧盲区有车
         if (s.l_front_blind) { //原车左侧前方
             return -2
         } else if (s.left_blindspot) { //原车左侧后方
             return -4
-        } else if (s.lidar_lblind || s.lidar_lfblind || s.lidar_lbblind) { //激光雷达(纯激光)
+        } else if (lidarSideBlind(action)) { //激光雷达(纯激光，只看侧方)
             return -8
-        } else if (laneLineJudgement(true) == LaneLineJudgement.SOLID) { //左侧实线(取或)
+        } else if (laneLineJudgement(true, purpose) == LaneLineJudgement.SOLID) { //左侧实线(取或)
             return -1
-        } else if (laneLineJudgement(true) == LaneLineJudgement.UNKNOWN) { //左侧线型判据不可用
+        } else if (laneLineJudgement(true, purpose) == LaneLineJudgement.UNKNOWN) { //左侧线型判据不可用
             return LANE_BLOCK_UNKNOWN
         } else if (s.blind_l) { //综合盲区里的其它来源(摄像头等)
             return -16
@@ -360,11 +435,11 @@ private fun MainActivity.LaneChangeSafetyCheckRaw(action: LaneChangeAction): Int
             return -2
         } else if (s.right_blindspot) {
             return -4
-        } else if (s.lidar_rblind || s.lidar_rfblind || s.lidar_rbblind) {
+        } else if (lidarSideBlind(action)) { //激光雷达(纯激光，只看侧方)
             return -8
-        } else if (laneLineJudgement(false) == LaneLineJudgement.SOLID) { //实线(取或)
+        } else if (laneLineJudgement(false, purpose) == LaneLineJudgement.SOLID) { //实线(取或)
             return -1
-        } else if (laneLineJudgement(false) == LaneLineJudgement.UNKNOWN) { //线型判据不可用
+        } else if (laneLineJudgement(false, purpose) == LaneLineJudgement.UNKNOWN) { //线型判据不可用
             return LANE_BLOCK_UNKNOWN
         } else if (s.blind_r) {
             return -16
@@ -396,25 +471,27 @@ fun MainActivity.sideBlockCause(action: LaneChangeAction): BlockCause? {
     val s = opStateManager.state
     val left = action == LaneChangeAction.LEFT
 
+    // 手写版兼容模式：卡片原因显示与安全门保持一致(见 safety_legacy_mode 说明)
+    val legacy = safety_legacy_mode
+
     val causes = mutableListOf(
         (if (left) s.l_front_blind else s.r_front_blind) to BlockCause(-2, "前侧盲区·前雷达"),
         (if (left) s.left_blindspot else s.right_blindspot) to BlockCause(-4, "后方盲区·BSD"),
-        (if (left) s.lidar_lfblind else s.lidar_rfblind) to BlockCause(-8, "激光盲区·前角"),
-        (if (left) s.lidar_lbblind else s.lidar_rbblind) to BlockCause(-8, "激光盲区·后角"),
         (if (left) s.lidar_lblind else s.lidar_rblind) to BlockCause(-8, "激光盲区·侧方"),
-        // 车道实线：与安全门同源(见 laneLineJudgement)，CP 判的实线 或 App 自己的车道线类型
-        (laneLineJudgement(left) == LaneLineJudgement.SOLID) to BlockCause(-1, "车道实线"),
+        // 车道实线：兼容模式只看视觉线型，严格模式为 CP/视觉取或(见 laneLineJudgement)
+        (if (legacy) (if (left) left_lane_type == 1 else right_lane_type == 1)
+         else laneLineJudgement(left) == LaneLineJudgement.SOLID) to BlockCause(-1, "车道实线"),
         // 车道线判据不可用：视觉检测停摆 且 CP 也没给线型判据(与安全门一致，禁止变道)
-        (laneLineJudgement(left) == LaneLineJudgement.UNKNOWN) to BlockCause(LANE_BLOCK_UNKNOWN, "车道线未知"),
+        (!legacy && laneLineJudgement(left) == LaneLineJudgement.UNKNOWN) to BlockCause(LANE_BLOCK_UNKNOWN, "车道线未知"),
         // 综合盲区按分解来源分别显示，避免一律标成"摄像头盲区"
-        (if (left) s.blind_camera_l else s.blind_camera_r) to BlockCause(-16, "摄像头盲区"),
-        (if (left) s.blind_car_l else s.blind_car_r) to BlockCause(-16, "车身盲区"),
-        (if (left) s.blind_l else s.blind_r) to BlockCause(-16, "综合盲区"),
+        (!legacy && (if (left) s.blind_camera_l else s.blind_camera_r)) to BlockCause(-16, "摄像头盲区"),
+        (!legacy && (if (left) s.blind_car_l else s.blind_car_r)) to BlockCause(-16, "车身盲区"),
+        (!legacy && (if (left) s.blind_l else s.blind_r)) to BlockCause(-16, "综合盲区"),
         // 侧向信号抖动：原始判据当前是"安全"，但去抖窗口未走完，仍按不安全处理
-        (LaneChangeSafetyCheck(action) < 0) to BlockCause(-256, "侧向信号抖动确认中"),
+        (!legacy && LaneChangeSafetyCheck(action) < 0) to BlockCause(-256, "侧向信号抖动确认中"),
     )
     // 激光自算的时距/TTC 判据（激光在线时才有，与 LaneChangeSafetyCheck 的判据集合一致）
-    lidarSideHazard(action)?.let { causes += (true to it) }
+    if (!legacy) lidarSideHazard(action)?.let { causes += (true to it) }
     return causes.firstOrNull { it.first }?.second
 }
 
@@ -507,7 +584,8 @@ fun MainActivity.doLaneChangeAction(action: LaneChangeAction, edgeAction: LaneCh
         }
 
         //盲区不安全，播报盲区有车
-        val lane_change_safe = LaneChangeSafetyCheck(action)
+        // 导航变道(靠边/进匝道)：判据不可用不拦、去抖更快放行，避免错过路口
+        val lane_change_safe = LaneChangeSafetyCheck(action, LaneChangePurpose.NAVI)
         if (lane_change_safe < 0) {
             blindSafeTime = now
             lastBlindDbTime = now
@@ -669,7 +747,7 @@ fun MainActivity.doLaneChangeAction(action: LaneChangeAction, edgeAction: LaneCh
             // 播报后还要等 0.75~2.25s 才真正下发，这段时间车辆已行进数十米，
             // 实线/盲区状态可能已经变化(典型：播报时是虚线、执行时已进实线区)。
             // 这里必须重新过一次安全门，不通过就取消本次下发并重新计时等待。
-            val recheck = LaneChangeSafetyCheck(action)
+            val recheck = LaneChangeSafetyCheck(action, LaneChangePurpose.NAVI)
             if (recheck < 0) {
                 laneSpeakTime = now
                 if (now - lastRecheckLogTime >= BLIND_SPEAK_INTERVAL) {
