@@ -42,6 +42,15 @@ var disableLaneChangeTimer = 0L
 var laneLineValid = false
 
 // -----------------------------
+// 决策循环单飞保护(重要)
+//   startTimeoutChecker() 会被 UDP 初始化回调重复调用，导致多个协程同时跑 naviProcess：
+//   表现为同一条变道命令被多个线程重复下发、状态机标志与冷却计时互相覆盖，
+//   触发/超时时机不可控。这里用原子标志保证任一时刻只有一个决策在跑。
+// -----------------------------
+val naviProcessBusy = java.util.concurrent.atomic.AtomicBoolean(false)
+val timeoutCheckerRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+
+// -----------------------------
 // 匝道/分岔提前减速运行态
 //   active 期间把下发到 OP 的道路限速压到 rampSlowdownSpeed；
 //   rampSlowdownUntil 是维持期截止时间，避免刚进匝道就撤销减速。

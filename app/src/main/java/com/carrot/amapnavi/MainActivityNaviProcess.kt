@@ -1022,53 +1022,65 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
 
 //导航处理
 fun MainActivity.naviProcess() {
+    //单飞保护：并发进来直接跳过本周期(见 NavRuntimeState.naviProcessBusy)
+    if (!naviProcessBusy.compareAndSet(false, true)) return
+    try {
 
-    //行驶路程处理(先更新到路口的剩余距离)
-    travelDistProcess()
-    //匝道提前减速(须先于限速下发：限速下发要用到本周期的减速状态)
-    rampSlowdownProcess()
-    //平滑道路限速
-    smoothSpeedLimit()
-    //车道线有效检测
-    var lane_line_valid = laneLineProcess()
-    laneLineValid = lane_line_valid
+        //行驶路程处理(先更新到路口的剩余距离)
+        travelDistProcess()
+        //匝道提前减速(须先于限速下发：限速下发要用到本周期的减速状态)
+        rampSlowdownProcess()
+        //平滑道路限速
+        smoothSpeedLimit()
+        //车道线有效检测
+        var lane_line_valid = laneLineProcess()
+        laneLineValid = lane_line_valid
 
-    //端到端模拟注入(仅调试用，见 DebugReceiver cmd=sim)
-    // 必须放在 laneLineValid 赋值之后，否则会被 laneLineProcess() 的结果覆盖
-    if (simScene != null) {
-        if (System.currentTimeMillis() < simHoldUntil) {
-            applySimScene(simScene!!, simTick++)
-        } else {
-            simScene = null
-            resetLaneTypeFilter()
-            Log.d("Overtake", "模拟场景结束")
+        //端到端模拟注入(仅调试用，见 DebugReceiver cmd=sim)
+        // 必须放在 laneLineValid 赋值之后，否则会被 laneLineProcess() 的结果覆盖
+        if (simScene != null) {
+            if (System.currentTimeMillis() < simHoldUntil) {
+                applySimScene(simScene!!, simTick++)
+            } else {
+                simScene = null
+                resetLaneTypeFilter()
+                Log.d("Overtake", "模拟场景结束")
+            }
         }
-    }
 
-    //高德导航
-    var naviFlag = AmapNavi(lane_line_valid)
-    //超车功能
-    autoOvertake(naviFlag)
+        //高德导航
+        var naviFlag = AmapNavi(lane_line_valid)
+        //超车功能
+        autoOvertake(naviFlag)
 
-    //是否关闭超车功能（Python 版已移除，这里只在状态变化时打日志）
-    if (py_overtake_disable_prev != py_overtake_disable) {
-        py_overtake_disable_prev = py_overtake_disable
+        //是否关闭超车功能（Python 版已移除，这里只在状态变化时打日志）
+        if (py_overtake_disable_prev != py_overtake_disable) {
+            py_overtake_disable_prev = py_overtake_disable
 
-        val now = System.currentTimeMillis()
-        val nowTime = nowTimeStr()
-        val msg = if (py_overtake_disable) {
-            "$nowTime ${py_overtake_disable_reason},超车功能关闭"
-        } else {
-            "$nowTime 超车功能打开"
+            val now = System.currentTimeMillis()
+            val nowTime = nowTimeStr()
+            val msg = if (py_overtake_disable) {
+                "$nowTime ${py_overtake_disable_reason},超车功能关闭"
+            } else {
+                "$nowTime 超车功能打开"
+            }
+            Log.d("LaneState", msg)
+            showLaneDebug(msg)
         }
-        Log.d("LaneState", msg)
-        showLaneDebug(msg)
+    } finally {
+        naviProcessBusy.set(false)
     }
 }
 
 fun MainActivity.startTimeoutChecker() {
+    // 防重复启动：UDP 初始化回调可能被多次触发，重复启动会让多个协程同时跑决策
+    if (!timeoutCheckerRunning.compareAndSet(false, true)) {
+        Log.w("Navi", "决策循环已在运行，忽略重复启动")
+        return
+    }
     timeoutJob?.cancel()
     timeoutJob = lifecycleScope.launch(Dispatchers.IO) {
+      try {
         delay(5000)
         var imageViewCheckTime = 0L
 
@@ -1161,5 +1173,9 @@ fun MainActivity.startTimeoutChecker() {
                 recvTimeoutCnt = 0
             }
         }
+      } finally {
+        // 协程退出(取消/异常)时释放标志，保证之后还能重新启动决策循环
+        timeoutCheckerRunning.set(false)
+      }
     }
 }
