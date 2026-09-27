@@ -407,7 +407,7 @@ class DebugReceiver : BroadcastReceiver() {
         Log.d(TAG, "开关: 领航 高速/公路=${a.app_navi}/${a.app_road_navi} 超车 高速/公路=${a.app_overtake}/${a.app_road_overtake} 推荐车道=${a.suggest_lane_en} 禁行=${a.dis_lane_en} 靠左/右=${a.keep_left_en}/${a.keep_right_en}")
         Log.d(TAG, "距离: atc_h=${a.atc_dist_h} fork_h=${a.fork_dist_h} atc_l=${a.atc_dist_l} fork_l=${a.fork_dist_l} minSpeed=${a.navi_min_speed}")
         Log.d(TAG, "匝道减速: 开关=${a.ramp_slowdown_en} 高速${a.ramp_slowdown_dist_h}m/${a.ramp_slowdown_speed_h}km 公路${a.ramp_slowdown_dist_l}m/${a.ramp_slowdown_speed_l}km 维持${a.ramp_hold_time}s" +
-                " | active=$rampSlowdownActive 起点=${rampSlowdownLockedDist.toInt()}m v0=${rampSlowdownV0.toInt()} 目标=$rampSlowdownSpeed 剩余=${(rampSlowdownUntil - now).coerceAtLeast(0L)}ms")
+                " | active=$rampSlowdownActive 起点=${rampSlowdownLockedDist.toInt()}m v0=${rampSlowdownV0.toInt()} 目标=$rampSlowdownSpeed 曲线压制=${rampActiveLimit}km/h 剩余=${(rampSlowdownUntil - now).coerceAtLeast(0L)}ms")
         Log.d(TAG, "限速下发: nRoadLimitSpeed=${a.naviState.nRoadLimitSpeed} ramp=${a.nRoadLimitSpeedRamp} cnt=${a.nRoadLimitSpeedRampCnt} 末次高德=${a.nAmapLimitSpeedLast}")
         Log.d(TAG, "阈值: 自算=${a.app_lidar_self_check} 跟随CP=${a.app_thresh_follow_cp} 前=${a.lidar_front_dist_m}m/${a.lidar_front_time_s}s 后=${a.lidar_rear_dist_m}m/${a.lidar_rear_time_s}s vrel=${a.lidar_front_vrel_time_s}/${a.lidar_rear_vrel_time_s}")
         Log.d(TAG, "变道状态机: cmdSent=${a.laneCmdSent} execOk=${a.laneCmdExecOk} pause=${a.laneActionPause} atc_curr=${a.atc_state_curr} target=${a.lastTargetIdx} visual=${a.lastVisualIdx} action=${a.laneAction}")

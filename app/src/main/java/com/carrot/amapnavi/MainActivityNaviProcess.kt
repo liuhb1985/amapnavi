@@ -162,18 +162,23 @@ fun MainActivity.rampSlowdownProcess() {
         // applyRampLimit 只压不抬，所以限速会随曲线单调、平缓地下降 → 接近无感减速。
         val curve = rampCurveSpeed(dist, rampSlowdownLockedDist, forkDist,
                 rampSlowdownV0, targetSpeed.toFloat())
-        applyRampLimit(kotlin.math.ceil(curve).toInt())
+        // 记录"曲线当前值"：下发限速时与该值取较小值(而不是固定目标速度)，
+        // 这样减速才会沿曲线平滑下降，同时更高德限速也不会把它抬起来
+        rampActiveLimit = kotlin.math.ceil(curve).toInt()
+        applyRampLimit(rampActiveLimit)
         return
     }
 
     // 不在减速区：已进匝道或引导已切换，维持期内保持目标限速，避免速度立刻被提起来
     if (rampSlowdownActive) {
         if (now < rampSlowdownUntil) {
+            rampActiveLimit = rampSlowdownSpeed      // 维持期：压住目标速度
             applyRampLimit(rampSlowdownSpeed)
             return
         }
         rampSlowdownActive = false
         rampSlowdownSpeed = -1
+        rampActiveLimit = -1                         // 撤销：不再参与取小
         rampSlowdownLockedDist = 0f
         rampSlowdownV0 = 0f
         restoreLimitAfterRamp()
@@ -190,11 +195,10 @@ fun MainActivity.smoothSpeedLimit() {
     if (smooth_speed_limit) {
         if (naviState.nRoadLimitSpeed != null) {
             var nRoadLimitSpeedTmp = naviState.nRoadLimitSpeed ?: -1
-            //匝道提前减速：把爬坡目标压到匝道限速以内(只压不抬)
+            //匝道提前减速：与"曲线当前值"取小(不被高德抬高，但采纳更低的限速)
             var rampTarget = nRoadLimitSpeedRamp
-            if (rampSlowdownActive && rampSlowdownSpeed > 0 &&
-                    (rampTarget < 0 || rampTarget > rampSlowdownSpeed)) {
-                rampTarget = rampSlowdownSpeed
+            if (rampActiveLimit > 0 && (rampTarget < 0 || rampTarget > rampActiveLimit)) {
+                rampTarget = rampActiveLimit
             }
             if ((rampTarget != nRoadLimitSpeedTmp) || (nRoadLimitSpeedRampCnt > 0)) { //速度未爬坡完成或者还有发送次数
                 //发送次数递减
