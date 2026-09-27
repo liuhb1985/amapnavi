@@ -65,6 +65,11 @@ const val LANE_BLOCK_UNKNOWN = -128
 private const val BLIND_LANE_FRESH_MS = 1500L
 
 // 该侧车道线判据：CP 车道实线信号 与 App 视觉线型 取或(保守)，并识别"判据不可用"
+//
+//   许可权划分(重要)：CP 侧信号只能"否决"(判实线时阻止变道)，不能"许可"。
+//   原因：无法区分"CP 确认该侧不是实线"和"CP 没有车道线判据、字段恰好为 false"。
+//         若把 CP 的 false 当成许可，一旦本机视觉检测停摆(相机断流/推理掉帧)，
+//         实线拦截会整体失效并静默放行 —— 这正是"实线有时也变道"的隐患之一。
 fun laneLineJudgement(left: Boolean): LaneLineJudgement {
     val s = opStateManager.state
     val cpSolid = if (left) s.blind_lane_l else s.blind_lane_r
@@ -74,9 +79,9 @@ fun laneLineJudgement(left: Boolean): LaneLineJudgement {
 
     // 任一来源判实线 → 实线
     if ((cpFresh && cpSolid) || (appValid && appType == 1)) return LaneLineJudgement.SOLID
-    // 至少一路明确给出"不是实线"
-    if ((cpFresh && !cpSolid) || appValid) return LaneLineJudgement.CLEAR
-    // 两路都没有有效判断
+    // 只有本机视觉判据能给出"非实线"的许可
+    if (appValid) return LaneLineJudgement.CLEAR
+    // 视觉判据不可用 → 未知(不采信 CP 的 false)，fail-safe 禁止变道
     return LaneLineJudgement.UNKNOWN
 }
 

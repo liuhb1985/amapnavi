@@ -73,16 +73,29 @@ object SimScenes {
         put("lidar_rbblind", false)
         put("blind_l", false)
         put("blind_r", false)
-        put("blind_lane_l", false)
-        put("blind_lane_r", false)
+        // 注意：lane_unknown 场景刻意"不下发" blind_lane_*，
+        // 用于验证"CP 也没提供车道线判据"时 App 是否 fail-safe
 
         when (name) {
-            "solid_cp" -> put("blind_lane_l", true)
-            "cp_flaky" -> put("blind_lane_l", (tick / 3) % 2 == 0L)   // 每3帧翻转：CP 判据不稳定
-            "radar_flaky" -> put("l_front_blind", (tick / 3) % 2 == 0L)
-            "lidar_flaky" -> put("lidar_lblind", (tick / 3) % 2 == 0L)
-            "lane_unknown" -> Unit   // 两个来源都不给判据(视觉检测由 laneDetectOff 关闭)
-            else -> Unit
+            "solid_cp" -> {
+                put("blind_lane_l", true); put("blind_lane_r", false)
+            }
+            "cp_flaky" -> {
+                put("blind_lane_l", (tick / 3) % 2 == 0L)             // 每3帧翻转：CP 判据不稳定
+                put("blind_lane_r", false)
+            }
+            "radar_flaky" -> {
+                put("l_front_blind", (tick / 3) % 2 == 0L)
+                put("blind_lane_l", false); put("blind_lane_r", false)
+            }
+            "lidar_flaky" -> {
+                put("lidar_lblind", (tick / 3) % 2 == 0L)
+                put("blind_lane_l", false); put("blind_lane_r", false)
+            }
+            "lane_unknown" -> Unit   // 不下发 blind_lane_*：模拟 CP 也没有判据
+            else -> {
+                put("blind_lane_l", false); put("blind_lane_r", false)
+            }
         }
     }
 
