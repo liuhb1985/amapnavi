@@ -67,6 +67,10 @@ const val LANE_BLOCK_UNKNOWN = -128
 // CP 车道实线信号的有效期：超过该时长没收到，视为 CP 没有在提供线型判据
 private const val BLIND_LANE_FRESH_MS = 1500L
 
+// Prepare 期间保持变道请求的重发间隔(ms)：CP 侧只有 atc 请求持续存在才会推进到 Starting，
+//   请求一消失就立刻退回 Off(见 Overtake 模块同名常量说明)
+private const val LANE_PRE_KEEPALIVE_MS = 250L
+
 // 该侧车道线判据：CP 车道实线信号 与 App 视觉线型 取或(保守)，并识别"判据不可用"
 //
 //   许可权划分(重要)：CP 侧信号只能"否决"(判实线时阻止变道)，不能"许可"。
@@ -140,6 +144,8 @@ fun MainActivity.sendLaneCmd(index: Int, cmd: String, arg: String) {
     json.put("carrotArg", arg) //LEFT/RIGHT
     val jsonStr = json.toString()
     cmUdpServiceSend(jsonStr, port = carrotManOpPort)
+    // 运行时自检：同一条命令被重复下发(并发/误重发)时告警
+    HealthMonitor.onCmdSent(index, cmd, arg)
 }
 
 fun MainActivity.sendBlinkerCtrlComm(index: Int, ctrl: String, state: String) {
@@ -842,6 +848,23 @@ fun MainActivity.processLaneChangeState(atcState: Int?) {
             val msg = "${nowTime} 变道命令已执行，等待变道完成..."
             Log.d("LaneState", msg)
             showLaneDebug(msg)
+        }
+    }
+
+    // Prepare 期间持续保持变道请求(CP 侧 atc 请求消失会立刻退回 Off)
+    if (atcState == PreLaneChange && !inLaneChangeStarting) {
+        if (now - lastCmdSendTime >= LANE_PRE_KEEPALIVE_MS) {
+            laneChangeCmdIndex++                        // 序号递增，避免被 CP 去重
+            sendLaneActionCmd(laneAction)               // 方向保持不变
+            lastCmdSendTime = now
+            laneCmdSentRetryCnt++
+
+            if (laneCmdSentRetryCnt % 4 == 1) {
+                val msg = "${nowTime} Prepare 保持中，持续重发变道命令" +
+                        "(已发${laneCmdSentRetryCnt}次) index=$laneChangeCmdIndex 方向=$laneAction"
+                Log.d("LaneCmd", msg)
+                showLaneDebug(msg)
+            }
         }
     }
 
