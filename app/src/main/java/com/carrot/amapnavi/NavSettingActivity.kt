@@ -7,7 +7,9 @@ import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.RadioGroup
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 
 /**
@@ -45,6 +47,14 @@ class NavSettingActivity : AppCompatActivity() {
     private lateinit var etRampSpeedH: EditText
     private lateinit var etRampSpeedL: EditText
     private lateinit var etRampHold: EditText
+    // 匝道参数组(未勾选开关时整组隐藏)
+    private lateinit var tvRampDesc: TextView
+    private lateinit var tvRampDistTitle: TextView
+    private lateinit var tvRampSpeedTitle: TextView
+    private lateinit var tvRampHoldTitle: TextView
+    private lateinit var layoutRampDist: LinearLayout
+    private lateinit var layoutRampSpeed: LinearLayout
+    private lateinit var layoutRampHold: LinearLayout
 
     private val prefsName = "user_settings"
 
@@ -78,6 +88,19 @@ class NavSettingActivity : AppCompatActivity() {
         etRampSpeedH = findViewById(R.id.etNavRampSpeedH)
         etRampSpeedL = findViewById(R.id.etNavRampSpeedL)
         etRampHold = findViewById(R.id.etNavRampHold)
+        tvRampDesc = findViewById(R.id.tvRampDesc)
+        tvRampDistTitle = findViewById(R.id.tvRampDistTitle)
+        tvRampSpeedTitle = findViewById(R.id.tvRampSpeedTitle)
+        tvRampHoldTitle = findViewById(R.id.tvRampHoldTitle)
+        layoutRampDist = findViewById(R.id.layoutRampDist)
+        layoutRampSpeed = findViewById(R.id.layoutRampSpeed)
+        layoutRampHold = findViewById(R.id.layoutRampHold)
+
+        // 未勾选"匝道/分岔提前减速"时，下面的距离/速度/维持设置自动隐藏
+        cbRampSlowdown.setOnCheckedChangeListener { _, checked ->
+            applyRampGroupVisible(checked)
+        }
+        applyRampGroupVisible(cbRampSlowdown.isChecked)
 
         // 隐藏"领航转弯"与"使用车道置信度"(保留控件与保存逻辑，不影响已有设置值)
         cbNavTurn.visibility = View.GONE
@@ -123,6 +146,14 @@ class NavSettingActivity : AppCompatActivity() {
             finish()
         }
         findViewById<Button>(R.id.btnCancelNavSetting).setOnClickListener { finish() }
+    }
+
+    // 匝道参数组可见性：开关未勾选时整组隐藏(控件与保存逻辑保留，设置值不丢)
+    private fun applyRampGroupVisible(show: Boolean) {
+        val vis = if (show) View.VISIBLE else View.GONE
+        arrayOf<View>(tvRampDesc, tvRampDistTitle, layoutRampDist,
+                tvRampSpeedTitle, layoutRampSpeed, tvRampHoldTitle, layoutRampHold)
+                .forEach { it.visibility = vis }
     }
 
     private fun bindStep(minusId: Int, plusId: Int, view: EditText, step: Int, min: Int, max: Int) {

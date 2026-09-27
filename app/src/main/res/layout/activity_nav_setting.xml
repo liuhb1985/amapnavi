@@ -430,6 +430,7 @@
             android:padding="0dp" />
 
         <TextView
+            android:id="@+id/tvRampDesc"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
@@ -438,6 +439,7 @@
             android:textColor="#666666" />
 
         <TextView
+            android:id="@+id/tvRampDistTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
@@ -446,6 +448,7 @@
             android:textColor="#000000" />
 
         <LinearLayout
+            android:id="@+id/layoutRampDist"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
@@ -499,6 +502,7 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/tvRampSpeedTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
@@ -507,6 +511,7 @@
             android:textColor="#000000" />
 
         <LinearLayout
+            android:id="@+id/layoutRampSpeed"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
@@ -560,6 +565,7 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/tvRampHoldTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
@@ -568,6 +574,7 @@
             android:textColor="#000000" />
 
         <LinearLayout
+            android:id="@+id/layoutRampHold"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
