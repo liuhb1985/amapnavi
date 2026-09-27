@@ -158,6 +158,7 @@ class DebugReceiver : BroadcastReceiver() {
                             prevLeadDrel = null
                             prevLeadPresent = false
                             resetLaneTypeFilter()
+                            resetSideSafetyDebounce()
                             simScene = scene
                             simTick = 0L
                             simHoldUntil = System.currentTimeMillis() + secs.coerceIn(5L, 600L) * 1000L

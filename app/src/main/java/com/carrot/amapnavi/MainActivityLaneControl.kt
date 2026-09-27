@@ -9,6 +9,48 @@ import org.json.JSONObject
  *       变道相关的状态与定时常量定义在 MainActivity.kt 中。
  * ========================================================= */
 
+// -----------------------------
+// 侧向安全去抖(迟滞)
+// -----------------------------
+// 传感器存在抖动：毫米波盲区、激光雷达盲区、CP 车道实线信号、视觉线型，
+// 都会在"有车/无车""实线/虚线"之间跳变。原来安全门每个控制周期独立判定，
+// 抖动时约有一半的帧是"安全"的，只要二次确认恰好落在安全帧就下发变道命令，
+// 表现为"实线有时也变道""雷达/激光雷达不稳定也会变道"。
+// 这里改为：判"不安全"立即生效；判"安全"需连续 SAFE_CONFIRM_FRAMES 帧才恢复。
+const val SAFE_CONFIRM_FRAMES = 5      // 约 0.5s(控制周期 100ms)
+private const val SAFETY_TICK_MS = 100L
+private val sideSafeStreak = HashMap<LaneChangeAction, Int>()
+private val sideBlockCode = HashMap<LaneChangeAction, Int>()
+private var lastSafetyTickTime = 0L
+
+// 复位侧向安全去抖状态(场景切换 / 调试复位时调用)
+fun resetSideSafetyDebounce() {
+    sideSafeStreak.clear()
+    sideBlockCode.clear()
+    lastSafetyTickTime = 0L
+}
+
+// 带去抖的安全门入口：同一控制周期内多次调用不会重复推进计数
+fun MainActivity.LaneChangeSafetyCheck(action: LaneChangeAction): Int {
+    val now = System.currentTimeMillis()
+    if (now - lastSafetyTickTime >= SAFETY_TICK_MS) {
+        lastSafetyTickTime = now
+        for (dir in arrayOf(LaneChangeAction.LEFT, LaneChangeAction.RIGHT)) {
+            val raw = LaneChangeSafetyCheckRaw(dir)
+            if (raw < 0) {                    // 不安全：立即生效
+                sideSafeStreak[dir] = 0
+                sideBlockCode[dir] = raw
+            } else {                          // 安全：连续若干帧才恢复
+                val n = (sideSafeStreak[dir] ?: 0) + 1
+                sideSafeStreak[dir] = n
+                if (n >= SAFE_CONFIRM_FRAMES) sideBlockCode[dir] = 0
+            }
+        }
+    }
+    // 转弯动作只查侧前盲区，不做去抖
+    return sideBlockCode[action] ?: LaneChangeSafetyCheckRaw(action)
+}
+
 // 车道线判据的三态结果
 //   SOLID   = 确定实线(CP 判实线 或 App 视觉判实线)
 //   CLEAR   = 确定非实线(至少一路明确给出"不是实线")
@@ -275,7 +317,7 @@ fun MainActivity.lidarCornerRisky(left: Boolean, front: Boolean): Boolean {
 //  -32    激光自算：侧前方不安全(时距/TTC)
 //  -64    激光自算：侧后方不安全(时距/TTC)
 // -128    车道线判据不可用(视觉检测停摆 且 CP 未下发车道线判据) → fail-safe 禁止
-fun MainActivity.LaneChangeSafetyCheck(action: LaneChangeAction): Int {
+private fun MainActivity.LaneChangeSafetyCheckRaw(action: LaneChangeAction): Int {
     val s = opStateManager.state
     if (action == LaneChangeAction.LEFT) {
         //左侧盲区有车
@@ -350,6 +392,8 @@ fun MainActivity.sideBlockCause(action: LaneChangeAction): BlockCause? {
         (if (left) s.blind_camera_l else s.blind_camera_r) to BlockCause(-16, "摄像头盲区"),
         (if (left) s.blind_car_l else s.blind_car_r) to BlockCause(-16, "车身盲区"),
         (if (left) s.blind_l else s.blind_r) to BlockCause(-16, "综合盲区"),
+        // 侧向信号抖动：原始判据当前是"安全"，但去抖窗口未走完，仍按不安全处理
+        (LaneChangeSafetyCheck(action) < 0) to BlockCause(-256, "侧向信号抖动确认中"),
     )
     // 激光自算的时距/TTC 判据（激光在线时才有，与 LaneChangeSafetyCheck 的判据集合一致）
     lidarSideHazard(action)?.let { causes += (true to it) }
