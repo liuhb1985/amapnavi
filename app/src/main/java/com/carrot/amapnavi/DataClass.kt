@@ -116,6 +116,8 @@ data class OpState(
         var blind_car_r: Boolean = false,
         var blind_lane_l: Boolean = false,
         var blind_lane_r: Boolean = false,
+        // CP 车道实线信号的最近接收时间(ms)：用于区分"CP 说不是实线"和"CP 根本没给判据"
+        var blindLaneTs: Long = 0L,
 
         //侧向判定阈值(CP 下发, x0.1: 正=时距s / 负=绝对距离m)，App 自算判据与 CP 同源
         var lidar_front_vdist_time: Int? = null,

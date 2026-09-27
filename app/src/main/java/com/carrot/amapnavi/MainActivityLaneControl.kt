@@ -9,6 +9,35 @@ import org.json.JSONObject
  *       变道相关的状态与定时常量定义在 MainActivity.kt 中。
  * ========================================================= */
 
+// 车道线判据的三态结果
+//   SOLID   = 确定实线(CP 判实线 或 App 视觉判实线)
+//   CLEAR   = 确定非实线(至少一路明确给出"不是实线")
+//   UNKNOWN = 两路都没有给出有效判断(视觉检测停摆 且 CP 未下发车道线判据)
+enum class LaneLineJudgement { SOLID, CLEAR, UNKNOWN }
+
+// 变道安全门返回码补充：
+//   -128 车道线判据不可用(看不到线 ≠ 可以变道)，按 fail-safe 禁止变道
+const val LANE_BLOCK_UNKNOWN = -128
+
+// CP 车道实线信号的有效期：超过该时长没收到，视为 CP 没有在提供线型判据
+private const val BLIND_LANE_FRESH_MS = 1500L
+
+// 该侧车道线判据：CP 车道实线信号 与 App 视觉线型 取或(保守)，并识别"判据不可用"
+fun laneLineJudgement(left: Boolean): LaneLineJudgement {
+    val s = opStateManager.state
+    val cpSolid = if (left) s.blind_lane_l else s.blind_lane_r
+    val cpFresh = (System.currentTimeMillis() - s.blindLaneTs) < BLIND_LANE_FRESH_MS
+    val appType = if (left) left_lane_type else right_lane_type
+    val appValid = laneTypeDetectValid() && appType >= 0
+
+    // 任一来源判实线 → 实线
+    if ((cpFresh && cpSolid) || (appValid && appType == 1)) return LaneLineJudgement.SOLID
+    // 至少一路明确给出"不是实线"
+    if ((cpFresh && !cpSolid) || appValid) return LaneLineJudgement.CLEAR
+    // 两路都没有有效判断
+    return LaneLineJudgement.UNKNOWN
+}
+
 fun MainActivity.showLaneDebug(msg: String) {
     // 显示在 UI 上的日志
     setRawLogVisible(true)
@@ -238,13 +267,14 @@ fun MainActivity.lidarCornerRisky(left: Boolean, front: Boolean): Boolean {
 //检查盲区是否安全
 //  返回码(0=允许变道；<0=禁止，供卡片显示原因)：
 //    0    允许
-//   -1    本侧车道线为实线
+//   -1    本侧车道线为实线(CP 判据 或 App 视觉判据，取或)
 //   -2    原车前雷达的侧前盲区(l_front_blind/r_front_blind)
 //   -4    原车后盲区(BSD, left_blindspot/right_blindspot)
 //   -8    外挂激光雷达盲区(纯激光: 侧方/前角/后角)
 //  -16    综合盲区里的其它来源(摄像头等, blind_l/blind_r)
 //  -32    激光自算：侧前方不安全(时距/TTC)
 //  -64    激光自算：侧后方不安全(时距/TTC)
+// -128    车道线判据不可用(视觉检测停摆 且 CP 未下发车道线判据) → fail-safe 禁止
 fun MainActivity.LaneChangeSafetyCheck(action: LaneChangeAction): Int {
     val s = opStateManager.state
     if (action == LaneChangeAction.LEFT) {
@@ -255,8 +285,10 @@ fun MainActivity.LaneChangeSafetyCheck(action: LaneChangeAction): Int {
             return -4
         } else if (s.lidar_lblind || s.lidar_lfblind || s.lidar_lbblind) { //激光雷达(纯激光)
             return -8
-        } else if (left_lane_type == 1) { //左侧实线
+        } else if (laneLineJudgement(true) == LaneLineJudgement.SOLID) { //左侧实线(取或)
             return -1
+        } else if (laneLineJudgement(true) == LaneLineJudgement.UNKNOWN) { //左侧线型判据不可用
+            return LANE_BLOCK_UNKNOWN
         } else if (s.blind_l) { //综合盲区里的其它来源(摄像头等)
             return -16
         }
@@ -270,8 +302,10 @@ fun MainActivity.LaneChangeSafetyCheck(action: LaneChangeAction): Int {
             return -4
         } else if (s.lidar_rblind || s.lidar_rfblind || s.lidar_rbblind) {
             return -8
-        } else if (right_lane_type == 1) { //实线
+        } else if (laneLineJudgement(false) == LaneLineJudgement.SOLID) { //实线(取或)
             return -1
+        } else if (laneLineJudgement(false) == LaneLineJudgement.UNKNOWN) { //线型判据不可用
+            return LANE_BLOCK_UNKNOWN
         } else if (s.blind_r) {
             return -16
         }
@@ -308,9 +342,10 @@ fun MainActivity.sideBlockCause(action: LaneChangeAction): BlockCause? {
         (if (left) s.lidar_lfblind else s.lidar_rfblind) to BlockCause(-8, "激光盲区·前角"),
         (if (left) s.lidar_lbblind else s.lidar_rbblind) to BlockCause(-8, "激光盲区·后角"),
         (if (left) s.lidar_lblind else s.lidar_rblind) to BlockCause(-8, "激光盲区·侧方"),
-        // 车道实线：CP 判的实线 或 App 自己的车道线类型(两套来源取或，更保守)
-        (((if (left) s.blind_lane_l else s.blind_lane_r) ||
-            ((if (left) left_lane_type else right_lane_type) == 1))) to BlockCause(-1, "车道实线"),
+        // 车道实线：与安全门同源(见 laneLineJudgement)，CP 判的实线 或 App 自己的车道线类型
+        (laneLineJudgement(left) == LaneLineJudgement.SOLID) to BlockCause(-1, "车道实线"),
+        // 车道线判据不可用：视觉检测停摆 且 CP 也没给线型判据(与安全门一致，禁止变道)
+        (laneLineJudgement(left) == LaneLineJudgement.UNKNOWN) to BlockCause(LANE_BLOCK_UNKNOWN, "车道线未知"),
         // 综合盲区按分解来源分别显示，避免一律标成"摄像头盲区"
         (if (left) s.blind_camera_l else s.blind_camera_r) to BlockCause(-16, "摄像头盲区"),
         (if (left) s.blind_car_l else s.blind_car_r) to BlockCause(-16, "车身盲区"),
@@ -420,12 +455,13 @@ fun MainActivity.doLaneChangeAction(action: LaneChangeAction, edgeAction: LaneCh
                 lastBlindSpeakTime = now
 
                 var msg = ""
-                if (lane_change_safe < -1) {
+                if (lane_change_safe == -1 || lane_change_safe == LANE_BLOCK_UNKNOWN) {
+                    appSpeakFile = "audio_solid_blocked" //实线/线型未知阻止变道
+                    val why = if (lane_change_safe == LANE_BLOCK_UNKNOWN) "车道线判据不可用" else "实线"
+                    msg = "${nowTime} 侧面(${action})${why}阻止变道"
+                } else {
                     appSpeakFile = "audio_car_watchout" //盲区有车
                     msg = "${nowTime} 侧面(${action})有车阻止变道"
-                } else {
-                    appSpeakFile = "audio_solid_blocked" //实线阻止变道
-                    msg = "${nowTime} 侧面(${action})实线阻止变道"
                 }
                 Log.d("LaneCmd", msg)
                 showLaneDebug(msg)
@@ -567,6 +603,27 @@ fun MainActivity.doLaneChangeAction(action: LaneChangeAction, edgeAction: LaneCh
 
         //已经发送语音并且延时了1500ms
         if (laneChangeSpeak && ((now - laneSpeakTime >= laneSpeakDelayTime) || !navi_speak_first)) {
+            // ---- 命令下发前二次确认 ----
+            // 播报后还要等 0.75~2.25s 才真正下发，这段时间车辆已行进数十米，
+            // 实线/盲区状态可能已经变化(典型：播报时是虚线、执行时已进实线区)。
+            // 这里必须重新过一次安全门，不通过就取消本次下发并重新计时等待。
+            val recheck = LaneChangeSafetyCheck(action)
+            if (recheck < 0) {
+                laneSpeakTime = now
+                if (now - lastRecheckLogTime >= BLIND_SPEAK_INTERVAL) {
+                    lastRecheckLogTime = now
+                    val why = when {
+                        recheck == -1 -> "实线"
+                        recheck == LANE_BLOCK_UNKNOWN -> "车道线判据不可用"
+                        else -> "盲区有车"
+                    }
+                    val msg = "${nowTime} 发送前二次检查不通过($why,$recheck)，暂不下发变道命令 $action"
+                    Log.w("LaneCmd", msg)
+                    showLaneDebug(msg)
+                }
+                return
+            }
+
             //保存当前变道状态
             atc_state_start = opStateManager.state.atc_state ?: LaneChangeOff
             atc_state_curr = atc_state_start

@@ -338,6 +338,7 @@ class MainActivity : AppCompatActivity() {
 
     internal var lastCmdSendTime = 0L //上次发送变道命令的时间
     internal var lastBlindSpeakTime = 0L //上次播报盲区有车语音的时间
+    internal var lastRecheckLogTime = 0L //上次打印"发送前二次检查不通过"的时间(节流用)
     internal var lastBlindDecSpeedTime = 0L //上次减速时间
     internal var laneSpeakTime = 0L //播报准备变道的时间点s
     internal var laneChangeStartTime = 0L //变道进行中的时间
@@ -374,6 +375,7 @@ class MainActivity : AppCompatActivity() {
 
     internal var lastOvertakeCmdSendTime = 0L //上次发送变道命令的时间
     internal var lastOvertakeBlindSpeakTime = 0L //上次播报盲区有车语音的时间
+    internal var lastOvertakeRecheckLogTime = 0L //上次打印"发送前二次检查不通过"的时间(节流用)
     internal var overtakeSpeakTime = 0L //播报准备变道的时间点s
     internal var overtakeStartTime = 0L //变道进行中的时间
     internal var lastOvertakeAtcStateChangeTime = 0L //最后一次ATC状态变化的时间

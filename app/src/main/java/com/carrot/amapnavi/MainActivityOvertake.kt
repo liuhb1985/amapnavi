@@ -9,6 +9,9 @@ import org.json.JSONObject
  *       超车相关的状态与定时常量定义在 MainActivity.kt 中。
  * ========================================================= */
 
+// 激进模式的最短"决定→下发"确认窗口(ms)：不保留窗口就等于没有任何复核机会
+private const val OVERTAKE_MIN_CONFIRM_MS = 300L
+
 fun MainActivity.sendOvertakeActionCmd(action: LaneChangeAction) {
     val dir = if (action == LaneChangeAction.LEFT || action == LaneChangeAction.LEFT_TURN) "LEFT" else "RIGHT"
 
@@ -57,13 +60,15 @@ fun MainActivity.doOvertakeAction(action: LaneChangeAction) {
         if (lane_change_safe < 0) {
             if (now - lastOvertakeBlindSpeakTime >= BLIND_SPEAK_INTERVAL) { //定时播报盲区有车
                 lastOvertakeBlindSpeakTime = now
-                appSpeakFile = "audio_car_watchout" //盲区有车
 
                 var msg = ""
-                if (lane_change_safe < -1) {
-                    msg = "${nowTime} 侧面(${action})有车阻止超车"
+                if (lane_change_safe == -1 || lane_change_safe == LANE_BLOCK_UNKNOWN) {
+                    appSpeakFile = "audio_solid_blocked" //实线/线型未知阻止超车
+                    val why = if (lane_change_safe == LANE_BLOCK_UNKNOWN) "车道线判据不可用" else "实线"
+                    msg = "${nowTime} 侧面(${action})${why}阻止超车"
                 } else {
-                    msg = "${nowTime} 侧面(${action})实线阻止超车"
+                    appSpeakFile = "audio_car_watchout" //盲区有车
+                    msg = "${nowTime} 侧面(${action})有车阻止超车"
                 }
                 Log.d("LaneCmd", msg)
                 showLaneDebug(msg)
@@ -74,7 +79,32 @@ fun MainActivity.doOvertakeAction(action: LaneChangeAction) {
         }
 
         //已经发送语音并且延时了1500ms
-        if (overtakeSpeak && ((now - overtakeSpeakTime >= overtakeSpeakDelayTime) || overtake_mode == 1)) {
+        // 激进模式原来直接跳过延时立即下发；现在仍允许缩短，但至少保留一个最小确认窗口，
+        // 给二次安全确认留出时间(否则"决定超车"和"下发命令"在同一周期完成，没有任何复核机会)
+        val speakElapsed = now - overtakeSpeakTime
+        val delayOk = speakElapsed >= overtakeSpeakDelayTime ||
+                (overtake_mode == 1 && speakElapsed >= OVERTAKE_MIN_CONFIRM_MS)
+        if (overtakeSpeak && delayOk) {
+            // ---- 命令下发前二次确认 ----
+            // 与导航变道同理：从决定超车到真正下发之间车已行进一段距离，
+            // 侧向盲区/车道线状态可能已变化，下发前必须重新过一次安全门。
+            val recheck = LaneChangeSafetyCheck(action)
+            if (recheck < 0) {
+                overtakeSpeakTime = now
+                if (now - lastOvertakeRecheckLogTime >= BLIND_SPEAK_INTERVAL) {
+                    lastOvertakeRecheckLogTime = now
+                    val why = when {
+                        recheck == -1 -> "实线"
+                        recheck == LANE_BLOCK_UNKNOWN -> "车道线判据不可用"
+                        else -> "盲区有车"
+                    }
+                    val msg = "${nowTime} 发送前二次检查不通过($why,$recheck)，暂不下发超车命令 $action"
+                    Log.w("OvertakeCmd", msg)
+                    showLaneDebug(msg)
+                }
+                return
+            }
+
             //保存当前变道状态
             overtake_atc_state_start = opStateManager.state.atc_state ?: LaneChangeOff
             overtake_atc_state_curr = overtake_atc_state_start

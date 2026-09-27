@@ -112,6 +112,8 @@ fun startLaneDetectInternal(
                     if (right_lane_type > -1) right_lane_type--
                     laneDetectResultSend()
                 }
+                // 检测关闭：线型判据不再可信，复位滤波器防止下次开启时沿用旧值
+                resetLaneTypeFilter()
                 results = emptyList()
             }
 
@@ -247,6 +249,86 @@ private val IGNORE_CLASSES = setOf(
         4  // road-sign-line
 )
 
+// ===============================
+// 车道线线型时间滤波(非对称迟滞)
+// ===============================
+// 原因：ONNX 分割结果原来每帧直接采信，一帧误判(实线被判成 dashed / 没检出)
+//       就会立刻放行变道，这是"实线也变道"的直接成因之一。
+// 策略：压实线的代价远大于错过一次变道，因此确认速度不对称——
+//         判实线要快(连续 SOLID_CONFIRM_FRAMES 帧即可，约 0.4s @5Hz)
+//         判非实线要慢(连续 CLEAR_CONFIRM_FRAMES 帧才释放，约 1.6s @5Hz)
+private const val LANE_SOLID_CONFIRM_FRAMES = 2
+private const val LANE_CLEAR_CONFIRM_FRAMES = 8
+
+// 视觉线型结果的有效期：超过该时长没有新帧，说明检测已停摆，线型判据不可信
+const val LANE_TYPE_FRESH_MS = 2000L
+
+private class LaneTypeFilter {
+    var value: Int = -1
+    var inited = false
+    private var solidCnt = 0
+    private var clearCnt = 0
+
+    fun update(raw: Int): Int {
+        if (!inited) {                 // 首帧直接采信，避免启动后长时间停留在未知态
+            inited = true
+            value = raw
+            solidCnt = 0
+            clearCnt = 0
+            return value
+        }
+        if (raw == 1) {                // 判实线：快确认
+            solidCnt++
+            clearCnt = 0
+            if (solidCnt >= LANE_SOLID_CONFIRM_FRAMES) value = 1
+        } else {                       // 判非实线：慢释放(含 -1 无线)
+            clearCnt++
+            solidCnt = 0
+            if (clearCnt >= LANE_CLEAR_CONFIRM_FRAMES) value = raw
+        }
+        return value
+    }
+
+    fun reset() {
+        value = -1
+        inited = false
+        solidCnt = 0
+        clearCnt = 0
+    }
+}
+
+private val leftLaneFilter = LaneTypeFilter()
+private val rightLaneFilter = LaneTypeFilter()
+
+// 最近一次拿到视觉线型结果的时间(ms)
+var laneTypeLastUpdateTime = 0L
+
+// 视觉车道线线型判据是否可信：检测开关打开 + 检测在跑 + 结果新鲜
+fun laneTypeDetectValid(): Boolean {
+    if (!lane_detect || lane_detect_enable <= 0) return false
+    if (!laneLineValid) return false
+    return (System.currentTimeMillis() - laneTypeLastUpdateTime) < LANE_TYPE_FRESH_MS
+}
+
+// 单帧线型结果入口(带时间滤波)
+internal fun updateLaneTypeFiltered(rawLeft: Int, rawRight: Int) {
+    laneTypeLastUpdateTime = System.currentTimeMillis()
+    left_lane_type = leftLaneFilter.update(rawLeft)
+    right_lane_type = rightLaneFilter.update(rawRight)
+}
+
+// 检测关闭/重启时复位，避免残留旧值被当成有效判据
+internal fun resetLaneTypeFilter() {
+    leftLaneFilter.reset()
+    rightLaneFilter.reset()
+    laneTypeLastUpdateTime = 0L
+}
+
+// 调试用：直接注入一帧原始线型(走同一套滤波，供 adb 模拟验证)
+fun simInjectLaneTypeRaw(rawLeft: Int, rawRight: Int) {
+    updateLaneTypeFiltered(rawLeft, rawRight)
+}
+
 // --------------------
 // Paint 对象复用
 // --------------------
@@ -370,8 +452,8 @@ private fun drawResultsWithLaneType(
         else -> -1
     }
 
-    left_lane_type = getLaneType(leftType)
-    right_lane_type = getLaneType(rightType)
+    // 单帧结果先过时间滤波再对外生效(实线快确认 / 非实线慢释放)
+    updateLaneTypeFiltered(getLaneType(leftType), getLaneType(rightType))
     if (lane_detect && lane_detect_enable > 0) {
         laneDetectResultSend()
     }

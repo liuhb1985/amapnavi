@@ -148,8 +148,9 @@ private val OP_FIELD_TABLE = listOf(
         BoolField("blind_camera_r", { s, v -> s.blind_camera_r = v }),
         BoolField("blind_car_l", { s, v -> s.blind_car_l = v }),
         BoolField("blind_car_r", { s, v -> s.blind_car_r = v }),
-        BoolField("blind_lane_l", { s, v -> s.blind_lane_l = v }),
-        BoolField("blind_lane_r", { s, v -> s.blind_lane_r = v }),
+        // 收到即刷新时间戳：安全门据此判断"CP 有没有在提供车道线判据"
+        BoolField("blind_lane_l", { s, v -> s.blind_lane_l = v; s.blindLaneTs = System.currentTimeMillis() }),
+        BoolField("blind_lane_r", { s, v -> s.blind_lane_r = v; s.blindLaneTs = System.currentTimeMillis() }),
 
         //侧向判定阈值(配置类: 断流后沿用上次的值)
         IntField("lidar_front_vdist_time", { s, v -> s.lidar_front_vdist_time = v }, resetOnTimeout = false),

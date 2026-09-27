@@ -619,6 +619,7 @@ fun MainActivity.evaluateOvertakeSide(side: LaneChangeAction): OvertakeSideEval 
     if (safeRet < 0) {
         val r = when (safeRet) {
             -1 -> "${sideStr}侧实线阻挡"
+            LANE_BLOCK_UNKNOWN -> "${sideStr}侧车道线判据不可用"
             -2 -> "${sideStr}前盲区有车"
             -4 -> "${sideStr}后盲区有车"
             -8 -> "${sideStr}激光雷达盲区有车"
