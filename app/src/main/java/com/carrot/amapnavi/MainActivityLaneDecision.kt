@@ -512,7 +512,7 @@ private val OVERTAKE_PARAMS_AGGRESSIVE = OvertakeParams(
     cutInSuppressMs = 1500L,
     minLaneWidth = 2.0f, sideMinScore = 45, sideVrelThreshold = 5,
     sideSafetyMargin = 3f, rearMinDist = 8f, sideFrontMinDist = 15f,
-    sideUnknownPenalty = 15,
+    sideUnknownPenalty = 15, sideSpeedMargin = 5,
     allowRightOvertake = true, preferLeftFirst = false,
     cooldownSuccess = 6000L, cooldownFailed = 3000L
 )
@@ -526,7 +526,7 @@ private val OVERTAKE_PARAMS_NORMAL = OvertakeParams(
     cutInSuppressMs = 2500L,
     minLaneWidth = 2.3f, sideMinScore = 60, sideVrelThreshold = 10,
     sideSafetyMargin = 5f, rearMinDist = 12f, sideFrontMinDist = 20f,
-    sideUnknownPenalty = 25,
+    sideUnknownPenalty = 25, sideSpeedMargin = 8,
     allowRightOvertake = true, preferLeftFirst = true,
     cooldownSuccess = 10000L, cooldownFailed = 4000L
 )
@@ -540,7 +540,7 @@ private val OVERTAKE_PARAMS_CONSERVATIVE = OvertakeParams(
     cutInSuppressMs = 3500L,
     minLaneWidth = 2.6f, sideMinScore = 75, sideVrelThreshold = 15,
     sideSafetyMargin = 8f, rearMinDist = 20f, sideFrontMinDist = 25f,
-    sideUnknownPenalty = 35,
+    sideUnknownPenalty = 35, sideSpeedMargin = 12,
     allowRightOvertake = false, preferLeftFirst = true,
     cooldownSuccess = 15000L, cooldownFailed = 6000L
 )
@@ -768,6 +768,16 @@ fun MainActivity.evaluateOvertakeSide(side: LaneChangeAction): OvertakeSideEval 
         reasons.add("侧前方无数据(超量程未知)-${p.sideUnknownPenalty}")
     }
 
+    //4.4 目标车道前车速度对比(硬否决) —— 防"变过去那条车道更慢"
+    //   只看距离不够：目标车道前车可能更远、但明显比本车道前车慢，变过去反而更慢。
+    //   速度来源：毫米波左右前角的绝对速度，缺失时用 vEgo+vrel 推算。
+    val sideVlead = sideFrontSpeed(side)
+    val ownVlead = s.vlead
+    if (sideVlead != null && ownVlead != null && sideVlead < ownVlead - p.sideSpeedMargin) {
+        return OvertakeSideEval(side, false, 0,
+            "${sideStr}侧前车${sideVlead}km/h低于本车道前车${ownVlead}km/h超${p.sideSpeedMargin}km/h，变过去更慢")
+    }
+
     if (sideVrel != null && sideVrel < -p.sideVrelThreshold) {
         score -= 20
         reasons.add("侧前车较慢${sideVrel}km/h")
@@ -824,6 +834,18 @@ fun MainActivity.sideRearDistance(side: LaneChangeAction): Float? {
         s.lb_drel?.takeIf { it < 0 }?.let { -it / 1000f }
     } else {
         s.rb_drel?.takeIf { it < 0 }?.let { -it / 1000f }
+    }
+}
+
+// 目标车道前方车辆绝对速度(km/h)：
+//   优先毫米波左右前角的绝对速度字段，缺失时用 本车速度+相对速度 推算；都无则 null
+fun MainActivity.sideFrontSpeed(side: LaneChangeAction): Int? {
+    val s = opStateManager.state
+    val vEgo = s.vEgo ?: 0
+    return if (side == LaneChangeAction.LEFT) {
+        s.l_vlead ?: s.l_vrel?.let { vEgo + it } ?: s.lf_vrel?.let { vEgo + it }
+    } else {
+        s.r_vlead ?: s.r_vrel?.let { vEgo + it } ?: s.rf_vrel?.let { vEgo + it }
     }
 }
 
@@ -919,6 +941,7 @@ private fun MainActivity.sideDebugLine(side: LaneChangeAction): String {
         " 盲区" + LaneChangeSafetyCheck(side) +
         " 侧前" + (front?.let { "%.0f".format(it) } ?: "-") +
         " 侧后" + (rear?.let { "%.0f".format(it) } ?: "-") +
+        " 侧前v" + (sideFrontSpeed(side)?.toString() ?: "-") +
         " 侧前vr" + (vrel ?: "-") +
         " 需净空" + "%.0f".format(overtakeRequiredRearDist()) +
         " 评分" + eval.score + (if (eval.safe) " 安全" else " 不安全") +

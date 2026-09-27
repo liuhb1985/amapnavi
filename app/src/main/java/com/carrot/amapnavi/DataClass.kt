@@ -40,6 +40,8 @@ data class OvertakeParams(
         val rearMinDist: Float = 12f,           // 目标车道后方车辆最小安全距离(m)，实际还会叠加约0.8s时距
         val sideFrontMinDist: Float = 20f,      // 目标车道前方车辆最小距离(m)，需小于激光雷达约50m量程
         val sideUnknownPenalty: Int = 25,       // 侧前方"无数据"扣分：量程外未知 ≠ 确定无车
+        val sideSpeedMargin: Int = 8,           // 目标车道前车比本车道前车慢超过该值(km/h)则否决该方向超车
+        //   —— 防"变过去那条车道更慢"：只看距离不够，必须比速度
         val allowRightOvertake: Boolean = true, // 是否允许右侧超车
         val preferLeftFirst: Boolean = true,    // 是否优先选择左侧超车
         // -------- 冷却 --------
