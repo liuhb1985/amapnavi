@@ -344,7 +344,10 @@ class MainActivity : AppCompatActivity() {
     var lastVisualIdx = -1
     var targetLaneIdx = -1 //车辆所在的导航车道编号(从0开始，从左往右)
     var visualLaneIdx = -1 //车辆所在视觉车道编号(从0开始，从右往左)
-    var laneChangeCmdIndex = 0 //变道命令id
+    // 变道命令序号：CP 侧按序号是否变化来判断"是否新命令"(carrotCmdIndex 去重)，
+    //   若 App 重启后从 0 重新计数，会与重启前的序号重复而被 CP 丢弃。
+    //   用时间戳低位初始化，保证重启后一开始就是"新序号"。
+    var laneChangeCmdIndex = (System.currentTimeMillis() % 1_000_000_000L).toInt()
     internal var laneCmdSent = false //变道命令已发送标志
     internal var laneCmdExecOk = false //变道命令已执行标志
     internal var laneCmdSentRetryCnt = 0 //变道命令重发次数
@@ -377,7 +380,7 @@ class MainActivity : AppCompatActivity() {
     internal var app_overtake_valid = -1
 
     var overtakeAction: LaneChangeAction = LaneChangeAction.KEEP
-    var overtakeCmdIndex = 0 //变道命令id
+    var overtakeCmdIndex = (System.currentTimeMillis() % 1_000_000_000L).toInt() //超车命令id(同 laneChangeCmdIndex 说明)
     internal var overtake_atc_state_start = 0 //首次发送变道命令时的atc状态
     internal var overtake_atc_state_curr = 0 //当前的atc状态    var overtakeChangeCmdIndex = 0 //变道命令id
     internal var overtakeActionPause = false //暂停变道动作
