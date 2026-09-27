@@ -304,8 +304,13 @@ fun MainActivity.updateNaviState(extras: Map<String, Any?>): Pair<Boolean, Strin
         }
 
         if(!smooth_speed_limit) {
-            if (naviState.nRoadLimitSpeed != computedSpeed) {
-                naviState.nRoadLimitSpeed = computedSpeed
+            //匝道提前减速：关闭平滑限速时直接按匝道限速下发(只压不抬)
+            var limitTarget = computedSpeed
+            if (rampSlowdownActive && rampSlowdownSpeed > 0 && limitTarget > rampSlowdownSpeed) {
+                limitTarget = rampSlowdownSpeed
+            }
+            if (naviState.nRoadLimitSpeed != limitTarget) {
+                naviState.nRoadLimitSpeed = limitTarget
                 updated = true
             }
         }else {

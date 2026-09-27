@@ -18,6 +18,8 @@ import android.util.Log
  *   adb shell am broadcast -a com.carrot.amapnavi.DEBUG --es cmd scenes
  *   adb shell am broadcast -a com.carrot.amapnavi.DEBUG --es cmd sim   --es val baseline      (场景[,持续秒数])
  *   adb shell am broadcast -a com.carrot.amapnavi.DEBUG --es cmd simstop
+ *   adb shell am broadcast -a com.carrot.amapnavi.DEBUG --es cmd lanecheck
+ *   adb shell am broadcast -a com.carrot.amapnavi.DEBUG --es cmd ramptest
  *
  * 端到端模拟：不需要实车和 CP，sim 会按帧把传感器状态灌进决策链路，
  * 覆盖实线/虚实线抖动、前雷达与激光雷达抖动、判据不可用、前车插入等场景。
@@ -60,6 +62,13 @@ class DebugReceiver : BroadcastReceiver() {
             "atc_dist_l" to Spec("atc_dist_l", 'i'),
             "fork_dist_h" to Spec("fork_dist_h", 'i'),
             "fork_dist_l" to Spec("fork_dist_l", 'i'),
+            // ---- 匝道/分岔提前减速 ----
+            "ramp_slowdown_en" to Spec("ramp_slowdown_en", 'b'),
+            "ramp_slowdown_dist_h" to Spec("ramp_slowdown_dist_h", 'i'),
+            "ramp_slowdown_dist_l" to Spec("ramp_slowdown_dist_l", 'i'),
+            "ramp_slowdown_speed_h" to Spec("ramp_slowdown_speed_h", 'i'),
+            "ramp_slowdown_speed_l" to Spec("ramp_slowdown_speed_l", 'i'),
+            "ramp_hold_time" to Spec("ramp_hold_time", 'i'),
             "overtake_reverse_cooldown_ms" to Spec("overtake_reverse_cooldown_s", 's'),
             // ---- 侧向安全阈值(不跟随CP时生效) ----
             "lidar_front_dist_mode" to Spec("lidar_front_dist_mode", 'i'),
@@ -220,6 +229,98 @@ class DebugReceiver : BroadcastReceiver() {
                         Log.d(TAG, "[lanecheck] 已恢复运行状态")
                     }
                 }
+                "ramptest" -> {
+                    if (a == null) {
+                        Log.w(TAG, "MainActivity 未运行，无法执行 ramptest")
+                    } else {
+                        // 匝道提前减速的确定性验证：构造引导类型/距离，检查状态机与限速下压
+                        val st = opStateManager.state
+                        val saveTurn = st.xTurnInfo
+                        val saveDist = st.xTurnDist
+                        val saveLimit = a.naviState.nRoadLimitSpeed
+                        val saveRamp = a.nRoadLimitSpeedRamp
+                        val saveRampCnt = a.nRoadLimitSpeedRampCnt
+                        val saveActive = rampSlowdownActive
+                        val saveSpeed = rampSlowdownSpeed
+                        val saveUntil = rampSlowdownUntil
+                        val saveHighway = a.bHighWay
+                        val saveEn = a.ramp_slowdown_en
+                        val saveSmooth = a.smooth_speed_limit
+                        try {
+                            a.bHighWay = true          // 高速默认：提前800m / 限速80
+                            a.ramp_slowdown_en = true
+                            rampSlowdownActive = false
+                            rampSlowdownSpeed = -1
+                            rampSlowdownUntil = 0L
+
+                            // 1) 减速区外
+                            st.xTurnInfo = TurnInfo_ForkRight
+                            st.xTurnDist = 1600f
+                            a.rampSlowdownProcess()
+                            Log.d(TAG, "[ramptest] 1 高速 匝道前1600m(区外) → active=$rampSlowdownActive 期望 false")
+
+                            // 2) 进入减速区
+                            st.xTurnDist = 700f
+                            a.rampSlowdownProcess()
+                            Log.d(TAG, "[ramptest] 2 高速 匝道前700m → active=$rampSlowdownActive speed=$rampSlowdownSpeed 期望 true/80")
+
+                            // 3a) 关闭平滑限速：进减速区立即把 120 压到 80
+                            a.smooth_speed_limit = false
+                            a.naviState.nRoadLimitSpeed = 120
+                            a.nRoadLimitSpeedRamp = 120
+                            a.nRoadLimitSpeedRampCnt = 0
+                            a.rampSlowdownProcess()   // 仍在减速区内
+                            Log.d(TAG, "[ramptest] 3a 关闭平滑限速 120 → ${a.naviState.nRoadLimitSpeed} 期望 80")
+
+                            // 3b) 打开平滑限速：逐周期爬坡到匝道限速
+                            a.smooth_speed_limit = true
+                            a.naviState.nRoadLimitSpeed = 120
+                            a.nRoadLimitSpeedRamp = 120
+                            a.nRoadLimitSpeedRampCnt = 0
+                            repeat(60) { a.smoothSpeedLimit() }
+                            Log.d(TAG, "[ramptest] 3b 平滑限速120 爬坡60周期 → ${a.naviState.nRoadLimitSpeed} 期望 80")
+
+                            // 4) 已进匝道(引导结束)：维持期内不撤销
+                            st.xTurnInfo = -1
+                            a.rampSlowdownProcess()
+                            Log.d(TAG, "[ramptest] 4 匝道引导结束(维持期内) → active=$rampSlowdownActive 期望 true")
+
+                            // 5) 维持期到期后撤销
+                            rampSlowdownUntil = System.currentTimeMillis() - 1
+                            a.rampSlowdownProcess()
+                            Log.d(TAG, "[ramptest] 5 维持期到期 → active=$rampSlowdownActive 期望 false")
+
+                            // 6) 公路参数：提前300m / 限速40
+                            a.bHighWay = false
+                            st.xTurnInfo = TurnInfo_ForkLeft
+                            st.xTurnDist = 250f
+                            a.rampSlowdownProcess()
+                            Log.d(TAG, "[ramptest] 6 公路 匝道前250m → active=$rampSlowdownActive speed=$rampSlowdownSpeed 期望 true/40")
+
+                            // 7) 转弯引导：不减速
+                            rampSlowdownActive = false
+                            st.xTurnInfo = TurnInfo_TurnRight
+                            st.xTurnDist = 100f
+                            a.rampSlowdownProcess()
+                            Log.d(TAG, "[ramptest] 7 右转弯100m → active=$rampSlowdownActive 期望 false")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "ramptest 异常: ${e.message}")
+                        } finally {
+                            st.xTurnInfo = saveTurn
+                            st.xTurnDist = saveDist
+                            a.naviState.nRoadLimitSpeed = saveLimit
+                            a.nRoadLimitSpeedRamp = saveRamp
+                            a.nRoadLimitSpeedRampCnt = saveRampCnt
+                            rampSlowdownActive = saveActive
+                            rampSlowdownSpeed = saveSpeed
+                            rampSlowdownUntil = saveUntil
+                            a.bHighWay = saveHighway
+                            a.ramp_slowdown_en = saveEn
+                            a.smooth_speed_limit = saveSmooth
+                        }
+                        Log.d(TAG, "[ramptest] 已恢复运行状态")
+                    }
+                }
                 "params" -> Log.d(TAG, "可设置参数: " + PARAMS.keys.joinToString(","))
                 else -> Log.w(TAG, "未知命令 $cmd (支持: dump/lane/get/set/frame/clearcd/reset/params)")
             }
@@ -245,6 +346,9 @@ class DebugReceiver : BroadcastReceiver() {
         Log.d(TAG, "配置: nav_mode=${a.nav_mode} overtake_mode=${a.overtake_mode} vision_lane=${a.vision_lane_mode} median=${a.road_median} rightFirst=${a.road_right_first}")
         Log.d(TAG, "开关: 领航 高速/公路=${a.app_navi}/${a.app_road_navi} 超车 高速/公路=${a.app_overtake}/${a.app_road_overtake} 推荐车道=${a.suggest_lane_en} 禁行=${a.dis_lane_en} 靠左/右=${a.keep_left_en}/${a.keep_right_en}")
         Log.d(TAG, "距离: atc_h=${a.atc_dist_h} fork_h=${a.fork_dist_h} atc_l=${a.atc_dist_l} fork_l=${a.fork_dist_l} minSpeed=${a.navi_min_speed}")
+        Log.d(TAG, "匝道减速: 开关=${a.ramp_slowdown_en} 高速${a.ramp_slowdown_dist_h}m/${a.ramp_slowdown_speed_h}km 公路${a.ramp_slowdown_dist_l}m/${a.ramp_slowdown_speed_l}km 维持${a.ramp_hold_time}s" +
+                " | active=$rampSlowdownActive speed=$rampSlowdownSpeed 剩余=${(rampSlowdownUntil - now).coerceAtLeast(0L)}ms")
+        Log.d(TAG, "限速下发: nRoadLimitSpeed=${a.naviState.nRoadLimitSpeed} ramp=${a.nRoadLimitSpeedRamp} cnt=${a.nRoadLimitSpeedRampCnt} 末次高德=${a.nAmapLimitSpeedLast}")
         Log.d(TAG, "阈值: 自算=${a.app_lidar_self_check} 跟随CP=${a.app_thresh_follow_cp} 前=${a.lidar_front_dist_m}m/${a.lidar_front_time_s}s 后=${a.lidar_rear_dist_m}m/${a.lidar_rear_time_s}s vrel=${a.lidar_front_vrel_time_s}/${a.lidar_rear_vrel_time_s}")
         Log.d(TAG, "变道状态机: cmdSent=${a.laneCmdSent} execOk=${a.laneCmdExecOk} pause=${a.laneActionPause} atc_curr=${a.atc_state_curr} target=${a.lastTargetIdx} visual=${a.lastVisualIdx} action=${a.laneAction}")
         Log.d(TAG, "超车状态机: cmdSent=${a.overtakeCmdSent} pause=${a.overtakeActionPause} action=${a.overtakeAction}" +
@@ -292,6 +396,7 @@ class DebugReceiver : BroadcastReceiver() {
                     "navi_blind_dec_speed" -> a.navi_blind_dec_speed = v
                     "app_lidar_self_check" -> a.app_lidar_self_check = v
                     "app_thresh_follow_cp" -> a.app_thresh_follow_cp = v
+                    "ramp_slowdown_en" -> a.ramp_slowdown_en = v
                 }
                 ed.putBoolean(spec.prefKey, v)
             }
@@ -308,6 +413,11 @@ class DebugReceiver : BroadcastReceiver() {
                     "fork_dist_l" -> a.fork_dist_l = v
                     "lidar_front_dist_mode" -> a.lidar_front_dist_mode = v
                     "lidar_rear_dist_mode" -> a.lidar_rear_dist_mode = v
+                    "ramp_slowdown_dist_h" -> a.ramp_slowdown_dist_h = v
+                    "ramp_slowdown_dist_l" -> a.ramp_slowdown_dist_l = v
+                    "ramp_slowdown_speed_h" -> a.ramp_slowdown_speed_h = v
+                    "ramp_slowdown_speed_l" -> a.ramp_slowdown_speed_l = v
+                    "ramp_hold_time" -> a.ramp_hold_time = v
                 }
                 ed.putInt(spec.prefKey, v)
             }
@@ -357,6 +467,7 @@ class DebugReceiver : BroadcastReceiver() {
                 "navi_blind_dec_speed" -> a.navi_blind_dec_speed
                 "app_lidar_self_check" -> a.app_lidar_self_check
                 "app_thresh_follow_cp" -> a.app_thresh_follow_cp
+                "ramp_slowdown_en" -> a.ramp_slowdown_en
                 else -> false
             }).toString()
             'i' -> (if (a == null) prefs.getInt(spec.prefKey, 0) else when (key) {
@@ -370,6 +481,11 @@ class DebugReceiver : BroadcastReceiver() {
                 "fork_dist_l" -> a.fork_dist_l
                 "lidar_front_dist_mode" -> a.lidar_front_dist_mode
                 "lidar_rear_dist_mode" -> a.lidar_rear_dist_mode
+                "ramp_slowdown_dist_h" -> a.ramp_slowdown_dist_h
+                "ramp_slowdown_dist_l" -> a.ramp_slowdown_dist_l
+                "ramp_slowdown_speed_h" -> a.ramp_slowdown_speed_h
+                "ramp_slowdown_speed_l" -> a.ramp_slowdown_speed_l
+                "ramp_hold_time" -> a.ramp_hold_time
                 else -> 0
             }).toString()
             'f' -> (if (a == null) prefs.getFloat(spec.prefKey, 0f) else when (key) {

@@ -41,6 +41,15 @@ var disableLaneChangeTimer = 0L
 
 var laneLineValid = false
 
+// -----------------------------
+// 匝道/分岔提前减速运行态
+//   active 期间把下发到 OP 的道路限速压到 rampSlowdownSpeed；
+//   rampSlowdownUntil 是维持期截止时间，避免刚进匝道就撤销减速。
+// -----------------------------
+var rampSlowdownActive = false
+var rampSlowdownSpeed = -1
+var rampSlowdownUntil = 0L
+
 var appSpeakFile = ""
 
 var lastOvertakeNavLane = NavLane(

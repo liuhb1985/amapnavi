@@ -33,12 +33,18 @@ class NavSettingActivity : AppCompatActivity() {
     private lateinit var cbNavTurn: CheckBox
     private lateinit var cbVisionKeepRight: CheckBox
     private lateinit var cbLaneProb: CheckBox
+    private lateinit var cbRampSlowdown: CheckBox
 
     private lateinit var etNaviMinSpeed: EditText
     private lateinit var etAtcDistH: EditText
     private lateinit var etAtcDistL: EditText
     private lateinit var etForkDistH: EditText
     private lateinit var etForkDistL: EditText
+    private lateinit var etRampDistH: EditText
+    private lateinit var etRampDistL: EditText
+    private lateinit var etRampSpeedH: EditText
+    private lateinit var etRampSpeedL: EditText
+    private lateinit var etRampHold: EditText
 
     private val prefsName = "user_settings"
 
@@ -66,6 +72,16 @@ class NavSettingActivity : AppCompatActivity() {
         etAtcDistL = findViewById(R.id.etNavAtcDistL)
         etForkDistH = findViewById(R.id.etNavForkDistH)
         etForkDistL = findViewById(R.id.etNavForkDistL)
+        cbRampSlowdown = findViewById(R.id.cbNavSettingRampSlowdown)
+        etRampDistH = findViewById(R.id.etNavRampDistH)
+        etRampDistL = findViewById(R.id.etNavRampDistL)
+        etRampSpeedH = findViewById(R.id.etNavRampSpeedH)
+        etRampSpeedL = findViewById(R.id.etNavRampSpeedL)
+        etRampHold = findViewById(R.id.etNavRampHold)
+
+        // 隐藏"领航转弯"与"使用车道置信度"(保留控件与保存逻辑，不影响已有设置值)
+        cbNavTurn.visibility = View.GONE
+        cbLaneProb.visibility = View.GONE
 
         load()
 
@@ -74,6 +90,11 @@ class NavSettingActivity : AppCompatActivity() {
         bindStep(R.id.btnMinusAtcDistL, R.id.btnPlusAtcDistL, etAtcDistL, 50, 0, 100000)
         bindStep(R.id.btnMinusForkDistH, R.id.btnPlusForkDistH, etForkDistH, 10, 0, 100000)
         bindStep(R.id.btnMinusForkDistL, R.id.btnPlusForkDistL, etForkDistL, 10, 0, 100000)
+        bindStep(R.id.btnMinusRampDistH, R.id.btnPlusRampDistH, etRampDistH, 100, 0, 5000)
+        bindStep(R.id.btnMinusRampDistL, R.id.btnPlusRampDistL, etRampDistL, 50, 0, 5000)
+        bindStep(R.id.btnMinusRampSpeedH, R.id.btnPlusRampSpeedH, etRampSpeedH, 5, 0, 150)
+        bindStep(R.id.btnMinusRampSpeedL, R.id.btnPlusRampSpeedL, etRampSpeedL, 5, 0, 150)
+        bindStep(R.id.btnMinusRampHold, R.id.btnPlusRampHold, etRampHold, 5, 0, 300)
 
         // 分页入口（跳走时关闭本页，保证一次返回回到主界面）
         findViewById<Button>(R.id.btnGotoGeneral).setOnClickListener {
@@ -142,6 +163,12 @@ class NavSettingActivity : AppCompatActivity() {
                 .putInt("atc_dist_l", etAtcDistL.text.toString().toIntOrNull() ?: 500)
                 .putInt("fork_dist_h", etForkDistH.text.toString().toIntOrNull() ?: 80)
                 .putInt("fork_dist_l", etForkDistL.text.toString().toIntOrNull() ?: 30)
+                .putBoolean("ramp_slowdown_en", cbRampSlowdown.isChecked)
+                .putInt("ramp_slowdown_dist_h", etRampDistH.text.toString().toIntOrNull() ?: 800)
+                .putInt("ramp_slowdown_dist_l", etRampDistL.text.toString().toIntOrNull() ?: 300)
+                .putInt("ramp_slowdown_speed_h", etRampSpeedH.text.toString().toIntOrNull() ?: 80)
+                .putInt("ramp_slowdown_speed_l", etRampSpeedL.text.toString().toIntOrNull() ?: 40)
+                .putInt("ramp_hold_time", etRampHold.text.toString().toIntOrNull() ?: 10)
                 .apply()
     }
 
@@ -171,5 +198,11 @@ class NavSettingActivity : AppCompatActivity() {
         etAtcDistL.setText(prefs.getInt("atc_dist_l", 500).toString())
         etForkDistH.setText(prefs.getInt("fork_dist_h", 80).toString())
         etForkDistL.setText(prefs.getInt("fork_dist_l", 30).toString())
+        cbRampSlowdown.isChecked = prefs.getBoolean("ramp_slowdown_en", true)
+        etRampDistH.setText(prefs.getInt("ramp_slowdown_dist_h", 800).toString())
+        etRampDistL.setText(prefs.getInt("ramp_slowdown_dist_l", 300).toString())
+        etRampSpeedH.setText(prefs.getInt("ramp_slowdown_speed_h", 80).toString())
+        etRampSpeedL.setText(prefs.getInt("ramp_slowdown_speed_l", 40).toString())
+        etRampHold.setText(prefs.getInt("ramp_hold_time", 10).toString())
     }
 }

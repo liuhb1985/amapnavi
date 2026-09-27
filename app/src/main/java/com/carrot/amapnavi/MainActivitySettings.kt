@@ -300,6 +300,44 @@ fun MainActivity.loadUserSettings() {
         30
     }
 
+    //匝道/分岔提前减速
+    ramp_slowdown_en = if (prefs.contains("ramp_slowdown_en")) {
+        prefs.getBoolean("ramp_slowdown_en", true)
+    } else {
+        editor.putBoolean("ramp_slowdown_en", true)
+        true
+    }
+    ramp_slowdown_dist_h = if (prefs.contains("ramp_slowdown_dist_h")) {
+        prefs.getInt("ramp_slowdown_dist_h", 800)
+    } else {
+        editor.putInt("ramp_slowdown_dist_h", 800)
+        800
+    }
+    ramp_slowdown_dist_l = if (prefs.contains("ramp_slowdown_dist_l")) {
+        prefs.getInt("ramp_slowdown_dist_l", 300)
+    } else {
+        editor.putInt("ramp_slowdown_dist_l", 300)
+        300
+    }
+    ramp_slowdown_speed_h = if (prefs.contains("ramp_slowdown_speed_h")) {
+        prefs.getInt("ramp_slowdown_speed_h", 80)
+    } else {
+        editor.putInt("ramp_slowdown_speed_h", 80)
+        80
+    }
+    ramp_slowdown_speed_l = if (prefs.contains("ramp_slowdown_speed_l")) {
+        prefs.getInt("ramp_slowdown_speed_l", 40)
+    } else {
+        editor.putInt("ramp_slowdown_speed_l", 40)
+        40
+    }
+    ramp_hold_time = if (prefs.contains("ramp_hold_time")) {
+        prefs.getInt("ramp_hold_time", 10)
+    } else {
+        editor.putInt("ramp_hold_time", 10)
+        10
+    }
+
     top_pad_dp = if (prefs.contains("top_pad_dp")) {
         prefs.getInt("top_pad_dp", 5)
     } else {

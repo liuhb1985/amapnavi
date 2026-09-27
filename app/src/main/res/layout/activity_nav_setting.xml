@@ -418,6 +418,176 @@
                 android:textSize="14sp" />
         </LinearLayout>
 
+        <CheckBox
+            android:id="@+id/cbNavSettingRampSlowdown"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:layout_marginStart="16dp"
+            android:text="匝道/分岔提前减速"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="匝道提前距离(米) 高速/低速"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnMinusRampDistH"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etNavRampDistH"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="number"
+                android:gravity="center"
+                android:text="800"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusRampDistH"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="+"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnMinusRampDistL"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="12dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etNavRampDistL"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="number"
+                android:gravity="center"
+                android:text="300"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusRampDistL"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="+"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="匝道目标限速(km/h) 高速/低速"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnMinusRampSpeedH"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etNavRampSpeedH"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="number"
+                android:gravity="center"
+                android:text="80"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusRampSpeedH"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="+"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnMinusRampSpeedL"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="12dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etNavRampSpeedL"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="number"
+                android:gravity="center"
+                android:text="40"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusRampSpeedL"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="+"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="进入匝道后维持减速(秒)"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnMinusRampHold"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etNavRampHold"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="number"
+                android:gravity="center"
+                android:text="10"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusRampHold"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="+"
+                android:textSize="14sp" />
+        </LinearLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

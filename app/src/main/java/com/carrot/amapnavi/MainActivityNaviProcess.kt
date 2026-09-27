@@ -40,6 +40,90 @@ fun MainActivity.travelDistProcess() {
     travelDistTimeValid = true
 }
 
+// -----------------------------
+// 匝道/分岔提前减速
+// -----------------------------
+// 背景：进匝道时高德道路限速和 OP 视觉减速都太晚，车会高速冲进匝道才开始减速。
+// 做法：在进匝道/分岔前 ramp_slowdown_dist 米处开始，把下发到 OP 的道路限速
+//       压到 ramp_slowdown_speed，由 CP 按道路限速提前把车速降下来。
+//       仅对匝道/分岔引导(ForkLeft/ForkRight)生效，转弯(TurnLeft/TurnRight)不处理。
+//       进入匝道后维持 ramp_hold_time 秒才撤销：否则刚进匝道就撤销，而高德/视觉
+//       减速还没接上，速度会被重新提起来。
+// 把下发到 OP 的道路限速压到匝道限速以内(只压不抬)
+//   smooth_speed_limit 打开时交给爬坡逻辑逐周期下降，否则直接下发。
+//   不依赖高德广播是否到来，保证进入减速区时立刻开始限速。
+private fun MainActivity.applyRampLimit(speed: Int) {
+    if (speed <= 0) return
+    if (smooth_speed_limit) {
+        if (nRoadLimitSpeedRamp < 0 || nRoadLimitSpeedRamp > speed) {
+            nRoadLimitSpeedRamp = speed
+            nRoadLimitSpeedRampCnt = 6
+        }
+    } else {
+        val cur = naviState.nRoadLimitSpeed
+        if (cur == null || cur > speed) {
+            naviState.nRoadLimitSpeed = speed
+            nRoadLimitSpeedRamp = speed
+        }
+    }
+}
+
+// 撤销匝道减速后恢复限速：回到最近一次高德道路限速，下一次广播会重算完整值
+private fun MainActivity.restoreLimitAfterRamp() {
+    val restore = nAmapLimitSpeedLast
+    if (restore <= 0) return          // 没有可恢复的高德限速，等下一次广播
+    if (smooth_speed_limit) {
+        if (nRoadLimitSpeedRamp != restore) {
+            nRoadLimitSpeedRamp = restore
+            nRoadLimitSpeedRampCnt = 6
+        }
+    } else {
+        if (naviState.nRoadLimitSpeed != restore) {
+            naviState.nRoadLimitSpeed = restore
+            nRoadLimitSpeedRamp = restore
+        }
+    }
+}
+
+fun MainActivity.rampSlowdownProcess() {
+    val now = System.currentTimeMillis()
+    val s = opStateManager.state
+    val turn = s.xTurnInfo
+    val dist = s.xTurnDist
+
+    val isFork = (turn == TurnInfo_ForkLeft || turn == TurnInfo_ForkRight)
+    val triggerDist = (if (bHighWay) ramp_slowdown_dist_h else ramp_slowdown_dist_l).toFloat()
+    val targetSpeed = if (bHighWay) ramp_slowdown_speed_h else ramp_slowdown_speed_l
+
+    val inZone = ramp_slowdown_en && isFork && triggerDist > 0f && targetSpeed > 0 &&
+            dist >= 0f && dist <= triggerDist
+
+    if (inZone) {
+        if (!rampSlowdownActive) {
+            rampSlowdownActive = true
+            val msg = "${nowTimeStr()} 匝道提前减速开始(${if (bHighWay) "高速" else "公路"}" +
+                    "距离${dist.toInt()}m<${triggerDist.toInt()}m, 限速压至${targetSpeed}km/h)"
+            Log.d("Ramp", msg)
+            showLaneDebug(msg)
+        }
+        rampSlowdownSpeed = targetSpeed
+        // 每周期刷新：离开减速区后再维持 ramp_hold_time 秒才撤销
+        rampSlowdownUntil = now + ramp_hold_time * 1000L
+        applyRampLimit(targetSpeed)
+        return
+    }
+
+    // 不在减速区：维持期内保持，超时后撤销
+    if (rampSlowdownActive && now >= rampSlowdownUntil) {
+        rampSlowdownActive = false
+        rampSlowdownSpeed = -1
+        restoreLimitAfterRamp()
+        val msg = "${nowTimeStr()} 匝道提前减速结束(维持${ramp_hold_time}s 后撤销)"
+        Log.d("Ramp", msg)
+        showLaneDebug(msg)
+    }
+}
+
 //平滑道路限速
 fun MainActivity.smoothSpeedLimit() {
     val now = System.currentTimeMillis()
@@ -47,22 +131,28 @@ fun MainActivity.smoothSpeedLimit() {
     if (smooth_speed_limit) {
         if (naviState.nRoadLimitSpeed != null) {
             var nRoadLimitSpeedTmp = naviState.nRoadLimitSpeed ?: -1
-            if ((nRoadLimitSpeedRamp != nRoadLimitSpeedTmp) || (nRoadLimitSpeedRampCnt > 0)) { //速度未爬坡完成或者还有发送次数
+            //匝道提前减速：把爬坡目标压到匝道限速以内(只压不抬)
+            var rampTarget = nRoadLimitSpeedRamp
+            if (rampSlowdownActive && rampSlowdownSpeed > 0 &&
+                    (rampTarget < 0 || rampTarget > rampSlowdownSpeed)) {
+                rampTarget = rampSlowdownSpeed
+            }
+            if ((rampTarget != nRoadLimitSpeedTmp) || (nRoadLimitSpeedRampCnt > 0)) { //速度未爬坡完成或者还有发送次数
                 //发送次数递减
-                if ((nRoadLimitSpeedRamp == nRoadLimitSpeedTmp) && (nRoadLimitSpeedRampCnt > 0)) {
+                if ((rampTarget == nRoadLimitSpeedTmp) && (nRoadLimitSpeedRampCnt > 0)) {
                     nRoadLimitSpeedRampCnt--
                 }
 
                 //限速爬坡
-                if (nRoadLimitSpeedRamp >= 0) {
-                    if (nRoadLimitSpeedRamp > nRoadLimitSpeedTmp) {
+                if (rampTarget >= 0) {
+                    if (rampTarget > nRoadLimitSpeedTmp) {
                         nRoadLimitSpeedTmp++
-                    } else if (nRoadLimitSpeedRamp < nRoadLimitSpeedTmp) {
+                    } else if (rampTarget < nRoadLimitSpeedTmp) {
                         nRoadLimitSpeedTmp--
                     }
                     naviState.nRoadLimitSpeed = nRoadLimitSpeedTmp
                 } else {
-                    naviState.nRoadLimitSpeed = nRoadLimitSpeedRamp
+                    naviState.nRoadLimitSpeed = rampTarget
                 }
 
                 //发送json
@@ -874,10 +964,12 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
 //导航处理
 fun MainActivity.naviProcess() {
 
+    //行驶路程处理(先更新到路口的剩余距离)
+    travelDistProcess()
+    //匝道提前减速(须先于限速下发：限速下发要用到本周期的减速状态)
+    rampSlowdownProcess()
     //平滑道路限速
     smoothSpeedLimit()
-    //行驶路程处理
-    travelDistProcess()
     //车道线有效检测
     var lane_line_valid = laneLineProcess()
     laneLineValid = lane_line_valid
