@@ -358,6 +358,14 @@ fun MainActivity.loadUserSettings() {
         6
     }
 
+    //车道线判据不可用(false 视觉线型)时是否拦截变道：默认拦截(fail-safe)，可热调关闭
+    lane_unknown_block = if (prefs.contains("lane_unknown_block")) {
+        prefs.getBoolean("lane_unknown_block", true)
+    } else {
+        editor.putBoolean("lane_unknown_block", true)
+        true
+    }
+
     //侧向安全去抖确认帧数(约 = 帧数 × 100ms)：调大更保守/反应慢，调小更灵敏/可能误放行
     safeConfirmFrames = if (prefs.contains("safe_confirm_frames")) {
         prefs.getInt("safe_confirm_frames", 5)

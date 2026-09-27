@@ -41,6 +41,11 @@ var disableLaneChangeTimer = 0L
 
 var laneLineValid = false
 
+// 车道线判据不可用(视觉线型 -1 且 CP 无实线判据)时是否拦截变道：
+//   默认 true(fail-safe)；视觉长期识别不出导致变道功能整体不可用时，可车上热调关闭。
+//   放在全局是因为判据函数 laneLineJudgement() 是顶层函数，需要直接访问。
+var lane_unknown_block = true
+
 // -----------------------------
 // 决策循环单飞保护(重要)
 //   startTimeoutChecker() 会被 UDP 初始化回调重复调用，导致多个协程同时跑 naviProcess：

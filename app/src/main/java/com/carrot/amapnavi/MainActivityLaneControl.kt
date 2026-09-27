@@ -88,7 +88,11 @@ fun laneLineJudgement(left: Boolean): LaneLineJudgement {
     if ((cpFresh && cpSolid) || (appValid && appType == 1)) return LaneLineJudgement.SOLID
     // 只有本机视觉判据能给出"非实线"的许可
     if (appValid) return LaneLineJudgement.CLEAR
-    // 视觉判据不可用 → 未知(不采信 CP 的 false)，fail-safe 禁止变道
+    // 视觉判据不可用 → 未知(不采信 CP 的 false)
+    //   lane_unknown_block=true(默认)：fail-safe 禁止变道
+    //   lane_unknown_block=false：按"未知=不拦"处理(只在明确实线时拦)，用于视觉线型
+    //     长期识别不出(-1)导致变道功能整体不可用的场合，可车上热调
+    if (!lane_unknown_block) return LaneLineJudgement.CLEAR
     return LaneLineJudgement.UNKNOWN
 }
 
