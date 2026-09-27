@@ -63,6 +63,12 @@ var overtakeTriggerStableTime = 0L                     // 触发条件连续满�
 var overtakeLastReason = ""                            // 上次记录的决策原因(用于去重日志)
 var overtakeLastLogTime = 0L                           // 上次记录决策原因的时间(ms)
 
+// 全量逐帧记录(调试用，默认关)：开启后每个决策周期把一帧现场写到 logcat(OvtFrame) 和超车日志文件
+//   由调试后门 adb broadcast 控制：--es cmd frame --es val on/200ms
+var overtakeFullFrameLog = false
+var overtakeFullFrameIntervalMs = 200L
+var overtakeFullFrameLastTime = 0L
+
 // -----------------------------
 // 超车诊断面板运行态(测试用，可随时开关)
 //   面板把每次决策的输入/阶段/两侧评估/结论汇总显示在界面上，

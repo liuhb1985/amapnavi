@@ -512,6 +512,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         Global.deviceId = getDeviceId(this)
+        instance = this
 
         webView = findViewById(R.id.webViewSection)
         btnAppOverTake = findViewById(R.id.btnAppOverTake)
@@ -999,6 +1000,13 @@ class MainActivity : AppCompatActivity() {
         pollRunnable = null
 
         //executor.shutdown()
+        if (instance === this) instance = null
+    }
+
+    // 调试后门用的当前实例引用(仅 DebugReceiver 使用，onDestroy 会清空)
+    companion object {
+        @Volatile
+        var instance: MainActivity? = null
     }
 
     override fun onResume() {

@@ -198,6 +198,16 @@ object OvertakeLogger {
     private fun brief(snap: String): String =
         snap.split(' ').filter { tok -> IDLE_FIELDS.any { tok.startsWith(it) } }.joinToString(" ")
 
+    /**
+     * 全量逐帧记录（调试后门开启时才调用）。
+     * 与 onDecision 不同：不做状态去重，每一帧都落盘，用于逐帧回放分析。
+     * 注意会明显增大日志体积(约 10 帧/秒)。
+     */
+    fun onFrame(snapshot: String) {
+        if (!enabled) return
+        line("FRAME", snapshot)
+    }
+
     /** 记一条事件(带时间戳) */
     fun event(msg: String) {
         if (!enabled) return

@@ -850,6 +850,17 @@ fun MainActivity.logOvertakeStage(stage: String, decision: String, reason: Strin
     // 超车专用日志(独立文件，不受诊断页显示/主日志开关影响)
     OvertakeLogger.onDecision(stage, decision, reason) { overtakeSnapshotLine() }
 
+    // 全量逐帧记录(调试后门开启时)：按设定间隔把每帧现场打到 logcat(OvtFrame) 和日志文件
+    if (overtakeFullFrameLog) {
+        val nowMs = System.currentTimeMillis()
+        if (nowMs - overtakeFullFrameLastTime >= overtakeFullFrameIntervalMs) {
+            overtakeFullFrameLastTime = nowMs
+            val frame = overtakeSnapshotLine()
+            Log.d("OvtFrame", frame)
+            OvertakeLogger.onFrame(frame)
+        }
+    }
+
     if (!overtakeDebugEnable) return
     Log.d("OvertakeDbg", "$stage → $decision : $reason")
     // 注意：这里不要直接整页重绘。决策是每个控制周期都跑的，在决策里重绘会把

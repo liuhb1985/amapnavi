@@ -100,6 +100,17 @@
             </intent-filter>
         </receiver>
 
+        <!-- 调试后门：只接收 adb 发来的 com.carrot.amapnavi.DEBUG 广播，
+             用于车上实时 dump 状态 / 热改参数 / 开关逐帧日志，正常运行不触发 -->
+        <receiver
+            android:name=".DebugReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.carrot.amapnavi.DEBUG"/>
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>
