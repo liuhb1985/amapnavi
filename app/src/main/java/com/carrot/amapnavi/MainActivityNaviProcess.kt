@@ -717,20 +717,14 @@ fun MainActivity.AmapNavi(lane_line_valid: Boolean): Boolean {
                 }
                 //目标车道有效
                 else {
-                    //有禁止变道标志
-                    if (!enableLaneChange && action != LaneChangeAction.KEEP) {
-                        if (laneChangeEdge == LaneChangeAction.LEFT) //靠左行驶请求
-                        {
-                            if (action == LaneChangeAction.LEFT && !doForkNow) {
-                                action = LaneChangeAction.KEEP
-                            }
-                        } else if (laneChangeEdge == LaneChangeAction.RIGHT) //靠右行驶请求
-                        {
-                            if (action == LaneChangeAction.RIGHT && !doForkNow) {
-                                action = LaneChangeAction.KEEP
-                            }
-                        }
-                    }
+                    // ===== 原"已到最边车道就取消变道"的抑制已移除 =====
+                    //  原因(实车证据): 视觉右侧车道数抖动(2→1)+右侧实线会触发"车辆已靠最右边"，
+                    //  之后**所有**靠右变道请求(含导航要求的靠边与岔道口变道)都被改成 KEEP，
+                    //  表现为"不会提前靠边""走在禁行车道上也不变道"。
+                    //  移除后仍有两道保护:
+                    //    1) 目标车道是否可用由 decideLaneWithAction 判定(高速已排除最右应急车道)
+                    //    2) 实线/盲区由安全门 LaneChangeSafetyCheck 拦截
+                    //  enableLaneChange 仍保留用于"已靠最左边/最右边"的语音提示。
 
                     //是否需要变道?
                     if (action != LaneChangeAction.KEEP) {
