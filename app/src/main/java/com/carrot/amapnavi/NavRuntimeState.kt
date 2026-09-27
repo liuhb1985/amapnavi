@@ -49,6 +49,10 @@ var laneLineValid = false
 var rampSlowdownActive = false
 var rampSlowdownSpeed = -1
 var rampSlowdownUntil = 0L
+// 本次减速的计划起点距离(m)：激活时锁定，避免过程中反复进出减速区
+var rampSlowdownLockedDist = 0f
+// 本次减速的规划起始速度(km/h)：激活时锁定，用于生成匀减速曲线
+var rampSlowdownV0 = 0f
 
 var appSpeakFile = ""
 

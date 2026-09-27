@@ -430,10 +430,18 @@
             android:padding="0dp" />
 
         <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="从下面的距离开始减速，到“分岔距离”处刚好降到目标速度；距离不够时自动提前。减速按匀减速曲线进行，体感平缓"
+            android:textSize="12sp"
+            android:textColor="#666666" />
+
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="匝道提前距离(米) 高速/低速"
+            android:text="匝道开始减速距离(米) 高速/低速"
             android:textSize="14sp"
             android:textColor="#000000" />
 
@@ -455,7 +463,7 @@
                 android:layout_height="36dp"
                 android:inputType="number"
                 android:gravity="center"
-                android:text="800"
+                android:text="400"
                 android:textSize="14sp" />
 
             <Button
@@ -479,7 +487,7 @@
                 android:layout_height="36dp"
                 android:inputType="number"
                 android:gravity="center"
-                android:text="300"
+                android:text="200"
                 android:textSize="14sp" />
 
             <Button
@@ -516,7 +524,7 @@
                 android:layout_height="36dp"
                 android:inputType="number"
                 android:gravity="center"
-                android:text="80"
+                android:text="60"
                 android:textSize="14sp" />
 
             <Button
@@ -540,7 +548,7 @@
                 android:layout_height="36dp"
                 android:inputType="number"
                 android:gravity="center"
-                android:text="40"
+                android:text="45"
                 android:textSize="14sp" />
 
             <Button

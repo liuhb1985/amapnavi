@@ -253,14 +253,17 @@ class MainActivity : AppCompatActivity() {
     // -----------------------------
     // 匝道/分岔提前减速(领航参数页可设置)
     //   进匝道时高德道路限速与 OP 视觉减速都太晚，车会高速冲进匝道；
-    //   这里在进匝道前 ramp_slowdown_dist 米就把下发到 OP 的道路限速压到
-    //   ramp_slowdown_speed，由 CP 按道路限速提前把车速降下来。
+    //   这里在进匝道前把下发到 OP 的道路限速压到 ramp_slowdown_speed，
+    //   由 CP 按道路限速提前把车速降下来。
+    //   减速按匀减速曲线规划：dist_* 是开始减速的距离，终点是分岔距离
+    //   (fork_dist_*)，到达分岔距离时刚好降到目标速度；若 dist_* 太短
+    //   不足以减速，会自动把起点往外扩，避免猛减速。
     // -----------------------------
     internal var ramp_slowdown_en = true          // 总开关
-    internal var ramp_slowdown_dist_h = 800       // 高速：提前距离(m)
-    internal var ramp_slowdown_dist_l = 300       // 公路：提前距离(m)
-    internal var ramp_slowdown_speed_h = 80       // 高速：匝道目标限速(km/h)
-    internal var ramp_slowdown_speed_l = 40       // 公路：匝道目标限速(km/h)
+    internal var ramp_slowdown_dist_h = 400       // 高速：开始减速距离(m)
+    internal var ramp_slowdown_dist_l = 200       // 公路：开始减速距离(m)
+    internal var ramp_slowdown_speed_h = 60       // 高速：匝道目标限速(km/h)
+    internal var ramp_slowdown_speed_l = 45       // 公路：匝道目标限速(km/h)
     internal var ramp_hold_time = 10              // 进入匝道后维持减速的时间(s)
     internal var fork_dist_h = 80
     internal var fork_dist_l = 30

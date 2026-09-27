@@ -301,6 +301,18 @@ fun MainActivity.loadUserSettings() {
     }
 
     //匝道/分岔提前减速
+    // 一次性迁移：首版默认值(高速800m/80、公路300m/40)偏保守，
+    // 改为 400m/60、200m/45；只替换仍是旧默认值的项，用户改过的不动。
+    if (!prefs.getBoolean("ramp_default_migrated_v2", false)) {
+        editor.putBoolean("ramp_default_migrated_v2", true)
+        if (prefs.getInt("ramp_slowdown_dist_h", 800) == 800) editor.putInt("ramp_slowdown_dist_h", 400)
+        if (prefs.getInt("ramp_slowdown_dist_l", 300) == 300) editor.putInt("ramp_slowdown_dist_l", 200)
+        if (prefs.getInt("ramp_slowdown_speed_h", 80) == 80) editor.putInt("ramp_slowdown_speed_h", 60)
+        if (prefs.getInt("ramp_slowdown_speed_l", 40) == 40) editor.putInt("ramp_slowdown_speed_l", 45)
+        // 先落地：apply() 会立即更新内存缓存，下面的 prefs.getInt 才能读到迁移后的值
+        editor.apply()
+    }
+
     ramp_slowdown_en = if (prefs.contains("ramp_slowdown_en")) {
         prefs.getBoolean("ramp_slowdown_en", true)
     } else {
@@ -308,28 +320,28 @@ fun MainActivity.loadUserSettings() {
         true
     }
     ramp_slowdown_dist_h = if (prefs.contains("ramp_slowdown_dist_h")) {
-        prefs.getInt("ramp_slowdown_dist_h", 800)
+        prefs.getInt("ramp_slowdown_dist_h", 400)
     } else {
-        editor.putInt("ramp_slowdown_dist_h", 800)
-        800
+        editor.putInt("ramp_slowdown_dist_h", 400)
+        400
     }
     ramp_slowdown_dist_l = if (prefs.contains("ramp_slowdown_dist_l")) {
-        prefs.getInt("ramp_slowdown_dist_l", 300)
+        prefs.getInt("ramp_slowdown_dist_l", 200)
     } else {
-        editor.putInt("ramp_slowdown_dist_l", 300)
-        300
+        editor.putInt("ramp_slowdown_dist_l", 200)
+        200
     }
     ramp_slowdown_speed_h = if (prefs.contains("ramp_slowdown_speed_h")) {
-        prefs.getInt("ramp_slowdown_speed_h", 80)
+        prefs.getInt("ramp_slowdown_speed_h", 60)
     } else {
-        editor.putInt("ramp_slowdown_speed_h", 80)
-        80
+        editor.putInt("ramp_slowdown_speed_h", 60)
+        60
     }
     ramp_slowdown_speed_l = if (prefs.contains("ramp_slowdown_speed_l")) {
-        prefs.getInt("ramp_slowdown_speed_l", 40)
+        prefs.getInt("ramp_slowdown_speed_l", 45)
     } else {
-        editor.putInt("ramp_slowdown_speed_l", 40)
-        40
+        editor.putInt("ramp_slowdown_speed_l", 45)
+        45
     }
     ramp_hold_time = if (prefs.contains("ramp_hold_time")) {
         prefs.getInt("ramp_hold_time", 10)

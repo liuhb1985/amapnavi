@@ -85,6 +85,42 @@ private fun MainActivity.restoreLimitAfterRamp() {
     }
 }
 
+// -----------------------------
+// 匝道减速曲线规划
+// -----------------------------
+// 目标：从用户设定的距离开始减速，到"分岔距离"处刚好降到目标速度。
+//   - 减速按匀减速(v² 线性)规划，减速度恒定 → 体感平缓，接近无感减速
+//   - 如果用户设的距离不够减速(区间长度 < 所需距离)，自动把起点往外扩，
+//     保证到分岔点能降到目标速度，而不是猛刹
+//   - 起点与起始速度在激活瞬间锁定，整个减速过程按同一条曲线走
+private const val RAMP_DECEL_MS2 = 0.9f      // 规划用舒适减速度(m/s²)
+
+private fun kmhToMs(v: Float) = v / 3.6f
+
+// 规划减速起点距离(m)：max(用户设定距离, 分岔距离 + 所需减速距离)
+fun MainActivity.rampPlanStartDist(userDist: Float, endDist: Float, targetSpeedKmh: Int): Float {
+    val vEgo = ((opStateManager.state.vEgo ?: 0).coerceAtLeast(0)).toFloat()
+    // 起始速度取"当前车速"与"目标速度"的较大者：车已经比目标慢时曲线退化为恒等于目标速度
+    val v0 = kmhToMs(maxOf(vEgo, targetSpeedKmh.toFloat()))
+    val v1 = kmhToMs(targetSpeedKmh.toFloat())
+    val needDist = if (v0 > v1) (v0 * v0 - v1 * v1) / (2f * RAMP_DECEL_MS2) else 0f
+    return maxOf(userDist, endDist + needDist)
+}
+
+// 曲线上的目标限速(km/h)：dist 在 [endDist, startDist] 之间按
+//   v(dist) = sqrt(v1² + (v0²-v1²) × (dist-endDist)/(startDist-endDist))
+// 插值，等价于该区间内减速度恒定。
+private fun rampCurveSpeed(dist: Float, startDist: Float, endDist: Float,
+                           v0Kmh: Float, v1Kmh: Float): Float {
+    if (dist >= startDist) return v0Kmh
+    if (dist <= endDist) return v1Kmh
+    val frac = (dist - endDist) / (startDist - endDist)
+    val v0 = kmhToMs(v0Kmh)
+    val v1 = kmhToMs(v1Kmh)
+    val vSq = v1 * v1 + (v0 * v0 - v1 * v1) * frac
+    return maxOf(kotlin.math.sqrt(vSq) * 3.6f, v1Kmh)
+}
+
 fun MainActivity.rampSlowdownProcess() {
     val now = System.currentTimeMillis()
     val s = opStateManager.state
@@ -92,31 +128,54 @@ fun MainActivity.rampSlowdownProcess() {
     val dist = s.xTurnDist
 
     val isFork = (turn == TurnInfo_ForkLeft || turn == TurnInfo_ForkRight)
-    val triggerDist = (if (bHighWay) ramp_slowdown_dist_h else ramp_slowdown_dist_l).toFloat()
+    val userDist = (if (bHighWay) ramp_slowdown_dist_h else ramp_slowdown_dist_l).toFloat()
+    val forkDist = (if (bHighWay) fork_dist_h else fork_dist_l).toFloat()
     val targetSpeed = if (bHighWay) ramp_slowdown_speed_h else ramp_slowdown_speed_l
 
-    val inZone = ramp_slowdown_en && isFork && triggerDist > 0f && targetSpeed > 0 &&
-            dist >= 0f && dist <= triggerDist
+    // 减速起点：按用户设定距离开始；若距离不够减速则自动往外扩，
+    // 保证到"分岔距离"处刚好降到目标速度。已激活时用锁定值，避免反复进出。
+    val startDist = if (rampSlowdownActive && rampSlowdownLockedDist > 0f) {
+        rampSlowdownLockedDist
+    } else {
+        rampPlanStartDist(userDist, forkDist, targetSpeed)
+    }
+
+    val inZone = ramp_slowdown_en && isFork && targetSpeed > 0 &&
+            startDist > 0f && dist >= 0f && dist <= startDist
 
     if (inZone) {
         if (!rampSlowdownActive) {
             rampSlowdownActive = true
+            rampSlowdownLockedDist = startDist
+            rampSlowdownV0 = maxOf((s.vEgo ?: 0).coerceAtLeast(0).toFloat(), targetSpeed.toFloat())
             val msg = "${nowTimeStr()} 匝道提前减速开始(${if (bHighWay) "高速" else "公路"}" +
-                    "距离${dist.toInt()}m<${triggerDist.toInt()}m, 限速压至${targetSpeed}km/h)"
+                    "当前${dist.toInt()}m, 起点${startDist.toInt()}m(设定${userDist.toInt()}m/分岔${forkDist.toInt()}m), " +
+                    "${rampSlowdownV0.toInt()}km/h → ${targetSpeed}km/h)"
             Log.d("Ramp", msg)
             showLaneDebug(msg)
         }
         rampSlowdownSpeed = targetSpeed
         // 每周期刷新：离开减速区后再维持 ramp_hold_time 秒才撤销
         rampSlowdownUntil = now + ramp_hold_time * 1000L
-        applyRampLimit(targetSpeed)
+
+        // 本周期的目标限速：沿匀减速曲线取值。
+        // applyRampLimit 只压不抬，所以限速会随曲线单调、平缓地下降 → 接近无感减速。
+        val curve = rampCurveSpeed(dist, rampSlowdownLockedDist, forkDist,
+                rampSlowdownV0, targetSpeed.toFloat())
+        applyRampLimit(kotlin.math.ceil(curve).toInt())
         return
     }
 
-    // 不在减速区：维持期内保持，超时后撤销
-    if (rampSlowdownActive && now >= rampSlowdownUntil) {
+    // 不在减速区：已进匝道或引导已切换，维持期内保持目标限速，避免速度立刻被提起来
+    if (rampSlowdownActive) {
+        if (now < rampSlowdownUntil) {
+            applyRampLimit(rampSlowdownSpeed)
+            return
+        }
         rampSlowdownActive = false
         rampSlowdownSpeed = -1
+        rampSlowdownLockedDist = 0f
+        rampSlowdownV0 = 0f
         restoreLimitAfterRamp()
         val msg = "${nowTimeStr()} 匝道提前减速结束(维持${ramp_hold_time}s 后撤销)"
         Log.d("Ramp", msg)

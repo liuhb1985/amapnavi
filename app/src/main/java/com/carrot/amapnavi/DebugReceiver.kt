@@ -168,6 +168,10 @@ class DebugReceiver : BroadcastReceiver() {
                             prevLeadPresent = false
                             resetLaneTypeFilter()
                             resetSideSafetyDebounce()
+                            rampSlowdownActive = false
+                            rampSlowdownSpeed = -1
+                            rampSlowdownUntil = 0L
+                            rampSlowdownLockedDist = 0f
                             simScene = scene
                             simTick = 0L
                             simHoldUntil = System.currentTimeMillis() + secs.coerceIn(5L, 600L) * 1000L
@@ -246,77 +250,111 @@ class DebugReceiver : BroadcastReceiver() {
                         val saveHighway = a.bHighWay
                         val saveEn = a.ramp_slowdown_en
                         val saveSmooth = a.smooth_speed_limit
+                        val saveVEgo = st.vEgo
+                        val saveLocked = rampSlowdownLockedDist
+                        val saveDistH = a.ramp_slowdown_dist_h
+                        val saveDistL = a.ramp_slowdown_dist_l
+                        val saveSpeedH = a.ramp_slowdown_speed_h
+                        val saveSpeedL = a.ramp_slowdown_speed_l
+                        val saveForkH = a.fork_dist_h
+                        val saveForkL = a.fork_dist_l
+                        val saveV0 = rampSlowdownV0
                         try {
-                            a.bHighWay = true          // 高速默认：提前800m / 限速80
+                            a.bHighWay = true
                             a.ramp_slowdown_en = true
+                            a.ramp_slowdown_dist_h = 400
+                            a.ramp_slowdown_dist_l = 200
+                            a.ramp_slowdown_speed_h = 60
+                            a.ramp_slowdown_speed_l = 45
+                            a.fork_dist_h = 80
+                            a.fork_dist_l = 30
+                            a.smooth_speed_limit = false
                             rampSlowdownActive = false
                             rampSlowdownSpeed = -1
                             rampSlowdownUntil = 0L
+                            rampSlowdownLockedDist = 0f
+                            rampSlowdownV0 = 0f
 
-                            // 1) 减速区外
+                            // 高速 120km/h 设定400m：120→60 需约463m，400m 不够 → 起点自动扩到 80+463≈543m
+                            st.vEgo = 120
                             st.xTurnInfo = TurnInfo_ForkRight
                             st.xTurnDist = 1600f
                             a.rampSlowdownProcess()
-                            Log.d(TAG, "[ramptest] 1 高速 匝道前1600m(区外) → active=$rampSlowdownActive 期望 false")
+                            Log.d(TAG, "[ramptest] 1 高速120km/h 匝道前1600m → active=$rampSlowdownActive 期望 false")
 
-                            // 2) 进入减速区
-                            st.xTurnDist = 700f
+                            st.xTurnDist = 600f
                             a.rampSlowdownProcess()
-                            Log.d(TAG, "[ramptest] 2 高速 匝道前700m → active=$rampSlowdownActive speed=$rampSlowdownSpeed 期望 true/80")
+                            Log.d(TAG, "[ramptest] 2 高速120km/h 匝道前600m(起点≈543m) → active=$rampSlowdownActive 期望 false")
 
-                            // 3a) 关闭平滑限速：进减速区立即把 120 压到 80
-                            a.smooth_speed_limit = false
+                            st.xTurnDist = 500f
+                            a.rampSlowdownProcess()
+                            Log.d(TAG, "[ramptest] 3 高速120km/h 匝道前500m → active=$rampSlowdownActive v0=${rampSlowdownV0.toInt()} 起点=${rampSlowdownLockedDist.toInt()}m 期望 true/120/~543")
+
+                            // 4) 曲线中间点：dist=280m → 约91km/h
                             a.naviState.nRoadLimitSpeed = 120
                             a.nRoadLimitSpeedRamp = 120
                             a.nRoadLimitSpeedRampCnt = 0
-                            a.rampSlowdownProcess()   // 仍在减速区内
-                            Log.d(TAG, "[ramptest] 3a 关闭平滑限速 120 → ${a.naviState.nRoadLimitSpeed} 期望 80")
+                            st.xTurnDist = 280f
+                            a.rampSlowdownProcess()
+                            Log.d(TAG, "[ramptest] 4 高速120km/h dist=280m → 限速=${a.naviState.nRoadLimitSpeed} 期望 ≈91")
 
-                            // 3b) 打开平滑限速：逐周期爬坡到匝道限速
-                            a.smooth_speed_limit = true
-                            a.naviState.nRoadLimitSpeed = 120
-                            a.nRoadLimitSpeedRamp = 120
-                            a.nRoadLimitSpeedRampCnt = 0
-                            repeat(60) { a.smoothSpeedLimit() }
-                            Log.d(TAG, "[ramptest] 3b 平滑限速120 爬坡60周期 → ${a.naviState.nRoadLimitSpeed} 期望 80")
+                            // 5) 到分岔距离处应为目标速度
+                            st.xTurnDist = 80f
+                            a.rampSlowdownProcess()
+                            Log.d(TAG, "[ramptest] 5 高速120km/h dist=80m(分岔) → 限速=${a.naviState.nRoadLimitSpeed} 期望 60")
 
-                            // 4) 已进匝道(引导结束)：维持期内不撤销
+                            // 6) 已进匝道(引导结束)：维持期内保持目标限速
                             st.xTurnInfo = -1
                             a.rampSlowdownProcess()
-                            Log.d(TAG, "[ramptest] 4 匝道引导结束(维持期内) → active=$rampSlowdownActive 期望 true")
+                            Log.d(TAG, "[ramptest] 6 匝道引导结束(维持期内) → active=$rampSlowdownActive 期望 true")
 
-                            // 5) 维持期到期后撤销
+                            // 7) 维持期到期后撤销
                             rampSlowdownUntil = System.currentTimeMillis() - 1
                             a.rampSlowdownProcess()
-                            Log.d(TAG, "[ramptest] 5 维持期到期 → active=$rampSlowdownActive 期望 false")
+                            Log.d(TAG, "[ramptest] 7 维持期到期 → active=$rampSlowdownActive 期望 false")
 
-                            // 6) 公路参数：提前300m / 限速40
+                            // 8) 公路 60km/h 设定200m：60→45 只需约68m，200m 够用 → 起点=200m
                             a.bHighWay = false
+                            st.vEgo = 60
                             st.xTurnInfo = TurnInfo_ForkLeft
-                            st.xTurnDist = 250f
+                            st.xTurnDist = 180f
                             a.rampSlowdownProcess()
-                            Log.d(TAG, "[ramptest] 6 公路 匝道前250m → active=$rampSlowdownActive speed=$rampSlowdownSpeed 期望 true/40")
+                            Log.d(TAG, "[ramptest] 8 公路60km/h 匝道前180m → active=$rampSlowdownActive 起点=${rampSlowdownLockedDist.toInt()}m 期望 true/200")
 
-                            // 7) 转弯引导：不减速
+                            st.xTurnDist = 30f
+                            a.rampSlowdownProcess()
+                            Log.d(TAG, "[ramptest] 9 公路60km/h dist=30m(分岔) → 限速=${a.naviState.nRoadLimitSpeed} 期望 45")
+
+                            // 10) 转弯引导：不减速
                             rampSlowdownActive = false
+                            rampSlowdownLockedDist = 0f
                             st.xTurnInfo = TurnInfo_TurnRight
                             st.xTurnDist = 100f
                             a.rampSlowdownProcess()
-                            Log.d(TAG, "[ramptest] 7 右转弯100m → active=$rampSlowdownActive 期望 false")
+                            Log.d(TAG, "[ramptest] 10 右转弯100m → active=$rampSlowdownActive 期望 false")
                         } catch (e: Exception) {
                             Log.e(TAG, "ramptest 异常: ${e.message}")
                         } finally {
                             st.xTurnInfo = saveTurn
                             st.xTurnDist = saveDist
+                            st.vEgo = saveVEgo
                             a.naviState.nRoadLimitSpeed = saveLimit
                             a.nRoadLimitSpeedRamp = saveRamp
                             a.nRoadLimitSpeedRampCnt = saveRampCnt
                             rampSlowdownActive = saveActive
                             rampSlowdownSpeed = saveSpeed
                             rampSlowdownUntil = saveUntil
+                            rampSlowdownLockedDist = saveLocked
+                            rampSlowdownV0 = saveV0
                             a.bHighWay = saveHighway
                             a.ramp_slowdown_en = saveEn
                             a.smooth_speed_limit = saveSmooth
+                            a.ramp_slowdown_dist_h = saveDistH
+                            a.ramp_slowdown_dist_l = saveDistL
+                            a.ramp_slowdown_speed_h = saveSpeedH
+                            a.ramp_slowdown_speed_l = saveSpeedL
+                            a.fork_dist_h = saveForkH
+                            a.fork_dist_l = saveForkL
                         }
                         Log.d(TAG, "[ramptest] 已恢复运行状态")
                     }
@@ -347,7 +385,7 @@ class DebugReceiver : BroadcastReceiver() {
         Log.d(TAG, "开关: 领航 高速/公路=${a.app_navi}/${a.app_road_navi} 超车 高速/公路=${a.app_overtake}/${a.app_road_overtake} 推荐车道=${a.suggest_lane_en} 禁行=${a.dis_lane_en} 靠左/右=${a.keep_left_en}/${a.keep_right_en}")
         Log.d(TAG, "距离: atc_h=${a.atc_dist_h} fork_h=${a.fork_dist_h} atc_l=${a.atc_dist_l} fork_l=${a.fork_dist_l} minSpeed=${a.navi_min_speed}")
         Log.d(TAG, "匝道减速: 开关=${a.ramp_slowdown_en} 高速${a.ramp_slowdown_dist_h}m/${a.ramp_slowdown_speed_h}km 公路${a.ramp_slowdown_dist_l}m/${a.ramp_slowdown_speed_l}km 维持${a.ramp_hold_time}s" +
-                " | active=$rampSlowdownActive speed=$rampSlowdownSpeed 剩余=${(rampSlowdownUntil - now).coerceAtLeast(0L)}ms")
+                " | active=$rampSlowdownActive 起点=${rampSlowdownLockedDist.toInt()}m v0=${rampSlowdownV0.toInt()} 目标=$rampSlowdownSpeed 剩余=${(rampSlowdownUntil - now).coerceAtLeast(0L)}ms")
         Log.d(TAG, "限速下发: nRoadLimitSpeed=${a.naviState.nRoadLimitSpeed} ramp=${a.nRoadLimitSpeedRamp} cnt=${a.nRoadLimitSpeedRampCnt} 末次高德=${a.nAmapLimitSpeedLast}")
         Log.d(TAG, "阈值: 自算=${a.app_lidar_self_check} 跟随CP=${a.app_thresh_follow_cp} 前=${a.lidar_front_dist_m}m/${a.lidar_front_time_s}s 后=${a.lidar_rear_dist_m}m/${a.lidar_rear_time_s}s vrel=${a.lidar_front_vrel_time_s}/${a.lidar_rear_vrel_time_s}")
         Log.d(TAG, "变道状态机: cmdSent=${a.laneCmdSent} execOk=${a.laneCmdExecOk} pause=${a.laneActionPause} atc_curr=${a.atc_state_curr} target=${a.lastTargetIdx} visual=${a.lastVisualIdx} action=${a.laneAction}")
