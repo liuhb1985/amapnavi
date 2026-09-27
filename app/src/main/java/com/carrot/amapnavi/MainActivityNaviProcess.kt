@@ -146,11 +146,13 @@ fun MainActivity.rampSlowdownProcess() {
     if (inZone) {
         if (!rampSlowdownActive) {
             rampSlowdownActive = true
+            lastRampLogBucket = -1
             rampSlowdownLockedDist = startDist
             rampSlowdownV0 = maxOf((s.vEgo ?: 0).coerceAtLeast(0).toFloat(), targetSpeed.toFloat())
             val msg = "${nowTimeStr()} 匝道提前减速开始(${if (bHighWay) "高速" else "公路"}" +
                     "当前${dist.toInt()}m, 起点${startDist.toInt()}m(设定${userDist.toInt()}m/分岔${forkDist.toInt()}m), " +
-                    "${rampSlowdownV0.toInt()}km/h → ${targetSpeed}km/h)"
+                    "实际车速${s.vEgo ?: 0}km/h, 曲线起点${rampSlowdownV0.toInt()}km/h → ${targetSpeed}km/h" +
+                    (if (rampSlowdownV0 <= targetSpeed) "[车速已≤目标，无需减速]" else "")
             Log.d("Ramp", msg)
             showLaneDebug(msg)
         }
@@ -166,6 +168,14 @@ fun MainActivity.rampSlowdownProcess() {
         // 这样减速才会沿曲线平滑下降，同时更高德限速也不会把它抬起来
         rampActiveLimit = kotlin.math.ceil(curve).toInt()
         applyRampLimit(rampActiveLimit)
+
+        // 减速过程日志：每跨 50m 记一次，用于核对限速是否逐档下降(而不是一步到目标)
+        val bucket = (dist / 50f).toInt()
+        if (bucket != lastRampLogBucket) {
+            lastRampLogBucket = bucket
+            Log.d("Ramp", "${nowTimeStr()} 匝道减速中: 距分岔${dist.toInt()}m 曲线限速=${rampActiveLimit}km/h " +
+                    "(实际车速${s.vEgo ?: 0}km/h)")
+        }
         return
     }
 

@@ -65,6 +65,8 @@ var rampSlowdownSpeed = -1
 // 匝道减速当前应压到的限速(km/h)：减速区内=曲线当前值，进匝道维持期=目标速度，其余=-1。
 //   下发限速时与高德计算值取较小值，保证"匝道期间不会被高德抬高，但采纳更低的限速"
 var rampActiveLimit = -1
+// 匝道减速过程日志限频：每跨过 50m 记一次曲线值(便于车上核对减速是否逐档进行)
+var lastRampLogBucket = -1
 var rampSlowdownUntil = 0L
 // 本次减速的计划起点距离(m)：激活时锁定，避免过程中反复进出减速区
 var rampSlowdownLockedDist = 0f
