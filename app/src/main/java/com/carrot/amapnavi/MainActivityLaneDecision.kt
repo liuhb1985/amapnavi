@@ -494,11 +494,14 @@ private const val OVERTAKE_REVERSE_COOLDOWN_MS = 20_000L
 private val OVERTAKE_PARAMS_AGGRESSIVE = OvertakeParams(
     mode = 1, modeName = "激进",
     triggerMaxDist = 100f, triggerMinDist = 8f,
-    vrelThreshold = -1, timeGapMax = 4.0f, cruiseRatio = 0.95f,
+    vrelThreshold = -2, timeGapMax = 2.5f, cruiseRatio = 0.95f,
     leadMinSpeedHighWay = 25, leadMinSpeedRoad = 15,
-    stableTime = 400L,
+    // 原 400ms：前车一插入(cut-in)的瞬态才刚产生就被当成"前车慢"执行变道
+    stableTime = 1200L,
+    cutInSuppressMs = 1500L,
     minLaneWidth = 2.0f, sideMinScore = 45, sideVrelThreshold = 5,
     sideSafetyMargin = 3f, rearMinDist = 8f, sideFrontMinDist = 15f,
+    sideUnknownPenalty = 15,
     allowRightOvertake = true, preferLeftFirst = false,
     cooldownSuccess = 6000L, cooldownFailed = 3000L
 )
@@ -506,11 +509,13 @@ private val OVERTAKE_PARAMS_AGGRESSIVE = OvertakeParams(
 private val OVERTAKE_PARAMS_NORMAL = OvertakeParams(
     mode = 2, modeName = "常规",
     triggerMaxDist = 80f, triggerMinDist = 12f,
-    vrelThreshold = -3, timeGapMax = 3.0f, cruiseRatio = 0.90f,
+    vrelThreshold = -3, timeGapMax = 2.5f, cruiseRatio = 0.90f,
     leadMinSpeedHighWay = 35, leadMinSpeedRoad = 20,
-    stableTime = 800L,
+    stableTime = 2000L,
+    cutInSuppressMs = 2500L,
     minLaneWidth = 2.3f, sideMinScore = 60, sideVrelThreshold = 10,
     sideSafetyMargin = 5f, rearMinDist = 12f, sideFrontMinDist = 20f,
+    sideUnknownPenalty = 25,
     allowRightOvertake = true, preferLeftFirst = true,
     cooldownSuccess = 10000L, cooldownFailed = 4000L
 )
@@ -520,9 +525,11 @@ private val OVERTAKE_PARAMS_CONSERVATIVE = OvertakeParams(
     triggerMaxDist = 60f, triggerMinDist = 20f,
     vrelThreshold = -8, timeGapMax = 2.0f, cruiseRatio = 0.80f,
     leadMinSpeedHighWay = 45, leadMinSpeedRoad = 30,
-    stableTime = 1200L,
+    stableTime = 3000L,
+    cutInSuppressMs = 3500L,
     minLaneWidth = 2.6f, sideMinScore = 75, sideVrelThreshold = 15,
     sideSafetyMargin = 8f, rearMinDist = 20f, sideFrontMinDist = 25f,
+    sideUnknownPenalty = 35,
     allowRightOvertake = false, preferLeftFirst = true,
     cooldownSuccess = 15000L, cooldownFailed = 6000L
 )
@@ -575,14 +582,70 @@ fun MainActivity.evaluateOvertakeTrigger(): Pair<Boolean, String> {
     if (timeGap > 0f && timeGap <= p.timeGapMax) {
         reasons.add("跟车时距${"%.1f".format(timeGap)}s")
     }
-    if (vCruise > 0 && vEgo < vCruise * p.cruiseRatio) {
-        reasons.add("速度比${vEgo * 100 / vCruise}%")
+    // 以"前车绝对速度低于巡航"为主判据(vlead 在上面已取出)：
+    //   cut-in 刚发生时本车还没开始减速，vEgo 仍接近巡航，只看 vEgo 会漏判；
+    //   而看 vlead 才能反映"前车是不是真的比我慢"，避免把插队瞬态当成需要超车。
+    if (vCruise > 0 && vlead != null && vlead < vCruise * p.cruiseRatio) {
+        reasons.add("前车${vlead}km/h低于巡航${(vCruise * p.cruiseRatio).toInt()}km/h")
+    } else if (vCruise > 0 && vEgo < vCruise * p.cruiseRatio) {
+        reasons.add("速度比${vEgo * 100 / vCruise}%") // vlead 缺失时退回用本车速度
     }
 
     if (reasons.isEmpty()) return false to "未满足超车触发条件"
     return true to reasons.joinToString(",")
 }
 
+
+// -----------------------------
+// 前车 cut-in(插队)检测
+// -----------------------------
+// 现象：有车并入本车道时 drel 会突然大幅变小、vrel 瞬间变得很负。
+//       原逻辑把这种瞬态直接当成"前车慢"，稳定时间一到就发变道命令，
+//       用户反馈的"前车一插入就立即变道"就是这个原因(激进模式 stableTime 仅 400ms)。
+// 处理：识别到插队后进入抑制窗口，窗口内不触发超车，并清零触发稳定计时。
+private const val CUT_IN_DROP_MIN_M = 8       // 单周期内前车距离突降阈值(m)
+private const val CUT_IN_DROP_RATIO = 0.25f   // 且降幅不低于原距离的该比例
+
+fun MainActivity.updateCutInDetection() {
+    val s = opStateManager.state
+    val now = System.currentTimeMillis()
+    val drel = if (s.lead1) s.drel?.takeIf { it > 0 } else null
+    val prev = prevLeadDrel
+
+    var reason = ""
+    var strong = true
+    if (drel != null) {
+        if (!prevLeadPresent) {
+            // 前车从无到有：多数是插入，但也可能是雷达刚重新捕获，抑制窗口取一半
+            reason = "前车突然出现${drel}m"
+            strong = false
+        } else if (prev != null) {
+            val drop = prev - drel
+            if (drop >= CUT_IN_DROP_MIN_M && drop >= prev * CUT_IN_DROP_RATIO) {
+                reason = "前车距离突降${prev}m→${drel}m"
+            }
+        }
+    }
+    prevLeadDrel = drel
+    prevLeadPresent = drel != null
+
+    if (reason.isEmpty()) return
+
+    val p = currentOvertakeParams()
+    val window = if (strong) p.cutInSuppressMs else p.cutInSuppressMs / 2
+    cutInSuppressUntil = now + window
+    lastCutInTime = now
+    cutInReason = reason
+    overtakeTriggerStableTime = 0L   // 触发计时重新开始，避免沿用插队前的累计时间
+
+    val msg = "${nowTimeStr()} 检测到前车插入($reason)，${window / 1000}s 内不触发超车"
+    Log.w("Overtake", msg)
+    showLaneDebug(msg)
+}
+
+// 是否处于 cut-in 抑制窗口内
+fun MainActivity.isCutInSuppressing(): Boolean =
+        System.currentTimeMillis() < cutInSuppressUntil
 
 // -----------------------------
 // 单侧车道超车评估(综合毫米波雷达 + 激光雷达侧向数据)
@@ -680,8 +743,11 @@ fun MainActivity.evaluateOvertakeSide(side: LaneChangeAction): OvertakeSideEval 
             reasons.add("侧前车过近(${sideFrontDist.toInt()}m<${p.sideFrontMinDist.toInt()}m)")
         }
     } else {
-        // 注意：没有数据只代表"量程内没有"，量程之外属于未知，不能当成"确定无车"
-        reasons.add("侧前方无数据(超量程未知)")
+        // 注意：没有数据只代表"量程内没有"，量程之外属于未知，不能当成"确定无车"。
+        // 原来这里只记原因不扣分(等于按"畅通"处理)，现在按模式扣分，
+        // 两侧都无数据时评分会低于门限，不再因为"没看到车"就变过去。
+        score -= p.sideUnknownPenalty
+        reasons.add("侧前方无数据(超量程未知)-${p.sideUnknownPenalty}")
     }
 
     if (sideVrel != null && sideVrel < -p.sideVrelThreshold) {
@@ -934,6 +1000,7 @@ fun MainActivity.overtakeSnapshotLine(): String {
         append(" pause=").append(b(overtakeActionPause))
         append(" prog=").append(b(overtakeInProgress))
         append(" cd=").append(cdLeft)
+        append(" cutIn=").append((cutInSuppressUntil - now).coerceAtLeast(0L))
         append(" stable=").append(stable).append('/').append(p.stableTime)
         append(" lastDir=").append(overtakeLastDirection)
 

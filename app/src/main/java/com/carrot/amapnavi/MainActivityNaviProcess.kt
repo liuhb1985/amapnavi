@@ -803,6 +803,17 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
         return
     }
 
+    // ============ 5.5 前车 cut-in(插队)抑制 ============
+    // 每周期先做插队检测：有车并入时 drel 突降/vrel 瞬态极负，
+    // 若直接当成"前车慢"就会出现"刚被插队就立刻变道"。窗口内不触发并清零稳定计时。
+    updateCutInDetection()
+    if (isCutInSuppressing()) {
+        overtakeTriggerStableTime = 0L
+        logOvertakeReason("${nowTime} 前车插入抑制中：$cutInReason")
+        logOvertakeStage("6-cutIn抑制", "不超车", "剩${cutInSuppressUntil - now}ms | $cutInReason")
+        return
+    }
+
     // ============ 6. 超车触发条件评估 ============
     val (trigger, triggerReason) = evaluateOvertakeTrigger()
     if (!trigger) {
@@ -870,6 +881,19 @@ fun MainActivity.naviProcess() {
     //车道线有效检测
     var lane_line_valid = laneLineProcess()
     laneLineValid = lane_line_valid
+
+    //端到端模拟注入(仅调试用，见 DebugReceiver cmd=sim)
+    // 必须放在 laneLineValid 赋值之后，否则会被 laneLineProcess() 的结果覆盖
+    if (simScene != null) {
+        if (System.currentTimeMillis() < simHoldUntil) {
+            applySimScene(simScene!!, simTick++)
+        } else {
+            simScene = null
+            resetLaneTypeFilter()
+            Log.d("Overtake", "模拟场景结束")
+        }
+    }
+
     //高德导航
     var naviFlag = AmapNavi(lane_line_valid)
     //超车功能

@@ -15,6 +15,12 @@ import android.util.Log
  *   adb shell am broadcast -a com.carrot.amapnavi.DEBUG --es cmd clearcd
  *   adb shell am broadcast -a com.carrot.amapnavi.DEBUG --es cmd reset
  *   adb shell am broadcast -a com.carrot.amapnavi.DEBUG --es cmd lane
+ *   adb shell am broadcast -a com.carrot.amapnavi.DEBUG --es cmd scenes
+ *   adb shell am broadcast -a com.carrot.amapnavi.DEBUG --es cmd sim   --es val baseline      (场景[,持续秒数])
+ *   adb shell am broadcast -a com.carrot.amapnavi.DEBUG --es cmd simstop
+ *
+ * 端到端模拟：不需要实车和 CP，sim 会按帧把传感器状态灌进决策链路，
+ * 覆盖实线/虚实线抖动、前雷达与激光雷达抖动、判据不可用、前车插入等场景。
  *
  * 说明：
  *   dump / lane / get 只读不写；set 会同时改内存里的变量并写入 user_settings，
@@ -122,6 +128,49 @@ class DebugReceiver : BroadcastReceiver() {
                         a.resetOvertakeAction()
                         Log.d(TAG, "已复位变道/超车状态机")
                     } else Log.w(TAG, "MainActivity 未运行")
+                }
+                "scenes" -> {
+                    Log.d(TAG, "可用模拟场景(cmd=sim --es val <场景>[,秒数]):")
+                    SimScenes.scenes.forEach { (k, v) -> Log.d(TAG, "  $k : $v") }
+                }
+                "sim" -> {
+                    if (a == null) {
+                        Log.w(TAG, "MainActivity 未运行，无法启动模拟")
+                    } else {
+                        val parts = (value ?: "baseline").split(",")
+                        val scene = parts[0].trim()
+                        val secs = parts.getOrNull(1)?.trim()?.toLongOrNull() ?: 30L
+                        if (!SimScenes.isKnown(scene)) {
+                            Log.w(TAG, "未知场景 $scene，可用 --es cmd scenes 查看")
+                        } else {
+                            // 模拟高速工况：打开超车、关闭领航(领航会接管变道请求)，并复位状态机
+                            a.bHighWay = true
+                            a.app_overtake = true
+                            a.app_road_overtake = true
+                            a.app_navi = false
+                            a.app_road_navi = false
+                            a.resetOvertakeAction()
+                            a.resetLaneAction()
+                            overtakeCooldownUntil = 0L
+                            overtakeLastDirection = LaneChangeAction.KEEP
+                            overtakeTriggerStableTime = 0L
+                            cutInSuppressUntil = 0L
+                            prevLeadDrel = null
+                            prevLeadPresent = false
+                            resetLaneTypeFilter()
+                            simScene = scene
+                            simTick = 0L
+                            simHoldUntil = System.currentTimeMillis() + secs.coerceIn(5L, 600L) * 1000L
+                            Log.d(TAG, "模拟启动: $scene (${SimScenes.scenes[scene]})，持续${secs}s")
+                            Log.d(TAG, "提示: 用 logcat -s AmapDbg OvertakeDbg OvertakeCmd LaneCmd 观察决策过程")
+                        }
+                    }
+                }
+                "simstop" -> {
+                    simScene = null
+                    simHoldUntil = 0L
+                    resetLaneTypeFilter()
+                    Log.d(TAG, "模拟已停止")
                 }
                 "params" -> Log.d(TAG, "可设置参数: " + PARAMS.keys.joinToString(","))
                 else -> Log.w(TAG, "未知命令 $cmd (支持: dump/lane/get/set/frame/clearcd/reset/params)")

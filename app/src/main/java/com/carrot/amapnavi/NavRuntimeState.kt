@@ -60,6 +60,17 @@ var overtakeLastDirection = LaneChangeAction.KEEP      // 上次超车方向
 var overtakeLastDirectionTime = 0L                     // 上次超车方向的时间(ms)，用于反向变道冷却
 var overtakeInProgress = false                         // 超车变道进行中
 var overtakeTriggerStableTime = 0L                     // 触发条件连续满足起始时间(ms)
+
+// -----------------------------
+// 前车 cut-in(插队)检测运行态
+//   有车并入时 drel 会突降、vrel 瞬间很负；识别后进入抑制窗口，窗口内不触发超车，
+//   避免把插队瞬态当成"前车慢"而立即变道。
+// -----------------------------
+var prevLeadDrel: Int? = null                          // 上一周期的前车距离(m)
+var prevLeadPresent = false                            // 上一周期是否有前车
+var cutInSuppressUntil = 0L                            // cut-in 抑制窗口截止时间(ms)
+var lastCutInTime = 0L                                 // 最近一次判定 cut-in 的时间(ms)
+var cutInReason = ""                                   // 最近一次 cut-in 判定说明(诊断用)
 var overtakeLastReason = ""                            // 上次记录的决策原因(用于去重日志)
 var overtakeLastLogTime = 0L                           // 上次记录决策原因的时间(ms)
 
@@ -68,6 +79,15 @@ var overtakeLastLogTime = 0L                           // 上次记录决策原�
 var overtakeFullFrameLog = false
 var overtakeFullFrameIntervalMs = 200L
 var overtakeFullFrameLastTime = 0L
+
+// -----------------------------
+// 端到端模拟注入(仅调试用，由 DebugReceiver cmd=sim 启动)
+//   simScene 非空时，naviProcess 每个周期把该场景的一帧状态灌进 opStateManager，
+//   用于在无车环境下验证变道/超车决策(见 SimScenes.kt)。
+// -----------------------------
+var simScene: String? = null                           // 当前模拟场景名
+var simHoldUntil = 0L                                  // 模拟结束时间(ms)
+var simTick = 0L                                       // 已注入帧数
 
 // -----------------------------
 // 超车诊断面板运行态(测试用，可随时开关)

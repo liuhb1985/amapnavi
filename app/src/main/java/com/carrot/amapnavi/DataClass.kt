@@ -31,6 +31,7 @@ data class OvertakeParams(
         val leadMinSpeedHighWay: Int = 35,      // 高速前车最低速度(km/h)，低于视为拥堵不超车
         val leadMinSpeedRoad: Int = 20,         // 普通道路前车最低速度(km/h)
         val stableTime: Long = 800L,            // 触发条件需要连续满足的时间(ms)
+        val cutInSuppressMs: Long = 2500L,      // 检测到前车插入(cut-in)后的超车抑制时长(ms)
         // -------- 单侧安全评估 --------
         val minLaneWidth: Float = 2.3f,         // 目标车道最小宽度(m)
         val sideMinScore: Int = 60,             // 单侧可用最低评分
@@ -38,6 +39,7 @@ data class OvertakeParams(
         val sideSafetyMargin: Float = 5f,       // 侧前车与本车道前车距离安全裕度(m)
         val rearMinDist: Float = 12f,           // 目标车道后方车辆最小安全距离(m)，实际还会叠加约0.8s时距
         val sideFrontMinDist: Float = 20f,      // 目标车道前方车辆最小距离(m)，需小于激光雷达约50m量程
+        val sideUnknownPenalty: Int = 25,       // 侧前方"无数据"扣分：量程外未知 ≠ 确定无车
         val allowRightOvertake: Boolean = true, // 是否允许右侧超车
         val preferLeftFirst: Boolean = true,    // 是否优先选择左侧超车
         // -------- 冷却 --------
