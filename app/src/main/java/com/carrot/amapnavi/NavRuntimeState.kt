@@ -101,6 +101,10 @@ var overtakeFullFrameLastTime = 0L
 var simScene: String? = null                           // 当前模拟场景名
 var simHoldUntil = 0L                                  // 模拟结束时间(ms)
 var simTick = 0L                                       // 已注入帧数
+// 模拟会临时改动导航车道与相关开关，启动时保存、结束时恢复
+var simSavedNavLane: NavLane? = null
+var simSavedSuggestLaneEn = false
+var simSavedDisLaneEn = false
 
 // -----------------------------
 // 超车诊断面板运行态(测试用，可随时开关)

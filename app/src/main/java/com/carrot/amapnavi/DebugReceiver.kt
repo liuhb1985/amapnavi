@@ -146,9 +146,11 @@ class DebugReceiver : BroadcastReceiver() {
                     if (a == null) {
                         Log.w(TAG, "MainActivity 未运行，无法启动模拟")
                     } else {
-                        val parts = (value ?: "baseline").split(",")
+                        val parts = (value ?: "ot_base").split(",")
                         val scene = parts[0].trim()
-                        val secs = parts.getOrNull(1)?.trim()?.toLongOrNull() ?: 30L
+                        // 未指定时长时用场景自带的推荐时长(匝道场景更长)
+                        val secs = parts.getOrNull(1)?.trim()?.toLongOrNull()
+                                ?: SimScenes.durationSec(scene).toLong()
                         if (!SimScenes.isKnown(scene)) {
                             Log.w(TAG, "未知场景 $scene，可用 --es cmd scenes 查看")
                         } else {
@@ -172,6 +174,10 @@ class DebugReceiver : BroadcastReceiver() {
                             rampSlowdownSpeed = -1
                             rampSlowdownUntil = 0L
                             rampSlowdownLockedDist = 0f
+                            // 保存导航车道/相关开关：部分场景会临时替换
+                            simSavedNavLane = navLane
+                            simSavedSuggestLaneEn = a.suggest_lane_en
+                            simSavedDisLaneEn = a.dis_lane_en
                             simScene = scene
                             simTick = 0L
                             simHoldUntil = System.currentTimeMillis() + secs.coerceIn(5L, 600L) * 1000L
@@ -184,7 +190,19 @@ class DebugReceiver : BroadcastReceiver() {
                     simScene = null
                     simHoldUntil = 0L
                     resetLaneTypeFilter()
-                    Log.d(TAG, "模拟已停止")
+                    resetSideSafetyDebounce()
+                    rampSlowdownActive = false
+                    rampSlowdownSpeed = -1
+                    rampSlowdownUntil = 0L
+                    rampSlowdownLockedDist = 0f
+                    // 恢复导航车道与开关
+                    simSavedNavLane?.let { navLane = it }
+                    simSavedNavLane = null
+                    if (a != null) {
+                        a.suggest_lane_en = simSavedSuggestLaneEn
+                        a.dis_lane_en = simSavedDisLaneEn
+                    }
+                    Log.d(TAG, "模拟已停止(导航车道与开关已恢复)")
                 }
                 "lanecheck" -> {
                     if (a == null) {

@@ -583,26 +583,33 @@ fun MainActivity.evaluateOvertakeTrigger(): Pair<Boolean, String> {
         return false to "前车距离${drel}m过近等待拉开(<${p.triggerMinDist.toInt()}m)"
     }
 
-    //是否被前车压速
-    val reasons = mutableListOf<String>()
+    // 是否被前车压速：必须有至少一条"前车确实比我慢"的证据。
+    //   注意"跟车时距"只作为辅助说明，不能单独构成超车理由：
+    //   正常跟车时时距本来就可能很小，单独用它触发会变成"只要跟得近就超车"
+    //   (实车表现为前车稍近一点就不停地试图变道)。
+    val slowReasons = mutableListOf<String>()
     val vrel = s.vrel
     if (vrel != null && vrel < p.vrelThreshold) {
-        reasons.add("前车较慢${vrel}km/h")
+        slowReasons.add("前车较慢${vrel}km/h")
     }
+    // 以"前车绝对速度低于巡航"为主要判据(vlead 在上面已取出)：
+    //   cut-in 刚发生时本车还没开始减速，vEgo 仍接近巡航，只看 vEgo 会漏判；
+    //   看 vlead 才能反映"前车是不是真的比我慢"。
+    if (vCruise > 0 && vlead != null && vlead < vCruise * p.cruiseRatio) {
+        slowReasons.add("前车${vlead}km/h低于巡航${(vCruise * p.cruiseRatio).toInt()}km/h")
+    } else if (vCruise > 0 && vEgo < vCruise * p.cruiseRatio) {
+        slowReasons.add("速度比${vEgo * 100 / vCruise}%") // vlead 缺失时退回用本车速度
+    }
+    if (slowReasons.isEmpty()) {
+        return false to "前车不慢(跟车时距不作为独立触发条件)"
+    }
+
+    val reasons = slowReasons.toMutableList()
     val timeGap = if (vEgo > 0) drel / (vEgo / 3.6f) else 0f
     if (timeGap > 0f && timeGap <= p.timeGapMax) {
         reasons.add("跟车时距${"%.1f".format(timeGap)}s")
     }
-    // 以"前车绝对速度低于巡航"为主判据(vlead 在上面已取出)：
-    //   cut-in 刚发生时本车还没开始减速，vEgo 仍接近巡航，只看 vEgo 会漏判；
-    //   而看 vlead 才能反映"前车是不是真的比我慢"，避免把插队瞬态当成需要超车。
-    if (vCruise > 0 && vlead != null && vlead < vCruise * p.cruiseRatio) {
-        reasons.add("前车${vlead}km/h低于巡航${(vCruise * p.cruiseRatio).toInt()}km/h")
-    } else if (vCruise > 0 && vEgo < vCruise * p.cruiseRatio) {
-        reasons.add("速度比${vEgo * 100 / vCruise}%") // vlead 缺失时退回用本车速度
-    }
 
-    if (reasons.isEmpty()) return false to "未满足超车触发条件"
     return true to reasons.joinToString(",")
 }
 
