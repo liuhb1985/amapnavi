@@ -1067,6 +1067,9 @@ fun MainActivity.naviProcess() {
             Log.d("LaneState", msg)
             showLaneDebug(msg)
         }
+
+        //运行时自检：把"实时调试要盯的判据"做进程序，异常统一输出 AmapAlert(见 HealthMonitor)
+        HealthMonitor.tick(this)
     } finally {
         naviProcessBusy.set(false)
     }
