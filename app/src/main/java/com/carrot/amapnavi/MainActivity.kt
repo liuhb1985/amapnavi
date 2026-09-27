@@ -264,7 +264,7 @@ class MainActivity : AppCompatActivity() {
     internal var ramp_slowdown_dist_l = 200       // 公路：开始减速距离(m)
     internal var ramp_slowdown_speed_h = 60       // 高速：匝道目标限速(km/h)
     internal var ramp_slowdown_speed_l = 45       // 公路：匝道目标限速(km/h)
-    internal var ramp_hold_time = 10              // 进入匝道后维持减速的时间(s)
+    internal var ramp_hold_time = 6               // 进入匝道后维持减速的时间(s)
     internal var fork_dist_h = 80
     internal var fork_dist_l = 30
     internal var top_pad_dp = 5

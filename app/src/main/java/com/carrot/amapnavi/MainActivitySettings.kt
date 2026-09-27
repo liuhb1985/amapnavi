@@ -343,11 +343,19 @@ fun MainActivity.loadUserSettings() {
         editor.putInt("ramp_slowdown_speed_l", 45)
         45
     }
+    //一次性迁移：匝道减速维持时间默认 10s → 6s(10s 偏长，出匝道后限速恢复太慢)，
+    //只替换仍是旧默认值的项，用户改过的不动
+    if (!prefs.getBoolean("ramp_hold_migrated_v3", false)) {
+        editor.putBoolean("ramp_hold_migrated_v3", true)
+        if (prefs.getInt("ramp_hold_time", 10) == 10) editor.putInt("ramp_hold_time", 6)
+        editor.apply()
+    }
+
     ramp_hold_time = if (prefs.contains("ramp_hold_time")) {
-        prefs.getInt("ramp_hold_time", 10)
+        prefs.getInt("ramp_hold_time", 6)
     } else {
-        editor.putInt("ramp_hold_time", 10)
-        10
+        editor.putInt("ramp_hold_time", 6)
+        6
     }
 
     //侧向安全去抖确认帧数(约 = 帧数 × 100ms)：调大更保守/反应慢，调小更灵敏/可能误放行

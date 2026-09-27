@@ -168,7 +168,7 @@ class NavSettingActivity : AppCompatActivity() {
                 .putInt("ramp_slowdown_dist_l", etRampDistL.text.toString().toIntOrNull() ?: 200)
                 .putInt("ramp_slowdown_speed_h", etRampSpeedH.text.toString().toIntOrNull() ?: 60)
                 .putInt("ramp_slowdown_speed_l", etRampSpeedL.text.toString().toIntOrNull() ?: 45)
-                .putInt("ramp_hold_time", etRampHold.text.toString().toIntOrNull() ?: 10)
+                .putInt("ramp_hold_time", etRampHold.text.toString().toIntOrNull() ?: 6)
                 .apply()
     }
 
@@ -203,6 +203,6 @@ class NavSettingActivity : AppCompatActivity() {
         etRampDistL.setText(prefs.getInt("ramp_slowdown_dist_l", 200).toString())
         etRampSpeedH.setText(prefs.getInt("ramp_slowdown_speed_h", 60).toString())
         etRampSpeedL.setText(prefs.getInt("ramp_slowdown_speed_l", 45).toString())
-        etRampHold.setText(prefs.getInt("ramp_hold_time", 10).toString())
+        etRampHold.setText(prefs.getInt("ramp_hold_time", 6).toString())
     }
 }
