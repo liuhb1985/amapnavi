@@ -93,6 +93,11 @@ fun MainActivity.decideLaneWithAction(
     val nav_lanes = _navLane.laneStrArray
     val nav_cnt = _navLane.validCount
 
+    // 高速时最右侧一条车道是应急车道：预留，不作为变道/超车目标
+    //   导航车道数组索引越大越靠右，故可用上界 = nav_cnt-1-预留数
+    val reservedRightLaneCnt = if (highWay) 1 else 0
+    val rightmostUsableIdx = nav_cnt - 1 - reservedRightLaneCnt
+
     //导航引导车道是否变化? 导航引导有变化?
     if(!isSameNavLane(_navLane, lastNavLane) || resetSuggestLaneTimer){
         //重置推荐车道计时和禁止推荐车道的标志
@@ -288,8 +293,8 @@ fun MainActivity.decideLaneWithAction(
             }
         }
     } else if (edgeType == LaneChangeAction.RIGHT) {
-        // 找最右侧可通行车道
-        for (i in nav_cnt - 1 downTo 0) {
+        // 找最右侧可通行车道(高速时最右侧应急车道不参与)
+        for (i in rightmostUsableIdx downTo 0) {
             if (!isBlocked(nav_lanes[i])) {
                 targetIdx = i
                 break
@@ -299,7 +304,9 @@ fun MainActivity.decideLaneWithAction(
         // 优先找推荐车道（带有*号的）
         var starIdx = -1
         if(suggest_lane_en && !disableSuggestLane) { //是否允许走推荐车道
-            starIdx = nav_lanes.indexOfFirst { it.contains("*") && !isBlocked(it) }
+            val idx = nav_lanes.indexOfFirst { it.contains("*") && !isBlocked(it) }
+            // 高速：推荐车道若落在预留的应急车道上则忽略
+            if (idx in 0..rightmostUsableIdx) starIdx = idx
         }
         if (starIdx != -1) {
             targetIdx = starIdx
@@ -315,7 +322,7 @@ fun MainActivity.decideLaneWithAction(
                             targetIdx = left
                             break
                         }
-                        if (right < nav_cnt && !isBlocked(nav_lanes[right])) {
+                        if (right <= rightmostUsableIdx && !isBlocked(nav_lanes[right])) {
                             targetIdx = right
                             break
                         }
@@ -447,6 +454,9 @@ fun MainActivity.decideOvertakeLane(
     fun isBlocked(s: String): Boolean = s.contains("X")
 
     // ---------- 校验目标导航车道 ----------
+    // 高速时最右侧一条车道是应急车道：不允许超车变道过去
+    val rightmostUsableIdx = count - 1 - if (highWay) 1 else 0
+
     val targetIdx: Int
     if (edgeType == LaneChangeAction.LEFT) {
         if (currentIdx <= 0) {
@@ -454,8 +464,9 @@ fun MainActivity.decideOvertakeLane(
         }
         targetIdx = currentIdx - 1
     } else {
-        if (currentIdx >= count - 1) {
-            return Triple(-1, LaneChangeAction.KEEP, -1)  // 已在最右侧导航车道
+        if (currentIdx >= rightmostUsableIdx) {
+            // 已在最右侧可用车道(高速时最右一条为应急车道，不再往右超车)
+            return Triple(-1, LaneChangeAction.KEEP, -1)
         }
         targetIdx = currentIdx + 1
     }

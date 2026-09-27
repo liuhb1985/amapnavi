@@ -173,6 +173,53 @@ class DebugReceiver : BroadcastReceiver() {
                     resetLaneTypeFilter()
                     Log.d(TAG, "模拟已停止")
                 }
+                "lanecheck" -> {
+                    if (a == null) {
+                        Log.w(TAG, "MainActivity 未运行，无法执行 lanecheck")
+                    } else {
+                        // 构造导航车道直接验证"高速预留最右侧应急车道"的决策结果
+                        //   注：必须打开 suggest_lane_en，否则 decideOvertakeLane 会走
+                        //       "仅凭视觉车道允许变道"的早退分支，验不到导航车道层面
+                        val savedNav = navLane
+                        val savedLast = lastNavLane
+                        val savedV = vLaneResult
+                        val savedHighway = a.bHighWay
+                        val savedSuggest = a.suggest_lane_en
+                        val savedDis = a.dis_lane_en
+                        try {
+                            a.bHighWay = true
+                            a.suggest_lane_en = true
+                            // 4 条导航车道：索引0最左 .. 索引3最右(应急车道)
+                            val nav = NavLane(arrayOf("0", "0", "0", "0"), 4)
+                            navLane = nav
+                            lastNavLane = nav
+                            Log.d(TAG, "[lanecheck] navCnt=4(索引3=应急车道) suggest_lane_en=true")
+
+                            // 例1：车辆在索引2(最右正常车道)，两侧视觉各2条 → currentIdx=2
+                            vLaneResult = LaneCalcResult(laneCnt = 4, leftLaneCnt = 2, rightLaneCnt = 2,
+                                    leftLaneId = 3, rightLaneId = 3)
+                            Log.d(TAG, "[lanecheck] 1 高速 车@索引2 右超 → ${a.decideOvertakeLane(vLaneResult, nav, LaneChangeAction.RIGHT, true, false)}  期望 (-1,KEEP,-1)")
+                            Log.d(TAG, "[lanecheck] 2 高速 车@索引2 靠右 → ${a.decideLaneWithAction(vLaneResult, nav, LaneChangeAction.RIGHT, true, false)}  期望 (2,KEEP,1)")
+                            Log.d(TAG, "[lanecheck] 3 公路 车同条件 右超 → ${a.decideOvertakeLane(vLaneResult, nav, LaneChangeAction.RIGHT, false, false)}  期望 (2,RIGHT,1)")
+                            Log.d(TAG, "[lanecheck] 4 高速 车@索引2 左超 → ${a.decideOvertakeLane(vLaneResult, nav, LaneChangeAction.LEFT, true, false)}  期望 (1,LEFT,2)")
+
+                            // 例2：车辆在索引1，左侧视觉1条 → currentIdx=1
+                            vLaneResult = LaneCalcResult(laneCnt = 4, leftLaneCnt = 1, rightLaneCnt = 3,
+                                    leftLaneId = 2, rightLaneId = 3)
+                            Log.d(TAG, "[lanecheck] 5 高速 车@索引1 右超 → ${a.decideOvertakeLane(vLaneResult, nav, LaneChangeAction.RIGHT, true, false)}  期望 (2,RIGHT,1)")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "lanecheck 异常: ${e.message}")
+                        } finally {
+                            navLane = savedNav
+                            lastNavLane = savedLast
+                            vLaneResult = savedV
+                            a.bHighWay = savedHighway
+                            a.suggest_lane_en = savedSuggest
+                            a.dis_lane_en = savedDis
+                        }
+                        Log.d(TAG, "[lanecheck] 已恢复运行状态")
+                    }
+                }
                 "params" -> Log.d(TAG, "可设置参数: " + PARAMS.keys.joinToString(","))
                 else -> Log.w(TAG, "未知命令 $cmd (支持: dump/lane/get/set/frame/clearcd/reset/params)")
             }
