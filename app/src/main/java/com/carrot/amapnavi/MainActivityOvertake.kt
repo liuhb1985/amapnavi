@@ -12,6 +12,12 @@ import org.json.JSONObject
 // 激进模式的最短"决定→下发"确认窗口(ms)：不保留窗口就等于没有任何复核机会
 private const val OVERTAKE_MIN_CONFIRM_MS = 300L
 
+// CP 停在 Prepare 不进入 Starting 时的推动重发：等多久重发一次、最多重发几次
+//   实车现象：命令已下发、CP 也回了 Prepare，但一直不进 Starting，App 只能等 10s 超时。
+//   这里主动带新序号重发，给 CP 一次推力(序号必须递增，否则会被去重丢弃)。
+private const val OVERTAKE_PRE_RETRY_MS = 1500L
+private const val OVERTAKE_PRE_RETRY_MAX = 2
+
 fun MainActivity.sendOvertakeActionCmd(action: LaneChangeAction) {
     val dir = if (action == LaneChangeAction.LEFT || action == LaneChangeAction.LEFT_TURN) "LEFT" else "RIGHT"
 
@@ -278,7 +284,12 @@ fun MainActivity.processOvertakeLaneChangeState(atcState: Int?) {
     }
 
     // 如果状态有变化，则重置计时
-    if (atc_state_curr != atcState) {
+    // 注意：这里必须比较超车自己的 overtake_atc_state_curr。
+    //   原代码误用了导航变道的 atc_state_curr(它一直是 0)，于是只要 atc != Off 就
+    //   每帧都判成"状态变化"：日志被刷屏、lastOvertakeAtcStateChangeTime 被不断刷新，
+    //   导致"变道状态长时间未变"的超时保护在 Prepare/Starting/Finishing 期间完全失效
+    //   (CP 停在 Prepare 不动时 App 会一直傻等)。
+    if (overtake_atc_state_curr != atcState) {
         val time_state_change = now - lastOvertakeAtcStateChangeTime
         val msg = "${nowTime} 超车变道状态变化: ${atcStateName(overtake_atc_state_curr)} -> $stateStr, time=$time_state_change ms"
         Log.w("Overtake", msg)
@@ -306,6 +317,23 @@ fun MainActivity.processOvertakeLaneChangeState(atcState: Int?) {
 
         overtake_atc_state_curr = atcState
         lastOvertakeAtcStateChangeTime = now
+    }
+
+    // CP 停在 Prepare 不进入 Starting：主动带新序号重发，推动 CP 真正执行变道
+    if (atcState == PreLaneChange && !inOvertakeStarting &&
+            now - lastOvertakeAtcStateChangeTime >= OVERTAKE_PRE_RETRY_MS &&
+            now - lastOvertakeCmdSendTime >= OVERTAKE_PRE_RETRY_MS &&
+            overtakeCmdSentRetryCnt < OVERTAKE_PRE_RETRY_MAX) {
+
+        overtakeCmdIndex++        // 序号必须递增，否则会被 CP 去重丢弃
+        sendOvertakeActionCmd(overtakeAction)
+        lastOvertakeCmdSendTime = now
+        overtakeCmdSentRetryCnt++
+
+        val msg = "${nowTime} CP停在Prepare ${now - lastOvertakeAtcStateChangeTime}ms 未执行，" +
+                "重发超车命令推动(${overtakeCmdSentRetryCnt}/${OVERTAKE_PRE_RETRY_MAX}) index=$overtakeCmdIndex"
+        Log.w("OvertakeCmd", msg)
+        showLaneDebug(msg)
     }
 
     // 变道状态未发生改变的时间超过指定时间后重置变道请求
