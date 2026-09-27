@@ -16,8 +16,11 @@ import org.json.JSONObject
 // 都会在"有车/无车""实线/虚线"之间跳变。原来安全门每个控制周期独立判定，
 // 抖动时约有一半的帧是"安全"的，只要二次确认恰好落在安全帧就下发变道命令，
 // 表现为"实线有时也变道""雷达/激光雷达不稳定也会变道"。
-// 这里改为：判"不安全"立即生效；判"安全"需连续 SAFE_CONFIRM_FRAMES 帧才恢复。
-const val SAFE_CONFIRM_FRAMES = 5      // 约 0.5s(控制周期 100ms)
+// 这里改为：判"不安全"立即生效；判"安全"需连续 safeConfirmFrames 帧才恢复。
+// 侧向安全去抖的确认帧数(约 = 帧数 × 100ms)。做成变量，便于车上实时调：
+//   调大 = 更保守(更少误放行，但变道反应变慢)；调小 = 更灵敏(抖动时可能误放行)。
+//   调试后门可热改：--es cmd set --es key safe_confirm_frames --es val 3
+var safeConfirmFrames = 5          // 默认约 0.5s(控制周期 100ms)
 private const val SAFETY_TICK_MS = 100L
 private val sideSafeStreak = HashMap<LaneChangeAction, Int>()
 private val sideBlockCode = HashMap<LaneChangeAction, Int>()
@@ -43,7 +46,7 @@ fun MainActivity.LaneChangeSafetyCheck(action: LaneChangeAction): Int {
             } else {                          // 安全：连续若干帧才恢复
                 val n = (sideSafeStreak[dir] ?: 0) + 1
                 sideSafeStreak[dir] = n
-                if (n >= SAFE_CONFIRM_FRAMES) sideBlockCode[dir] = 0
+                if (n >= safeConfirmFrames) sideBlockCode[dir] = 0
             }
         }
     }

@@ -350,6 +350,14 @@ fun MainActivity.loadUserSettings() {
         10
     }
 
+    //侧向安全去抖确认帧数(约 = 帧数 × 100ms)：调大更保守/反应慢，调小更灵敏/可能误放行
+    safeConfirmFrames = if (prefs.contains("safe_confirm_frames")) {
+        prefs.getInt("safe_confirm_frames", 5)
+    } else {
+        editor.putInt("safe_confirm_frames", 5)
+        5
+    }.coerceIn(1, 30)
+
     top_pad_dp = if (prefs.contains("top_pad_dp")) {
         prefs.getInt("top_pad_dp", 5)
     } else {

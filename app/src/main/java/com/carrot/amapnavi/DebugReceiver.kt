@@ -55,6 +55,8 @@ class DebugReceiver : BroadcastReceiver() {
             "app_thresh_follow_cp" to Spec("app_thresh_follow_cp", 'b'),
             // ---- 数值 ----
             "nav_mode" to Spec("nav_mode", 'i'),
+            // 侧向安全去抖确认帧数(约 ×100ms)：调大更保守、调小更灵敏
+            "safe_confirm_frames" to Spec("safe_confirm_frames", 'i'),
             "overtake_mode" to Spec("overtake_mode", 'i'),
             "vision_lane_mode" to Spec("vision_lane_mode", 'i'),
             "navi_min_speed" to Spec("navi_min_speed", 'i'),
@@ -458,6 +460,8 @@ class DebugReceiver : BroadcastReceiver() {
             }
             'i' -> {
                 val v = raw.toIntOrNull() ?: return false
+                // 侧向安全去抖帧数(全局变量，不依赖 MainActivity 实例)
+                if (key == "safe_confirm_frames") { safeConfirmFrames = v.coerceIn(1, 30) }
                 if (a != null) when (key) {
                     "nav_mode" -> a.nav_mode = v
                     "overtake_mode" -> a.overtake_mode = v
@@ -526,7 +530,9 @@ class DebugReceiver : BroadcastReceiver() {
                 "ramp_slowdown_en" -> a.ramp_slowdown_en
                 else -> false
             }).toString()
-            'i' -> (if (a == null) prefs.getInt(spec.prefKey, 0) else when (key) {
+            'i' -> run {
+                if (key == "safe_confirm_frames") return@run safeConfirmFrames.toString()
+                (if (a == null) prefs.getInt(spec.prefKey, 0) else when (key) {
                 "nav_mode" -> a.nav_mode
                 "overtake_mode" -> a.overtake_mode
                 "vision_lane_mode" -> a.vision_lane_mode
@@ -544,6 +550,7 @@ class DebugReceiver : BroadcastReceiver() {
                 "ramp_hold_time" -> a.ramp_hold_time
                 else -> 0
             }).toString()
+                }   // end run (safe_confirm_frames 提前返回)
             'f' -> (if (a == null) prefs.getFloat(spec.prefKey, 0f) else when (key) {
                 "lidar_front_dist_m" -> a.lidar_front_dist_m
                 "lidar_front_time_s" -> a.lidar_front_time_s
