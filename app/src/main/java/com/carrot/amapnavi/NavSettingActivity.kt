@@ -36,6 +36,7 @@ class NavSettingActivity : AppCompatActivity() {
     private lateinit var cbVisionKeepRight: CheckBox
     private lateinit var cbLaneProb: CheckBox
     private lateinit var cbSafetyLegacy: CheckBox
+    private lateinit var cbDriveLog: CheckBox
     private lateinit var cbRampSlowdown: CheckBox
 
     private lateinit var etNaviMinSpeed: EditText
@@ -79,6 +80,7 @@ class NavSettingActivity : AppCompatActivity() {
         cbVisionKeepRight = findViewById(R.id.cbNavSettingVisionKeepRight)
         cbLaneProb = findViewById(R.id.cbNavSettingLaneProb)
         cbSafetyLegacy = findViewById(R.id.cbNavSettingSafetyLegacy)
+        cbDriveLog = findViewById(R.id.cbNavSettingDriveLog)
         etNaviMinSpeed = findViewById(R.id.etNavNaviMinSpeed)
         etAtcDistH = findViewById(R.id.etNavAtcDistH)
         etAtcDistL = findViewById(R.id.etNavAtcDistL)
@@ -192,6 +194,7 @@ class NavSettingActivity : AppCompatActivity() {
                 .putBoolean("vision_keep_right", cbVisionKeepRight.isChecked)
                 .putBoolean("lane_prob_enable", cbLaneProb.isChecked)
                 .putBoolean("safety_legacy_mode", cbSafetyLegacy.isChecked)
+                .putBoolean("drive_log_en", cbDriveLog.isChecked)
                 .putInt("navi_min_speed", etNaviMinSpeed.text.toString().toIntOrNull() ?: 20)
                 .putInt("atc_dist_h", etAtcDistH.text.toString().toIntOrNull() ?: 2000)
                 .putInt("atc_dist_l", etAtcDistL.text.toString().toIntOrNull() ?: 500)
@@ -207,6 +210,8 @@ class NavSettingActivity : AppCompatActivity() {
 
         // 变道判据旧版逻辑开关：立即生效，不必重启 App
         safety_legacy_mode = cbSafetyLegacy.isChecked
+        // 行车日志落盘开关：立即生效(见 NavRuntimeState.drive_log_en)
+        drive_log_en = cbDriveLog.isChecked
     }
 
     private fun load() {
@@ -231,6 +236,7 @@ class NavSettingActivity : AppCompatActivity() {
         cbVisionKeepRight.isChecked = prefs.getBoolean("vision_keep_right", false)
         cbLaneProb.isChecked = prefs.getBoolean("lane_prob_enable", false)
         cbSafetyLegacy.isChecked = prefs.getBoolean("safety_legacy_mode", true)
+        cbDriveLog.isChecked = prefs.getBoolean("drive_log_en", true)
         etNaviMinSpeed.setText(prefs.getInt("navi_min_speed", 20).toString())
         etAtcDistH.setText(prefs.getInt("atc_dist_h", 2000).toString())
         etAtcDistL.setText(prefs.getInt("atc_dist_l", 500).toString())

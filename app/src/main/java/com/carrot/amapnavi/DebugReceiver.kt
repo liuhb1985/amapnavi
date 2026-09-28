@@ -52,6 +52,10 @@ class DebugReceiver : BroadcastReceiver() {
             "lane_unknown_block" to Spec("lane_unknown_block", 'b'),
             // 变道安全门"手写版兼容"总开关(默认开)：打开=回到 9-13 手写版的判据集合+零延时
             "safety_legacy_mode" to Spec("safety_legacy_mode", 'b'),
+            // 高速是否预留最右一条车道(当应急车道)：默认 false=靠边可到最右
+            "highway_reserve_rightmost_lane" to Spec("highway_reserve_rightmost_lane", 'b'),
+            // 行车日志落盘总开关(默认开)：关掉后不再写主日志(仍打 logcat)
+            "drive_log_en" to Spec("drive_log_en", 'b'),
             "navi_speak" to Spec("navi_speak", 'b'),
             "navi_speak_first" to Spec("navi_speak_first", 'b'),
             "navi_blind_dec_speed" to Spec("navi_blind_dec_speed", 'b'),
@@ -444,6 +448,8 @@ class DebugReceiver : BroadcastReceiver() {
                 // 全局开关，不依赖 MainActivity 实例
                 if (key == "lane_unknown_block") lane_unknown_block = v
                 if (key == "safety_legacy_mode") safety_legacy_mode = v
+                if (key == "highway_reserve_rightmost_lane") highway_reserve_rightmost_lane = v
+                if (key == "drive_log_en") drive_log_en = v
                 if (a != null) when (key) {
                     "app_navi" -> a.app_navi = v
                     "app_road_navi" -> a.app_road_navi = v
@@ -534,6 +540,8 @@ class DebugReceiver : BroadcastReceiver() {
                 "lane_prob_enable" -> a.lane_prob_enable
                 "lane_unknown_block" -> lane_unknown_block
                 "safety_legacy_mode" -> safety_legacy_mode
+                "highway_reserve_rightmost_lane" -> highway_reserve_rightmost_lane
+                "drive_log_en" -> drive_log_en
                 "navi_speak" -> a.navi_speak
                 "navi_speak_first" -> a.navi_speak_first
                 "navi_blind_dec_speed" -> a.navi_blind_dec_speed

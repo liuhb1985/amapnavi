@@ -338,6 +338,10 @@ class MainActivity : AppCompatActivity() {
 
     var laneAction: LaneChangeAction = LaneChangeAction.KEEP
     var curLaneAction: LaneChangeAction = LaneChangeAction.KEEP
+    //本帧导航期望的变道方向(靠边/转弯意图)。
+    //  原为 AmapNavi() 内的局部变量，提到成员以便 logNavSnapshot 落盘；
+    //  语义不变——AmapNavi() 每帧开头都会把它重置为 KEEP。
+    internal var laneChangeEdge: LaneChangeAction = LaneChangeAction.KEEP
     var lastValidLaneAction: LaneChangeAction = LaneChangeAction.KEEP
     var prevLaneAction: LaneChangeAction = LaneChangeAction.KEEP
     var lastTargetIdx = -1 //最后一次导航车道编号

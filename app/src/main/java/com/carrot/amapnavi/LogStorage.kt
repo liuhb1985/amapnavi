@@ -37,9 +37,14 @@ object LogStorage {
     @Volatile
     private var resolved: File? = null
 
+    /** resolved 是否为"无权限时的回退目录"(用于拿到权限后重新探测公共目录) */
+    @Volatile
+    private var resolvedIsFallback = false
+
     /** 权限授予后 / 切换记录时重新探测目录 */
     fun reset() {
         resolved = null
+        resolvedIsFallback = false
     }
 
     /** 日志根目录（自动创建）：主日志放这里 */
@@ -58,12 +63,20 @@ object LogStorage {
     }
 
     private fun rootDir(context: Context): File {
-        resolved?.let { return it }
+        val cur = resolved
+        // 已缓存"回退目录"时，一旦拿到存储权限就重新探测公共目录：
+        //   主日志(RadarCards/NavSnap/LaneDebug)是自动写入的，可能在权限授予前
+        //   就先解析成回退目录并被永久缓存 —— 表现为"超车日志能写进
+        //   /sdcard/AmapNavi，主日志却落在 Android/data/<包名>/files/logs"。
+        //   这里允许在"回退 + 当前已有权限"时重探测一次来修正。
+        if (cur != null && (!resolvedIsFallback || !hasWritePermission(context))) return cur
         val pub = File(Environment.getExternalStorageDirectory(), PUBLIC_DIR_NAME)
-        val d = if (writable(pub)) pub
+        val usePub = writable(pub)
+        val d = if (usePub) pub
         else File(context.getExternalFilesDir(null) ?: context.filesDir, "logs")
         if (!d.exists()) d.mkdirs()
         resolved = d
+        resolvedIsFallback = !usePub
         return d
     }
 

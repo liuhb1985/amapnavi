@@ -374,6 +374,14 @@ fun MainActivity.loadUserSettings() {
         true
     }
 
+    //行车日志落盘总开关(默认开)：设置页"行车日志(调试用)"默认勾选，见 NavRuntimeState.drive_log_en
+    drive_log_en = if (prefs.contains("drive_log_en")) {
+        prefs.getBoolean("drive_log_en", true)
+    } else {
+        editor.putBoolean("drive_log_en", true)
+        true
+    }
+
 
     //侧向安全去抖确认帧数(约 = 帧数 × 100ms)：调大更保守/反应慢，调小更灵敏/可能误放行
     safeConfirmFrames = if (prefs.contains("safe_confirm_frames")) {

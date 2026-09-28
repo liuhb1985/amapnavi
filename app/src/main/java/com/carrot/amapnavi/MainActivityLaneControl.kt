@@ -133,6 +133,12 @@ fun MainActivity.showLaneDebug(msg: String) {
     // 显示在 UI 上的日志
     setRawLogVisible(true)
     updateRawLog(msg, true)
+
+    // 关键事件落盘(靠边意图/播报/阻止变道/命令下发等)，由行车日志开关统一控制
+    //   原实现只在 app_log=true 时才写文件(见 updateRawLog)，而 app_log 默认关闭，
+    //   导致"不开电脑跑车"回来没有任何决策记录(只剩 RadarCards)。
+    //   这里改由 drive_log_en(设置页"行车日志(调试用)"，默认开)控制。
+    if (drive_log_en) AppLogger.log(this, "LaneDebug", msg)
 }
 
 fun MainActivity.LaneChangeActionStr(action: LaneChangeAction): String {

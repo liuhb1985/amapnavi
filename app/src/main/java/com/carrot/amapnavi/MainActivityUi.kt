@@ -437,7 +437,8 @@ private fun MainActivity.logRadarCardsOnce(cards: List<Pair<String, String>>) {
     if (line == radarCardsLogLast) return
     radarCardsLogLast = line
     android.util.Log.i("RadarCards", "RADARCARDS $line")
-    AppLogger.log(this, "RadarCards", line)
+    // 落盘由行车日志开关控制(见 NavRuntimeState.drive_log_en)：关掉后只打 logcat
+    if (drive_log_en) AppLogger.log(this, "RadarCards", line)
 }
 
 // -----------------------------

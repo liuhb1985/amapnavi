@@ -147,6 +147,27 @@ fun nextLaneCmdIndex(): Int = synchronized(laneCmdIndexLock) { ++laneCmdIndexSeq
 // -----------------------------
 var safety_legacy_mode = true
 
+// -----------------------------
+// 高速是否把最右一条车道当"应急车道"预留(不作为靠边/变道目标)
+//   默认 false = 恢复 9-13 手写版行为：靠边可一路靠到最右可通行车道。
+//   置 true = f42fbe3 的行为：高速靠边最多只到倒数第二条。
+//   背景(实车 2026-09-27)：高德下发的车道数组是"可通行的导航车道"，并不含
+//   应急车道，所以"预留最后一条"会把最右的正常车道也排除，表现为
+//   "高速该靠边、右侧明明还有一条车道却完全不动"。
+// -----------------------------
+var highway_reserve_rightmost_lane = false
+
+// -----------------------------
+// 行车日志落盘总开关(默认开；设置页"行车日志(调试用)"默认勾选)
+//   控制三类行车日志是否**写文件**(主日志 AmapNavi/app/yyyy-MM-dd.log)：
+//     · NavSnap     领航现场快照(引导/车道/决策/命令号)
+//     · LaneDebug   关键事件(靠边意图/播报/阻止变道/命令下发)
+//     · RadarCards  雷达卡片
+//   关掉后不再写盘(仍打 logcat)，用于调试完成后长期使用，避免每天十几 MB。
+//   注：与 app_log(UI 原始日志)相互独立；超车日志仍由超车页「记录」按钮单独控制。
+// -----------------------------
+var drive_log_en = true
+
 // 全量逐帧记录(调试用，默认关)：开启后每个决策周期把一帧现场写到 logcat(OvtFrame) 和超车日志文件
 //   由调试后门 adb broadcast 控制：--es cmd frame --es val on/200ms
 var overtakeFullFrameLog = false

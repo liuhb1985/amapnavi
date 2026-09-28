@@ -93,10 +93,15 @@ fun MainActivity.decideLaneWithAction(
     val nav_lanes = _navLane.laneStrArray
     val nav_cnt = _navLane.validCount
 
-    // 高速时最右侧一条车道是应急车道：预留，不作为变道/超车目标
-    //   导航车道数组索引越大越靠右，故可用上界 = nav_cnt-1-预留数
-    val reservedRightLaneCnt = if (highWay) 1 else 0
-    val rightmostUsableIdx = nav_cnt - 1 - reservedRightLaneCnt
+    // 高速是否把最右一条车道当"应急车道"预留(不作为靠边/变道目标)
+    //   f42fbe3 的假设是"高德车道数组最后一条 = 应急车道"，但实车验证
+    //   (2026-09-27)高德下发的是"可通行的导航车道"，并不含应急车道 →
+    //   预留会把最右的正常车道当成应急车道排除，表现为"高速靠边时右侧明明
+    //   还有一条车道却完全不动"(车恰在倒数第二条时)。
+    //   9-13 手写版是从 nav_cnt-1 开始找最右可通行车道的(无预留)。
+    //   故默认不预留(恢复手写版行为)，需要时用 highway_reserve_rightmost_lane 打开。
+    val reservedRightLaneCnt = if (highWay && highway_reserve_rightmost_lane) 1 else 0
+    val rightmostUsableIdx = (nav_cnt - 1 - reservedRightLaneCnt).coerceAtLeast(0)
 
     //导航引导车道是否变化? 导航引导有变化?
     if(!isSameNavLane(_navLane, lastNavLane) || resetSuggestLaneTimer){
@@ -126,25 +131,19 @@ fun MainActivity.decideLaneWithAction(
     if (nav_cnt <= 0 || nav_lanes.isEmpty() || (!suggest_lane_en && !dis_lane_en && vision_keep_right && edgeType == LaneChangeAction.RIGHT)) {
         inSuggestLaneTime = System.currentTimeMillis()
 
-        // ===== 无导航车道级数据时的视觉回退(修复"导航一直不靠边") =====
-        //  高德的车道级引导通常只在临近路口(<1km)才下发，而靠边/进匝道的准备
-        //  从 atc_dist(默认 2000m) 就要开始。若此时因为"没有导航车道数据"直接保持，
-        //  就会表现为"导航要求靠边但车一直不动"，直到很近才变、甚至错过出口。
-        //  这里退化为纯视觉：导航要求往哪一侧靠，就变到视觉上该侧的相邻车道。
-        //  (不再要求 vision_keep_right 开关；原开关行为作为其中一种情形保留)
-        //  注：仍会经过安全门(实线/盲区/激光)检查后才能下发命令。
-        if (vLaneResult.laneCnt > 0 && vLaneResult.leftLaneId > 0 && vLaneResult.rightLaneId > 0) {
-            if (edgeType == LaneChangeAction.RIGHT) {
-                val rightLaneId = vLaneResult.rightLaneId
-                if (highWay) {
-                    // 高速最右车道是应急车道：至少留一条 → rightLaneId>2 才往右
-                    if (rightLaneId > 2) return Triple(-1, LaneChangeAction.RIGHT, 1)
-                } else {
-                    if (rightLaneId > 1) return Triple(-1, LaneChangeAction.RIGHT, 0)
+        // ===== 恢复 9-13 手写版原样 =====
+        //  无导航车道级数据时，是否靠右由"纯视觉靠右(vision_keep_right)"开关决定，
+        //  判据与手写版逐字一致(高速 >2 / 公路 >1，即高速最右一条视为应急车道)。
+        if (vision_keep_right && edgeType == LaneChangeAction.RIGHT && vLaneResult.leftLaneId >= 1) {
+            val rightLaneId = vLaneResult.rightLaneId
+            if (highWay) {
+                if (rightLaneId > 2) { //车辆不在最右车道(应急车道除外)
+                    return Triple(-1, LaneChangeAction.RIGHT, 1)
                 }
-            } else if (edgeType == LaneChangeAction.LEFT) {
-                // 左侧还有可通行车道就往左靠
-                if (vLaneResult.leftLaneId > 1) return Triple(-1, LaneChangeAction.LEFT, 0)
+            } else {
+                if (rightLaneId > 1) { //车辆不在最右车道
+                    return Triple(-1, LaneChangeAction.RIGHT, 0)
+                }
             }
         }
 
@@ -697,8 +696,13 @@ fun MainActivity.evaluateOvertakeSide(side: LaneChangeAction): OvertakeSideEval 
             return OvertakeSideEval(side, false, 0, "${sideStr}侧无车道")
         }
     } else {
+        // 高速最右一条是应急车道：右侧"可见车道数"需 >1 才算存在可用车道
+        //   公路：右侧 1 条即可用(rightLaneCnt>=1)
+        //   高速：右侧仅 1 条时那是应急车道 → 视为无可用车道(rightLaneCnt>=2)
+        //   与 MainActivityLaneControl.kt 中"公路>=1 / 高速>=2"的既有惯例保持一致；
+        //   原写法固定用 <=0，高速上"右侧只剩应急车道"时不会判无车道(漏判)。
         val needLaneId = if (bHighWay) 2 else 1
-        if (vLaneResult.rightLaneId <= needLaneId && vLaneResult.rightLaneCnt <= 0) {
+        if (vLaneResult.rightLaneId <= needLaneId && vLaneResult.rightLaneCnt <= needLaneId - 1) {
             return OvertakeSideEval(side, false, 0, "${sideStr}侧无可用车道")
         }
     }

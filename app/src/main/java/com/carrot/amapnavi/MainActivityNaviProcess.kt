@@ -270,7 +270,7 @@ fun MainActivity.AmapNavi(lane_line_valid: Boolean): Boolean {
     val now = System.currentTimeMillis()
     val nowTime = nowTimeStr()
 
-    var laneChangeEdge: LaneChangeAction = LaneChangeAction.KEEP
+    laneChangeEdge = LaneChangeAction.KEEP   //成员变量(见 MainActivity.laneChangeEdge)，每帧重置
     var action = LaneChangeAction.KEEP
     py_overtake_disable = false
 
@@ -1089,8 +1089,76 @@ fun MainActivity.naviProcess() {
 
         //运行时自检：把"实时调试要盯的判据"做进程序，异常统一输出 AmapAlert(见 HealthMonitor)
         HealthMonitor.tick(this)
+
+        //领航现场快照落盘(不开电脑跑车也能回来分析，见 logNavSnapshot 注释)
+        logNavSnapshot()
     } finally {
         naviProcessBusy.set(false)
+    }
+}
+
+// -----------------------------
+// 领航现场快照(落盘，供"不开电脑"离线分析)
+//   每个决策周期(100ms)末尾调用；为避免刷屏做三层收敛：
+//     1) 快变字段量化(车速按 2km/h、路口距离按 10m)
+//     2) 与上一行完全相同则不写
+//     3) 最短间隔 NAV_SNAP_MIN_MS(500ms)
+//   落盘走主日志 AppLogger(自身不判断开关，故无条件写)：
+//     /sdcard/AmapNavi/app/yyyy-MM-dd.log
+//     无存储权限时 → Android/data/com.carrot.amapnavi/files/logs/app/yyyy-MM-dd.log
+//   一行覆盖现场排查所需：道路/车速/接管 + 引导(xTurn类型·距离) + 靠边意图 +
+//   导航车道数组 + 视觉车道(左右 cnt/id) + 车线类型 + 决策/目标 + 命令序号。
+//   注：整个过程包在 try 里——日志任何异常都不允许影响行车决策。
+// -----------------------------
+private var navSnapLast = ""
+private var navSnapLastMs = 0L
+private const val NAV_SNAP_MIN_MS = 500L
+
+fun MainActivity.logNavSnapshot() {
+    // 行车日志总开关(设置页"行车日志(调试用)"，默认开)；关掉后不写盘
+    if (!drive_log_en) return
+    try {
+        val now = System.currentTimeMillis()
+        if (now - navSnapLastMs < NAV_SNAP_MIN_MS) return
+
+        val st = opStateManager.state
+        val v = vLaneResult
+        val nl = navLane
+        val vEgoQ = ((st.vEgo ?: 0) / 2) * 2   // vEgo 为 Int?，2km/h 粒度
+        val distQ = (st.xTurnDist / 10).toInt() * 10
+
+        val sb = StringBuilder(192)
+        sb.append("hw=").append(if (bHighWay) 1 else 0)
+        sb.append(" v=").append(vEgoQ)
+        sb.append(" eng=").append(if (st.engaged) 1 else 0)
+        sb.append(" turn=").append(st.xTurnInfo).append('/').append(distQ)
+        sb.append(" edge=").append(laneChangeEdge.name)
+        sb.append(" en=").append(if (enableLaneChange) 1 else 0)
+        sb.append(" dec=").append(lastValidLaneAction.name)
+        sb.append(" tgt=").append(lastTargetIdx).append('/').append(lastVisualIdx)
+        sb.append(" | nav=").append(nl.validCount)
+        if (nl.validCount > 0) {
+            sb.append('[')
+            for (i in 0 until nl.validCount) {
+                if (i > 0) sb.append('|')
+                sb.append(nl.laneStrArray.getOrNull(i) ?: "")
+            }
+            sb.append(']')
+        }
+        sb.append(" | vL=").append(v.leftLaneCnt).append('/').append(v.leftLaneId)
+        sb.append(" vR=").append(v.rightLaneCnt).append('/').append(v.rightLaneId)
+        sb.append(" solid=").append(left_lane_type).append('/').append(right_lane_type)
+        sb.append(" lnv=").append(if (laneLineValid) 1 else 0)
+        sb.append(" cmd=").append(laneChangeCmdIndex)
+
+        val line = sb.toString()
+        if (line == navSnapLast) return
+        navSnapLast = line
+        navSnapLastMs = now
+        Log.i("NavSnap", line)
+        AppLogger.log(this, "NavSnap", line)
+    } catch (e: Exception) {
+        // 日志失败绝不影响行车决策
     }
 }
 
