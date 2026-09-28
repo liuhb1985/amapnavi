@@ -141,6 +141,59 @@ fun MainActivity.showLaneDebug(msg: String) {
     if (drive_log_en) AppLogger.log(this, "LaneDebug", msg)
 }
 
+// -----------------------------
+// 实线判据"临匝道放宽"判定(见 NavRuntimeState.solid_relax_en 说明)
+//   仅对导航变道(NAVI)生效；超车(OVERTAKE)保持严格。
+//   放宽只解除"实线"这一条，盲区/激光/雷达判据照常。
+// -----------------------------
+fun MainActivity.solidLineRelaxed(action: LaneChangeAction, purpose: LaneChangePurpose): Boolean {
+    if (!solid_relax_en) return false
+    if (purpose != LaneChangePurpose.NAVI) return false
+    // 方向必须与导航当前要求一致(避免自由变道也借道)
+    if (laneChangeEdge != action) return false
+
+    val dist = opStateManager.state.xTurnDist
+    val forkDist = (if (bHighWay) fork_dist_h else fork_dist_l).toFloat()
+    // ① 已进入"进匝道距离 + 余量"范围(默认：进匝道距离前 15m 起解除)
+    if (forkDist > 0f && dist <= forkDist + solid_relax_margin_m) return true
+
+    // ② 连续岔路：当前与下一步引导都是岔路(鱼骨线最易被误判成实线的路口)
+    return isForkChain()
+}
+
+// -----------------------------
+// 语音提示后等待多久才下发命令
+//   导航要求的靠边/进匝道/转弯(edgeAction != KEEP)时时间紧 —— 必须在路口前来得及变道，
+//   所以用更短的等待(navi_edge_speak_delay_ms)，普通变道沿用原值。
+//   注：navi_speak_first=false 时本来就不等(见调用点)。
+// -----------------------------
+fun MainActivity.laneSpeakDelayFor(action: LaneChangeAction, edgeAction: LaneChangeAction): Long {
+    val base = when {
+        edgeAction != LaneChangeAction.KEEP -> navi_edge_speak_delay_ms
+        action == LaneChangeAction.LEFT_TURN || action == LaneChangeAction.RIGHT_TURN -> LANE_TURN_DELAY
+        else -> LANE_CHANGE_SPEAK_DELAY
+    }
+    return when (nav_mode) {
+        3 -> base
+        2 -> base * 3 / 2
+        else -> base / 2
+    }
+}
+
+// 连续岔路判定：当前引导是岔路，且下一步引导也是岔路、距离不超过 fork_chain_dist_m
+fun MainActivity.isForkChain(): Boolean {
+    val cur = opStateManager.state.xTurnInfo
+    if (cur != TurnInfo_ForkLeft && cur != TurnInfo_ForkRight) return false
+    val next = try {
+        convert_x_tbt_type(naviState.nTBTTurnTypeNext ?: -1)
+    } catch (e: Exception) {
+        -1
+    }
+    if (next != TurnInfo_ForkLeft && next != TurnInfo_ForkRight) return false
+    val d = naviState.nTBTDistNext ?: return false
+    return d in 1..fork_chain_dist_m
+}
+
 fun MainActivity.LaneChangeActionStr(action: LaneChangeAction): String {
     if (action == LaneChangeAction.KEEP) {
         return "KEEP"
@@ -403,12 +456,12 @@ private fun MainActivity.LaneChangeSafetyCheckRaw(
             if (s.l_front_blind) return -2
             else if (s.left_blindspot) return -4
             else if (s.lidar_lblind) return -8
-            else if (left_lane_type == 1) return -1
+            else if (left_lane_type == 1 && !solidLineRelaxed(action, purpose)) return -1
         } else if (action == LaneChangeAction.RIGHT) {
             if (s.r_front_blind) return -2
             else if (s.right_blindspot) return -4
             else if (s.lidar_rblind) return -8
-            else if (right_lane_type == 1) return -1
+            else if (right_lane_type == 1 && !solidLineRelaxed(action, purpose)) return -1
         }
         if (action == LaneChangeAction.LEFT_TURN) {
             if (s.l_front_blind) return -2
@@ -426,7 +479,8 @@ private fun MainActivity.LaneChangeSafetyCheckRaw(
             return -4
         } else if (lidarSideBlind(action)) { //激光雷达(纯激光，只看侧方)
             return -8
-        } else if (laneLineJudgement(true, purpose) == LaneLineJudgement.SOLID) { //左侧实线(取或)
+        } else if (laneLineJudgement(true, purpose) == LaneLineJudgement.SOLID
+                   && !solidLineRelaxed(action, purpose)) { //左侧实线(取或；临匝道路口放宽)
             return -1
         } else if (laneLineJudgement(true, purpose) == LaneLineJudgement.UNKNOWN) { //左侧线型判据不可用
             return LANE_BLOCK_UNKNOWN
@@ -443,7 +497,8 @@ private fun MainActivity.LaneChangeSafetyCheckRaw(
             return -4
         } else if (lidarSideBlind(action)) { //激光雷达(纯激光，只看侧方)
             return -8
-        } else if (laneLineJudgement(false, purpose) == LaneLineJudgement.SOLID) { //实线(取或)
+        } else if (laneLineJudgement(false, purpose) == LaneLineJudgement.SOLID
+                   && !solidLineRelaxed(action, purpose)) { //右侧实线(取或；临匝道路口放宽)
             return -1
         } else if (laneLineJudgement(false, purpose) == LaneLineJudgement.UNKNOWN) { //线型判据不可用
             return LANE_BLOCK_UNKNOWN
@@ -716,7 +771,7 @@ fun MainActivity.doLaneChangeAction(action: LaneChangeAction, edgeAction: LaneCh
                 appSpeakFile = "audio_pre_lane_left"
                 laneChangeSpeak = true
                 laneSpeakTime = now
-                laneSpeakDelayTime = if (nav_mode == 3) { LANE_CHANGE_SPEAK_DELAY } else if (nav_mode == 2) { LANE_CHANGE_SPEAK_DELAY * 3 / 2 } else { LANE_CHANGE_SPEAK_DELAY / 2 }
+                laneSpeakDelayTime = laneSpeakDelayFor(action, edgeAction)
             }
         } else if (action == LaneChangeAction.RIGHT) {
             if (!laneChangeSpeak) {
@@ -725,7 +780,7 @@ fun MainActivity.doLaneChangeAction(action: LaneChangeAction, edgeAction: LaneCh
                 appSpeakFile = "audio_pre_lane_right"
                 laneChangeSpeak = true
                 laneSpeakTime = now
-                laneSpeakDelayTime = if (nav_mode == 3) { LANE_CHANGE_SPEAK_DELAY } else if (nav_mode == 2) { LANE_CHANGE_SPEAK_DELAY * 3 / 2 } else { LANE_CHANGE_SPEAK_DELAY / 2 }
+                laneSpeakDelayTime = laneSpeakDelayFor(action, edgeAction)
             }
         } else if (action == LaneChangeAction.LEFT_TURN) {
             if (!laneChangeSpeak) {
@@ -734,7 +789,7 @@ fun MainActivity.doLaneChangeAction(action: LaneChangeAction, edgeAction: LaneCh
                 appSpeakFile = "audio_turn"
                 laneChangeSpeak = true
                 laneSpeakTime = now
-                laneSpeakDelayTime = if (nav_mode == 3) { LANE_TURN_DELAY } else if (nav_mode == 2) { LANE_TURN_DELAY * 3 / 2 } else { LANE_TURN_DELAY / 2 }
+                laneSpeakDelayTime = laneSpeakDelayFor(action, edgeAction)
             }
         } else if (action == LaneChangeAction.RIGHT_TURN) {
             if (!laneChangeSpeak) {
@@ -743,19 +798,23 @@ fun MainActivity.doLaneChangeAction(action: LaneChangeAction, edgeAction: LaneCh
                 appSpeakFile = "audio_turn"
                 laneChangeSpeak = true
                 laneSpeakTime = now
-                laneSpeakDelayTime = if (nav_mode == 3) { LANE_TURN_DELAY } else if (nav_mode == 2) { LANE_TURN_DELAY * 3 / 2 } else { LANE_TURN_DELAY / 2 }
+                laneSpeakDelayTime = laneSpeakDelayFor(action, edgeAction)
             }
         }
 
-        //已经发送语音并且延时了1500ms
-        if (laneChangeSpeak && ((now - laneSpeakTime >= laneSpeakDelayTime) || !navi_speak_first)) {
+        // ===== 语音等待 与 "下发前二次安全确认" 并行 =====
+        //  原实现是串行：等满 laneSpeakDelayTime 才做一次确认；不通过就把计时重置、
+        //  再等一整轮(默认 2.25s)。靠近路口/匝道时最坏多耗 2 秒以上，直接把路口耗过去。
+        //  现改为每个决策周期都确认一次：
+        //    · 确认通过 且 已到语音延时 → 立即下发
+        //    · 确认不通过 → **不重置计时**(继续等它恢复)，恢复后立刻下发
+        //  注：仍需至少等满 laneSpeakDelayTime(或 navi_speak_first=false)才下发。
+        if (laneChangeSpeak) {
             // ---- 命令下发前二次确认 ----
-            // 播报后还要等 0.75~2.25s 才真正下发，这段时间车辆已行进数十米，
-            // 实线/盲区状态可能已经变化(典型：播报时是虚线、执行时已进实线区)。
-            // 这里必须重新过一次安全门，不通过就取消本次下发并重新计时等待。
+            // 播报后车辆已行进数十米，实线/盲区状态可能已变化(典型：播报时是虚线、
+            // 执行时已进实线区)，必须重新过一次安全门。
             val recheck = LaneChangeSafetyCheck(action, LaneChangePurpose.NAVI)
             if (recheck < 0) {
-                laneSpeakTime = now
                 if (now - lastRecheckLogTime >= BLIND_SPEAK_INTERVAL) {
                     lastRecheckLogTime = now
                     val why = when {
@@ -770,6 +829,9 @@ fun MainActivity.doLaneChangeAction(action: LaneChangeAction, edgeAction: LaneCh
                 return
             }
 
+            //确认通过：语音延时未到则继续等(到点即发)
+            if (!(now - laneSpeakTime >= laneSpeakDelayTime || !navi_speak_first)) return
+
             //保存当前变道状态
             atc_state_start = opStateManager.state.atc_state ?: LaneChangeOff
             atc_state_curr = atc_state_start
@@ -777,6 +839,9 @@ fun MainActivity.doLaneChangeAction(action: LaneChangeAction, edgeAction: LaneCh
             var msg = "----------------------------------------"
             Log.d("LaneDecision", msg)
             showLaneDebug(msg)
+
+            //记录本次变道是否由导航要求触发(靠边/进匝道/转弯)→ 决定是否用更短的超时
+            laneCmdForNaviEdge = (edgeAction != LaneChangeAction.KEEP)
 
             //首次发送命令
             sendLaneActionCmd(action)
@@ -939,16 +1004,24 @@ fun MainActivity.processLaneChangeState(atcState: Int?) {
         }
     }
 
-    // Prepare 期间持续保持变道请求(CP 侧 atc 请求消失会立刻退回 Off)
-    if (atcState == PreLaneChange && !inLaneChangeStarting) {
+    // Prepare / Off 期间持续保持变道请求(CP 侧 atc 请求消失会立刻退回 Off)
+    //   · Prepare：原逻辑，保持请求不让 CP 退回 Off；
+    //   · Off：**新增**——CP 不受理(或已退回 Off)时原实现什么都不做，只能干等超时
+    //     (实车 2026-09-28 有 5 次"变道超时，重置变道请求! 状态：Off"正是这种情况，白等 2 秒)。
+    //   要求 laneCmdSent 仍为真：变道完成/驾驶员干预时 completeLaneChange() 会经
+    //   resetLaneAction() 清掉 laneCmdSent，所以"收尾阶段的 Off"不会被误补发。
+    if (laneCmdSent && (atcState == PreLaneChange || atcState == LaneChangeOff)
+        && !inLaneChangeStarting && !inLaneChangeFinishing) {
         if (now - lastCmdSendTime >= LANE_PRE_KEEPALIVE_MS) {
-            laneChangeCmdIndex++                        // 序号递增，避免被 CP 去重
+            // 序号由 sendLaneActionCmd 内部统一取全局递增号(见 nextLaneCmdIndex)，
+            //   每次重发都是新序号 → 不会被 CP 去重
             sendLaneActionCmd(laneAction)               // 方向保持不变
             lastCmdSendTime = now
             laneCmdSentRetryCnt++
 
             if (laneCmdSentRetryCnt % 4 == 1) {
-                val msg = "${nowTime} Prepare 保持中，持续重发变道命令" +
+                val stTag = if (atcState == PreLaneChange) "Prepare 保持中" else "CP未受理(Off)，补发"
+                val msg = "${nowTime} ${stTag}，持续重发变道命令" +
                         "(已发${laneCmdSentRetryCnt}次) index=$laneChangeCmdIndex 方向=$laneAction"
                 Log.d("LaneCmd", msg)
                 showLaneDebug(msg)
@@ -957,7 +1030,12 @@ fun MainActivity.processLaneChangeState(atcState: Int?) {
     }
 
     // 变道状态未发生改变的时间超过指定时间后重置变道请求
-    val atc_timeout = when (atcState) {
+    //   导航要求的靠边/进匝道/转弯：CP 停在 Prepare 就说明它没戏了(实车成功案例
+    //   106~320ms 就进 Starting)，等满 2 秒只会把路口白等过去 → 用更短超时快速失败，
+    //   下一周期立刻重试。Starting 仍用 7 秒(真实变道本身约 5 秒)。
+    val atc_timeout = if (laneCmdForNaviEdge && atcState == PreLaneChange) {
+        navi_edge_atc_timeout_ms
+    } else when (atcState) {
         LaneChangeOff -> 2000L
         PreLaneChange -> 2000L
         LaneChangeStarting -> 7000L
@@ -995,6 +1073,7 @@ fun MainActivity.resetLaneAction() {
 
     laneCmdSent = false
     laneCmdExecOk = false
+    laneCmdForNaviEdge = false   //"本次命令是否导航要求"标记一并复位
     laneCmdSentRetryCnt = 0
     laneChangeSpeak = false
     laneAction = LaneChangeAction.KEEP

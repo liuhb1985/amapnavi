@@ -340,7 +340,7 @@ fun MainActivity.processOvertakeLaneChangeState(atcState: Int?) {
     // Prepare 期间持续保持变道请求(否则 CP 侧 desire 消失会立刻退回 Off，见常量注释)
     if (atcState == PreLaneChange && !inOvertakeStarting) {
         if (now - lastOvertakeCmdSendTime >= OVERTAKE_PRE_KEEPALIVE_MS) {
-            overtakeCmdIndex++                          // 序号递增，避免被 CP 去重
+            // 序号由 sendOvertakeActionCmd 内部统一取全局递增号(见 nextLaneCmdIndex)
             sendOvertakeActionCmd(overtakeAction)       // 方向必须保持不变
             lastOvertakeCmdSendTime = now
             overtakeCmdSentRetryCnt++

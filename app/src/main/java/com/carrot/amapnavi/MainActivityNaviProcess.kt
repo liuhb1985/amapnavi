@@ -1148,7 +1148,16 @@ fun MainActivity.logNavSnapshot() {
         sb.append(" | vL=").append(v.leftLaneCnt).append('/').append(v.leftLaneId)
         sb.append(" vR=").append(v.rightLaneCnt).append('/').append(v.rightLaneId)
         sb.append(" solid=").append(left_lane_type).append('/').append(right_lane_type)
+        // CP(openpilot)侧下发的车道线判据：用来区分"App 侧实线拦截"与"CP 侧拒执行"
+        sb.append(" cpSolid=").append(if (st.blind_lane_l) 1 else 0).append('/').append(if (st.blind_lane_r) 1 else 0)
         sb.append(" lnv=").append(if (laneLineValid) 1 else 0)
+        // 下一步引导(高德原始 icon / 距离)：用于核对"连续岔路"判定
+        sb.append(" next=").append(naviState.nTBTTurnTypeNext ?: -1).append('/').append(naviState.nTBTDistNext ?: -1)
+        // 实线放宽是否生效(临匝道/连续岔路)
+        sb.append(" relax=").append(
+            if (laneChangeEdge != LaneChangeAction.KEEP &&
+                solidLineRelaxed(laneChangeEdge, LaneChangePurpose.NAVI)) 1 else 0
+        )
         sb.append(" cmd=").append(laneChangeCmdIndex)
 
         val line = sb.toString()

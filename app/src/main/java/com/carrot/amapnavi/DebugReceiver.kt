@@ -56,6 +56,16 @@ class DebugReceiver : BroadcastReceiver() {
             "highway_reserve_rightmost_lane" to Spec("highway_reserve_rightmost_lane", 'b'),
             // 行车日志落盘总开关(默认开)：关掉后不再写主日志(仍打 logcat)
             "drive_log_en" to Spec("drive_log_en", 'b'),
+            // 实线判据"临匝道放宽"(默认开)：仅导航变道生效，超车仍严格
+            "solid_relax_en" to Spec("solid_relax_en", 'b'),
+            // 在"进匝道距离"之前多少米开始解除实线判定(默认 15m)
+            "solid_relax_margin_m" to Spec("solid_relax_margin_m", 'f'),
+            // 连续岔路判定：下一步岔路距离上限(m，默认 500)
+            "fork_chain_dist_m" to Spec("fork_chain_dist_m", 'i'),
+            // 导航靠边/进匝道时"语音后等待"毫秒数(默认 0=不等，立即下发；普通变道仍用 1500)
+            "navi_edge_speak_delay_ms" to Spec("navi_edge_speak_delay_ms", 'i'),
+            // 导航靠边/进匝道时 Prepare 状态超时毫秒数(默认 700，普通变道为 2000)
+            "navi_edge_atc_timeout_ms" to Spec("navi_edge_atc_timeout_ms", 'i'),
             "navi_speak" to Spec("navi_speak", 'b'),
             "navi_speak_first" to Spec("navi_speak_first", 'b'),
             "navi_blind_dec_speed" to Spec("navi_blind_dec_speed", 'b'),
@@ -450,6 +460,7 @@ class DebugReceiver : BroadcastReceiver() {
                 if (key == "safety_legacy_mode") safety_legacy_mode = v
                 if (key == "highway_reserve_rightmost_lane") highway_reserve_rightmost_lane = v
                 if (key == "drive_log_en") drive_log_en = v
+                if (key == "solid_relax_en") solid_relax_en = v
                 if (a != null) when (key) {
                     "app_navi" -> a.app_navi = v
                     "app_road_navi" -> a.app_road_navi = v
@@ -478,6 +489,9 @@ class DebugReceiver : BroadcastReceiver() {
                 // 侧向安全去抖帧数(全局变量，不依赖 MainActivity 实例)
                 if (key == "safe_confirm_frames") { safeConfirmFrames = v.coerceIn(1, 30) }
                 if (key == "safe_confirm_frames_navi") { safeConfirmFramesNavi = v.coerceIn(1, 30) }
+                if (key == "fork_chain_dist_m") { fork_chain_dist_m = v.coerceIn(0, 5000) }
+                if (key == "navi_edge_speak_delay_ms" && a != null) { a.navi_edge_speak_delay_ms = v.coerceIn(0, 5000).toLong() }
+                if (key == "navi_edge_atc_timeout_ms" && a != null) { a.navi_edge_atc_timeout_ms = v.coerceIn(100, 5000).toLong() }
                 if (a != null) when (key) {
                     "nav_mode" -> a.nav_mode = v
                     "overtake_mode" -> a.overtake_mode = v
@@ -499,6 +513,7 @@ class DebugReceiver : BroadcastReceiver() {
             }
             'f' -> {
                 val v = raw.toFloatOrNull() ?: return false
+                if (key == "solid_relax_margin_m") solid_relax_margin_m = v.coerceIn(0f, 200f)
                 if (a != null) when (key) {
                     "lidar_front_dist_m" -> a.lidar_front_dist_m = v
                     "lidar_front_time_s" -> a.lidar_front_time_s = v
@@ -542,6 +557,7 @@ class DebugReceiver : BroadcastReceiver() {
                 "safety_legacy_mode" -> safety_legacy_mode
                 "highway_reserve_rightmost_lane" -> highway_reserve_rightmost_lane
                 "drive_log_en" -> drive_log_en
+                "solid_relax_en" -> solid_relax_en
                 "navi_speak" -> a.navi_speak
                 "navi_speak_first" -> a.navi_speak_first
                 "navi_blind_dec_speed" -> a.navi_blind_dec_speed
@@ -553,6 +569,9 @@ class DebugReceiver : BroadcastReceiver() {
             'i' -> run {
                 if (key == "safe_confirm_frames") return@run safeConfirmFrames.toString()
                 if (key == "safe_confirm_frames_navi") return@run safeConfirmFramesNavi.toString()
+                if (key == "fork_chain_dist_m") return@run fork_chain_dist_m.toString()
+                if (key == "navi_edge_speak_delay_ms") return@run (a?.navi_edge_speak_delay_ms ?: 0L).toString()
+                if (key == "navi_edge_atc_timeout_ms") return@run (a?.navi_edge_atc_timeout_ms ?: 0L).toString()
                 (if (a == null) prefs.getInt(spec.prefKey, 0) else when (key) {
                 "nav_mode" -> a.nav_mode
                 "overtake_mode" -> a.overtake_mode
@@ -573,6 +592,7 @@ class DebugReceiver : BroadcastReceiver() {
             }).toString()
                 }   // end run (safe_confirm_frames 提前返回)
             'f' -> (if (a == null) prefs.getFloat(spec.prefKey, 0f) else when (key) {
+                "solid_relax_margin_m" -> solid_relax_margin_m
                 "lidar_front_dist_m" -> a.lidar_front_dist_m
                 "lidar_front_time_s" -> a.lidar_front_time_s
                 "lidar_rear_dist_m" -> a.lidar_rear_dist_m

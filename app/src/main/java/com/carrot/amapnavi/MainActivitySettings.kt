@@ -382,6 +382,50 @@ fun MainActivity.loadUserSettings() {
         true
     }
 
+    // ---- 以下为实线放宽/进匝道时序参数：首次启动把默认值写入 prefs ----
+    //   目的：1) DebugReceiver 的 get 从 prefs 读，不写就会出现"显示 0"的假象；
+    //        2) 车上热调过的值能持久化，重启后保持。
+
+    //实线判据"临匝道放宽"总开关(默认开，仅导航变道生效)
+    solid_relax_en = if (prefs.contains("solid_relax_en")) {
+        prefs.getBoolean("solid_relax_en", true)
+    } else {
+        editor.putBoolean("solid_relax_en", true)
+        true
+    }
+
+    //在"进匝道距离"之前多少米开始解除实线判定(默认 15m)
+    solid_relax_margin_m = if (prefs.contains("solid_relax_margin_m")) {
+        prefs.getFloat("solid_relax_margin_m", 15f)
+    } else {
+        editor.putFloat("solid_relax_margin_m", 15f)
+        15f
+    }
+
+    //连续岔路判定：下一步岔路距离上限(m，默认 500)
+    fork_chain_dist_m = if (prefs.contains("fork_chain_dist_m")) {
+        prefs.getInt("fork_chain_dist_m", 500)
+    } else {
+        editor.putInt("fork_chain_dist_m", 500)
+        500
+    }
+
+    //导航靠边/进匝道：语音后等待(默认 0=不等，播报后立即下发)
+    navi_edge_speak_delay_ms = if (prefs.contains("navi_edge_speak_delay_ms")) {
+        prefs.getInt("navi_edge_speak_delay_ms", 0).toLong()
+    } else {
+        editor.putInt("navi_edge_speak_delay_ms", 0)
+        0L
+    }
+
+    //导航靠边/进匝道：Prepare 状态超时(默认 700ms，普通变道仍为 2000ms)
+    navi_edge_atc_timeout_ms = if (prefs.contains("navi_edge_atc_timeout_ms")) {
+        prefs.getInt("navi_edge_atc_timeout_ms", 700).toLong()
+    } else {
+        editor.putInt("navi_edge_atc_timeout_ms", 700)
+        700L
+    }
+
 
     //侧向安全去抖确认帧数(约 = 帧数 × 100ms)：调大更保守/反应慢，调小更灵敏/可能误放行
     safeConfirmFrames = if (prefs.contains("safe_confirm_frames")) {

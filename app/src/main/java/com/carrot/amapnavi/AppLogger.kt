@@ -12,7 +12,9 @@ import java.util.*
 /* =========================================================
  * 主日志（由 app_log 开关控制，内容为 App 各模块的运行记录）
  *
- * 目录：/sdcard/AmapNavi/app/yyyy-MM-dd.log   ← 单独的子文件夹，跟超车日志分开
+ * 目录：/sdcard/AmapNavi/app/yyyy-MM-dd_NNNN.log  ← 单独的子文件夹，跟超车日志分开
+ *       文件名末尾 4 位是"当天第几次启动 App"的编号：**每次启动新建一份**，
+ *       这样每次上车测试各占一个文件，不用在一天的长日志里翻找。
  *       文件管理器打开 AmapNavi/ 只会看到 app/ 和 overtake/ 两个文件夹，
  *       要哪一份日志就进哪个文件夹，不会混在一起。
  *       （没有存储权限时回退 Android/data/<包名>/files/logs/app/，见 LogStorage）
@@ -30,8 +32,20 @@ object AppLogger {
     @Volatile
     private var migratedDir: String? = null
 
-    // 主日志文件名：yyyy-MM-dd.log（超车日志是 yyyy-MM-dd_NNNN.log，见 OvertakeLogger）
+    // 旧版主日志文件名：yyyy-MM-dd.log（仅用于把历史文件从根目录搬进 app/ 子目录）
     private val MAIN_RE = Regex("^\\d{4}-\\d{2}-\\d{2}\\.log$")
+
+    // 主日志文件名：yyyy-MM-dd_NNNN.log（NNNN = 当天第几次启动 App，0001 起）
+    //   每次启动新建一份，方便区分每次上车测试的数据
+    private val FILE_RE = Regex("^(\\d{4}-\\d{2}-\\d{2})_(\\d+)\\.log$")
+    private const val SEQ_WIDTH = 4
+
+    /** 本次启动(进程内)固定使用的日志文件：启动时算一次编号，之后所有写入都进这一份 */
+    @Volatile
+    private var sessionFile: File? = null
+
+    @Volatile
+    private var sessionDate: String = ""
 
     /**
      * 写入日志到文件
@@ -62,12 +76,59 @@ object AppLogger {
     }
 
     /**
-     * 获取当前日志文件（按日期命名）
+     * 获取当前日志文件：yyyy-MM-dd_NNNN.log
+     *   NNNN = 当天第几次启动 App（启动时确定一次，进程内固定）。
+     *   每次上车测试各占一个文件，避免所有数据混在一天的长日志里；跨天自动新起一份。
      */
     fun getTodayLogFile(context: Context): File {
-        val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-        return File(LogStorage.dir(context, SUB_DIR), "$dateStr.log")
+        val dateStr = today()
+        sessionFile?.let { if (sessionDate == dateStr) return it }
+        synchronized(this) {
+            sessionFile?.let { if (sessionDate == dateStr) return it }
+            val dir = LogStorage.dir(context, SUB_DIR)
+            val seq = nextSeq(dir, dateStr)
+            val f = File(dir, fileName(dateStr, seq))
+            sessionFile = f
+            sessionDate = dateStr
+            return f
+        }
     }
+
+    /** 当天已用最大编号 + 1（本次启动新建一份） */
+    private fun nextSeq(dir: File, date: String): Int {
+        adoptPlainFiles(dir, date)
+        var max = 0
+        dir.listFiles()?.forEach { f ->
+            if (!f.isFile) return@forEach
+            val m = FILE_RE.matchEntire(f.name) ?: return@forEach
+            if (m.groupValues[1] != date) return@forEach
+            val n = m.groupValues[2].toIntOrNull() ?: return@forEach
+            if (n > max) max = n
+        }
+        return max + 1
+    }
+
+    /** 把旧格式 yyyy-MM-dd.log 收编成 yyyy-MM-dd_NNNN.log，避免两种命名混在列表里 */
+    private fun adoptPlainFiles(dir: File, date: String) {
+        try {
+            val legacy = File(dir, "$date.log")
+            if (!legacy.isFile) return
+            var seq = 1
+            while (File(dir, fileName(date, seq)).exists()) seq++
+            val dest = File(dir, fileName(date, seq))
+            if (legacy.renameTo(dest)) {
+                android.util.Log.i(TAG, "旧主日志已更名：${legacy.name} → ${dest.name}")
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun fileName(date: String, seq: Int): String =
+        "${date}_" + String.format(Locale.US, "%0${SEQ_WIDTH}d", seq) + ".log"
+
+    private fun today(): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
     /** 主日志目录展示路径（提示用户去文件管理器哪里找） */
     fun logDirPath(context: Context): String = LogStorage.displayDir(context, SUB_DIR)

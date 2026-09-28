@@ -328,6 +328,22 @@ class MainActivity : AppCompatActivity() {
     internal val BLIND_BLINKER_INTERVAL = 500L
     internal val LANE_CHANGE_SPEAK_DELAY = 1500L
     internal val LANE_TURN_DELAY = 800L
+    //导航要求的靠边/进匝道/转弯：**默认不等待**(0ms)，播报后立即下发命令。
+    //  路口/匝道对时间要求高，等待会直接把路口耗过去(实车：播报等了 2.28s，
+    //  命令下发时距路口只剩 40m，CP 根本来不及变道)。
+    //  语音仍照常播放，只是不再等它播完；普通变道沿用 LANE_CHANGE_SPEAK_DELAY。
+    //  可车上热调(想留一点余量可设 300~500)。
+    internal var navi_edge_speak_delay_ms = 0L
+
+    //导航要求的靠边/进匝道/转弯：CP 若条件不成立会停在 Prepare 不动，
+    //  等满 2 秒只是白等(实车：距路口 40m 时白等 2 秒，路口直接过掉)。
+    //  这里给 Prepare 更短的超时，快速失败 → 下一周期立即重试。
+    //  取值依据：实车成功案例 CP 在 106~320ms 内进入 Starting，故 700ms 有约 2 倍余量。
+    //  (仅对 Prepare 生效；Starting 仍用 7 秒，因为真实变道本身要 5 秒)
+    internal var navi_edge_atc_timeout_ms = 700L
+
+    //本次变道命令是否由导航要求触发(靠边/进匝道/转弯) → 决定是否用更短的超时
+    internal var laneCmdForNaviEdge = false
     internal val FINISH_TIMEOUT = 10000L   // 10秒超时保护，可调整
 
     internal val OVERTAKE_END_DELAY = 30000L
