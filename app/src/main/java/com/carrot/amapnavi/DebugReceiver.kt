@@ -62,6 +62,12 @@ class DebugReceiver : BroadcastReceiver() {
             "solid_relax_margin_m" to Spec("solid_relax_margin_m", 'f'),
             // 连续岔路判定：下一步岔路距离上限(m，默认 500)
             "fork_chain_dist_m" to Spec("fork_chain_dist_m", 'i'),
+            // 临匝道放宽窗口偏移量(m)：窗口 = 进匝道距离 + 本值
+            //   窗口内同时解除：实线判据 / 激光盲区 / "车辆已靠边"抑制
+            "solid_relax_offset_h" to Spec("solid_relax_offset_h", 'i'),
+            "solid_relax_offset_l" to Spec("solid_relax_offset_l", 'i'),
+            // "车辆已靠边"抑制变道(默认开)：该侧实线(+高速该侧车道数<=1)持续5秒 → 禁止继续变道
+            "last_lane_suppress_en" to Spec("last_lane_suppress_en", 'b'),
             // 导航靠边/进匝道时"语音后等待"毫秒数(默认 0=不等，立即下发；普通变道仍用 1500)
             "navi_edge_speak_delay_ms" to Spec("navi_edge_speak_delay_ms", 'i'),
             // 导航靠边/进匝道时 Prepare 状态超时毫秒数(默认 700，普通变道为 2000)
@@ -176,12 +182,17 @@ class DebugReceiver : BroadcastReceiver() {
                         if (!SimScenes.isKnown(scene)) {
                             Log.w(TAG, "未知场景 $scene，可用 --es cmd scenes 查看")
                         } else {
-                            // 模拟高速工况：打开超车、关闭领航(领航会接管变道请求)，并复位状态机
+                            // 先保存模拟前的领航开关(下面会改，模拟结束/停止时恢复)
+                            simSavedAppNavi = a.app_navi
+                            simSavedAppRoadNavi = a.app_road_navi
+                            // 模拟工况：超车场景关领航(领航会接管变道请求)；
+                            //   领航场景(ramp_*)反之 —— 否则靠边/匝道决策会被入口门控整体跳过
+                            val naviScene = SimScenes.isNaviScene(scene)
                             a.bHighWay = true
-                            a.app_overtake = true
-                            a.app_road_overtake = true
-                            a.app_navi = false
-                            a.app_road_navi = false
+                            a.app_overtake = !naviScene
+                            a.app_road_overtake = !naviScene
+                            a.app_navi = naviScene
+                            a.app_road_navi = naviScene
                             a.resetOvertakeAction()
                             a.resetLaneAction()
                             overtakeCooldownUntil = 0L
@@ -223,6 +234,9 @@ class DebugReceiver : BroadcastReceiver() {
                     if (a != null) {
                         a.suggest_lane_en = simSavedSuggestLaneEn
                         a.dis_lane_en = simSavedDisLaneEn
+                        // 恢复领航开关(模拟启动时按场景类型改过)
+                        a.app_navi = simSavedAppNavi
+                        a.app_road_navi = simSavedAppRoadNavi
                     }
                     Log.d(TAG, "模拟已停止(导航车道与开关已恢复)")
                 }
@@ -461,6 +475,7 @@ class DebugReceiver : BroadcastReceiver() {
                 if (key == "highway_reserve_rightmost_lane") highway_reserve_rightmost_lane = v
                 if (key == "drive_log_en") drive_log_en = v
                 if (key == "solid_relax_en") solid_relax_en = v
+                if (key == "last_lane_suppress_en") last_lane_suppress_en = v
                 if (a != null) when (key) {
                     "app_navi" -> a.app_navi = v
                     "app_road_navi" -> a.app_road_navi = v
@@ -490,6 +505,8 @@ class DebugReceiver : BroadcastReceiver() {
                 if (key == "safe_confirm_frames") { safeConfirmFrames = v.coerceIn(1, 30) }
                 if (key == "safe_confirm_frames_navi") { safeConfirmFramesNavi = v.coerceIn(1, 30) }
                 if (key == "fork_chain_dist_m") { fork_chain_dist_m = v.coerceIn(0, 5000) }
+                if (key == "solid_relax_offset_h") { solid_relax_offset_h = v.coerceIn(0, 5000) }
+                if (key == "solid_relax_offset_l") { solid_relax_offset_l = v.coerceIn(0, 5000) }
                 if (key == "navi_edge_speak_delay_ms" && a != null) { a.navi_edge_speak_delay_ms = v.coerceIn(0, 5000).toLong() }
                 if (key == "navi_edge_atc_timeout_ms" && a != null) { a.navi_edge_atc_timeout_ms = v.coerceIn(100, 5000).toLong() }
                 if (a != null) when (key) {
@@ -558,6 +575,7 @@ class DebugReceiver : BroadcastReceiver() {
                 "highway_reserve_rightmost_lane" -> highway_reserve_rightmost_lane
                 "drive_log_en" -> drive_log_en
                 "solid_relax_en" -> solid_relax_en
+                "last_lane_suppress_en" -> last_lane_suppress_en
                 "navi_speak" -> a.navi_speak
                 "navi_speak_first" -> a.navi_speak_first
                 "navi_blind_dec_speed" -> a.navi_blind_dec_speed
@@ -570,6 +588,8 @@ class DebugReceiver : BroadcastReceiver() {
                 if (key == "safe_confirm_frames") return@run safeConfirmFrames.toString()
                 if (key == "safe_confirm_frames_navi") return@run safeConfirmFramesNavi.toString()
                 if (key == "fork_chain_dist_m") return@run fork_chain_dist_m.toString()
+                if (key == "solid_relax_offset_h") return@run solid_relax_offset_h.toString()
+                if (key == "solid_relax_offset_l") return@run solid_relax_offset_l.toString()
                 if (key == "navi_edge_speak_delay_ms") return@run (a?.navi_edge_speak_delay_ms ?: 0L).toString()
                 if (key == "navi_edge_atc_timeout_ms") return@run (a?.navi_edge_atc_timeout_ms ?: 0L).toString()
                 (if (a == null) prefs.getInt(spec.prefKey, 0) else when (key) {

@@ -83,14 +83,14 @@ object SimScenes {
         else -> true
     }
 
-    private fun vEgoOf(name: String): Int = when (name) {
+    fun vEgoOf(name: String): Int = when (name) {
         "ot_slow_speed" -> 30
         "ramp_hw90" -> 90
         "ramp_rd60" -> 60
         else -> 100
     }
 
-    private fun vCruiseOf(name: String): Int = when (name) {
+    fun vCruiseOf(name: String): Int = when (name) {
         "ot_no_cruise" -> 0
         else -> 110
     }
@@ -277,6 +277,10 @@ object SimScenes {
 
     // 是否需要打开推荐/禁行车道功能(仅导航场景)
     fun needNavCheck(name: String): Boolean = navLaneOf(name) != null
+
+    // 该场景是否为"领航(靠边/匝道/转弯)"场景：
+    //   这类场景需要额外的决策入口条件(开领航 + naviDataTimeout=false)，见 applySimScene
+    fun isNaviScene(name: String): Boolean = name.startsWith("ramp_")
 }
 
 // 把一帧模拟状态灌进运行状态(调用点：naviProcess)
@@ -296,6 +300,20 @@ fun MainActivity.applySimScene(name: String, tick: Long) {
     opStateManager.state.xTurnInfo = SimScenes.turnInfoOf(name, tick)
     opStateManager.state.xTurnDist = SimScenes.turnDistOf(name, tick)
     opStateManager.state.nTurnDist = opStateManager.state.xTurnDist.toInt()
+
+    // ④ 领航入口条件(见 AmapNavi 开头的 gate)：
+    //   模拟环境没有真实高德数据流，naviDataTimeout 会一直为 true，
+    //   整个靠边/匝道决策会被跳过(表现为 laneChangeEdge 恒为 KEEP)。
+    //   领航开关已由 DebugReceiver 的 sim 命令按场景类型设置。
+    if (SimScenes.isNaviScene(name)) naviDataTimeout = false
+
+    // ⑤ 车辆状态(carState)：领航的车速门限用的是 carState(来自 CP 车辆状态报文)，
+    //   模拟环境没有该报文 → vEgo 恒为 0，会在"车速过低"处直接退出。
+    //   carState.vEgo 单位 m/s，车辆状态报文里的 vEgo 换算即可。
+    carState.vEgo = (SimScenes.vEgoOf(name) / 3.6f).toInt()
+    carState.vCruise = SimScenes.vCruiseOf(name)
+    carState.isOnroad = true
+    carState.active = true
 
     val nav = SimScenes.navLaneOf(name)
     if (nav != null) {

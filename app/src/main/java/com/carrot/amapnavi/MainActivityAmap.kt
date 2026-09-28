@@ -42,6 +42,7 @@ fun MainActivity.updateNaviState(extras: Map<String, Any?>): Pair<Boolean, Strin
 
     fun updateRoadCateField(extras: Map<String, Any?>) {
         val roadcate = extras["ROAD_TYPE"]?.toString()?.toIntOrNull()?:8
+        rawRoadType = roadcate   //原始值保留，供日志诊断"高速被判成公路"
         naviState.roadcate = roadcate_conv(roadcate)
         bHighWay = isHighway(naviState.roadcate?:-1)
         gRoadCate = naviState.roadcate?:8

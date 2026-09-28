@@ -180,8 +180,49 @@ var drive_log_en = true
 //   放宽只解除**实线**这一条，盲区/激光/雷达判据照常生效。
 // -----------------------------
 var solid_relax_en = true
-var solid_relax_margin_m = 15f   // 在"进匝道距离"之前多少米开始解除实线判定
+var solid_relax_margin_m = 15f   // (已废弃，仅保留兼容旧 prefs)
 var fork_chain_dist_m = 500      // 连续岔路判定：下一步岔路距离的上限
+// "临匝道放宽"窗口 = 进匝道距离(fork_dist_h / fork_dist_l) + **本偏移量**(m)。
+//   以"进匝道距离"为基准做偏移：该距离本身会随道路类型/用户设置变化，
+//   用偏移量可自动跟随，不必两头对参数。
+//   窗口内**同时**解除三件事(三者同源，见 solidLineRelaxed)：
+//     ① 实线判据(App 安全门 -1 + 发往 CP 的线型 0)
+//     ② 激光盲区(通知 CP 屏蔽激光来源，见 calcLidarSuppress)
+//     ③ "车辆已靠边"抑制(该侧≤1条车道+实线 → 压成 KEEP 的那条)
+//   背景：导航给的"最右"是**可通行车道**，而视觉最右是应急车道，两者差一条 ——
+//   导航会一路要求变到"最右可通行车道"，被实线/已靠边压制就会错过匝道。
+//   设为 0 = 关闭该窗口(只保留连续岔路判定)。
+var solid_relax_offset_h = 200   // 高速偏移量(等效窗口 = fork_dist_h + 本值)
+var solid_relax_offset_l = 100   // 公路偏移量(等效窗口 = fork_dist_l + 本值)
+
+// -----------------------------
+// "车辆已靠边"抑制变道(设置页开关，默认开)
+//   含义：该侧"实线 + (高速时)该侧车道数<=1"持续 5 秒 → 判定已到最边(应急车道/路沿) →
+//        禁止继续往该方向变道，并播报"车辆已靠最左/最右边"。
+//   设计意图：防止实线抖动成虚线后立即变道进应急车道(右侧)或冲上路边。
+//   两个方向的路沿性质不同，判据也不同：
+//     · 公路·左 / 高速·左：左侧是路沿(无车道) → 只看实线
+//     · 高速·右：右侧可能是应急车道 → 实线 **且右侧车道数<=1**
+//     · 公路·右：右侧是路沿(无应急车道) → 本就不做该判定
+//   关闭后：不做该判定，始终允许继续变道(仅靠实线/盲区判据保护)。
+//   解除：临匝道放宽窗口内自动解除(与实线放宽同源，见 solidLineRelaxed)。
+// -----------------------------
+var last_lane_suppress_en = true
+
+// -----------------------------
+// 最近一次实际"发给 CP"的线型值(由 KeepAliveService.sendLaneType 写入)
+//   只用于 publishLaneTypeIfChanged()：放宽状态(实线→虚线发布)一变就立即补发一帧，
+//   不必等视觉帧。避免"安全门已放行、命令已下发，CP 手里却还是实线 → 停在 Prepare"。
+//   Int.MIN_VALUE = 尚未发布过。
+// -----------------------------
+var lastPubLaneL = Int.MIN_VALUE
+var lastPubLaneR = Int.MIN_VALUE
+
+// 最近一次实际发给 CP 的"临时屏蔽激光盲区"标志(左/右)
+//   与 lastPubLane* 同一用途：任一变化都立即补发一帧(见 publishLaneTypeIfChanged)，
+//   保证屏蔽与**恢复**都及时(恢复同样走这条通道，不依赖视觉帧)。
+var lastPubSupL = false
+var lastPubSupR = false
 
 // 全量逐帧记录(调试用，默认关)：开启后每个决策周期把一帧现场写到 logcat(OvtFrame) 和超车日志文件
 //   由调试后门 adb broadcast 控制：--es cmd frame --es val on/200ms
@@ -201,6 +242,9 @@ var simTick = 0L                                       // 已注入帧数
 var simSavedNavLane: NavLane? = null
 var simSavedSuggestLaneEn = false
 var simSavedDisLaneEn = false
+// 模拟前的领航开关(超车场景会关领航、领航场景会开)：模拟结束后恢复
+var simSavedAppNavi = false
+var simSavedAppRoadNavi = false
 
 // -----------------------------
 // 超车诊断面板运行态(测试用，可随时开关)

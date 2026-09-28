@@ -220,7 +220,11 @@ class MainActivity : AppCompatActivity() {
     internal var road_right_first = true
     internal var lane_prob_enable = false
     internal var vision_keep_right = true
-    internal var nav_turn = true
+    // 领航转弯(「领航转弯」设置页开关)：公路 TurnLeft/TurnRight 引导时把动作设成
+    //   LEFT_TURN/RIGHT_TURN。实际 CP 侧并无对应的转弯命令，勾选只会让公路转弯路口
+    //   走进 TURN 分支(见 MainActivityNaviProcess 的 fork_dist_l 判断)，故默认关闭；
+    //   需要时仍可在设置页手动勾选。
+    internal var nav_turn = false
     internal var nav_mode = 2
     internal var smooth_speed_limit = false
     internal var naviTrafficAssistLast = false
@@ -344,6 +348,10 @@ class MainActivity : AppCompatActivity() {
 
     //本次变道命令是否由导航要求触发(靠边/进匝道/转弯) → 决定是否用更短的超时
     internal var laneCmdForNaviEdge = false
+
+    //高德下发的原始道路类型(ROAD_TYPE)：用于诊断"高速被判成公路"
+    //  (bHighWay 由 roadcate_conv/kisHighway 换算，只认 0=高速/6=快速，取不到默认按公路)
+    internal var rawRoadType = -1
     internal val FINISH_TIMEOUT = 10000L   // 10秒超时保护，可调整
 
     internal val OVERTAKE_END_DELAY = 30000L

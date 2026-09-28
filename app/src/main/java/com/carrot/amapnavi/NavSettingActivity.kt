@@ -36,6 +36,7 @@ class NavSettingActivity : AppCompatActivity() {
     private lateinit var cbVisionKeepRight: CheckBox
     private lateinit var cbLaneProb: CheckBox
     private lateinit var cbSafetyLegacy: CheckBox
+    private lateinit var cbLastLaneSuppress: CheckBox
     private lateinit var cbDriveLog: CheckBox
     private lateinit var cbRampSlowdown: CheckBox
 
@@ -44,6 +45,9 @@ class NavSettingActivity : AppCompatActivity() {
     private lateinit var etAtcDistL: EditText
     private lateinit var etForkDistH: EditText
     private lateinit var etForkDistL: EditText
+    // 临匝道放宽窗口偏移量：窗口 = 分岔距离(fork_dist_h/l) + 本值
+    private lateinit var etRelaxOffsetH: EditText
+    private lateinit var etRelaxOffsetL: EditText
     private lateinit var etRampDistH: EditText
     private lateinit var etRampDistL: EditText
     private lateinit var etRampSpeedH: EditText
@@ -80,12 +84,15 @@ class NavSettingActivity : AppCompatActivity() {
         cbVisionKeepRight = findViewById(R.id.cbNavSettingVisionKeepRight)
         cbLaneProb = findViewById(R.id.cbNavSettingLaneProb)
         cbSafetyLegacy = findViewById(R.id.cbNavSettingSafetyLegacy)
+        cbLastLaneSuppress = findViewById(R.id.cbNavSettingLastLaneSuppress)
         cbDriveLog = findViewById(R.id.cbNavSettingDriveLog)
         etNaviMinSpeed = findViewById(R.id.etNavNaviMinSpeed)
         etAtcDistH = findViewById(R.id.etNavAtcDistH)
         etAtcDistL = findViewById(R.id.etNavAtcDistL)
         etForkDistH = findViewById(R.id.etNavForkDistH)
         etForkDistL = findViewById(R.id.etNavForkDistL)
+        etRelaxOffsetH = findViewById(R.id.etNavRelaxOffsetH)
+        etRelaxOffsetL = findViewById(R.id.etNavRelaxOffsetL)
         cbRampSlowdown = findViewById(R.id.cbNavSettingRampSlowdown)
         etRampDistH = findViewById(R.id.etNavRampDistH)
         etRampDistL = findViewById(R.id.etNavRampDistL)
@@ -117,6 +124,9 @@ class NavSettingActivity : AppCompatActivity() {
         bindStep(R.id.btnMinusAtcDistL, R.id.btnPlusAtcDistL, etAtcDistL, 50, 0, 100000)
         bindStep(R.id.btnMinusForkDistH, R.id.btnPlusForkDistH, etForkDistH, 10, 0, 100000)
         bindStep(R.id.btnMinusForkDistL, R.id.btnPlusForkDistL, etForkDistL, 10, 0, 100000)
+        // 放宽偏移量：0 = 关闭该窗口(只保留连续岔路判定)
+        bindStep(R.id.btnMinusRelaxOffsetH, R.id.btnPlusRelaxOffsetH, etRelaxOffsetH, 50, 0, 2000)
+        bindStep(R.id.btnMinusRelaxOffsetL, R.id.btnPlusRelaxOffsetL, etRelaxOffsetL, 50, 0, 2000)
         bindStep(R.id.btnMinusRampDistH, R.id.btnPlusRampDistH, etRampDistH, 100, 0, 5000)
         bindStep(R.id.btnMinusRampDistL, R.id.btnPlusRampDistL, etRampDistL, 50, 0, 5000)
         bindStep(R.id.btnMinusRampSpeedH, R.id.btnPlusRampSpeedH, etRampSpeedH, 5, 0, 150)
@@ -194,12 +204,15 @@ class NavSettingActivity : AppCompatActivity() {
                 .putBoolean("vision_keep_right", cbVisionKeepRight.isChecked)
                 .putBoolean("lane_prob_enable", cbLaneProb.isChecked)
                 .putBoolean("safety_legacy_mode", cbSafetyLegacy.isChecked)
+                .putBoolean("last_lane_suppress_en", cbLastLaneSuppress.isChecked)
                 .putBoolean("drive_log_en", cbDriveLog.isChecked)
                 .putInt("navi_min_speed", etNaviMinSpeed.text.toString().toIntOrNull() ?: 20)
                 .putInt("atc_dist_h", etAtcDistH.text.toString().toIntOrNull() ?: 2000)
                 .putInt("atc_dist_l", etAtcDistL.text.toString().toIntOrNull() ?: 500)
                 .putInt("fork_dist_h", etForkDistH.text.toString().toIntOrNull() ?: 80)
                 .putInt("fork_dist_l", etForkDistL.text.toString().toIntOrNull() ?: 30)
+                .putInt("solid_relax_offset_h", etRelaxOffsetH.text.toString().toIntOrNull() ?: 200)
+                .putInt("solid_relax_offset_l", etRelaxOffsetL.text.toString().toIntOrNull() ?: 100)
                 .putBoolean("ramp_slowdown_en", cbRampSlowdown.isChecked)
                 .putInt("ramp_slowdown_dist_h", etRampDistH.text.toString().toIntOrNull() ?: 400)
                 .putInt("ramp_slowdown_dist_l", etRampDistL.text.toString().toIntOrNull() ?: 200)
@@ -212,6 +225,11 @@ class NavSettingActivity : AppCompatActivity() {
         safety_legacy_mode = cbSafetyLegacy.isChecked
         // 行车日志落盘开关：立即生效(见 NavRuntimeState.drive_log_en)
         drive_log_en = cbDriveLog.isChecked
+        // "车辆已靠边"抑制开关：立即生效(见 NavRuntimeState.last_lane_suppress_en)
+        last_lane_suppress_en = cbLastLaneSuppress.isChecked
+        // 临匝道放宽窗口偏移量：立即生效(见 solidLineRelaxed)
+        solid_relax_offset_h = etRelaxOffsetH.text.toString().toIntOrNull() ?: 200
+        solid_relax_offset_l = etRelaxOffsetL.text.toString().toIntOrNull() ?: 100
     }
 
     private fun load() {
@@ -236,12 +254,15 @@ class NavSettingActivity : AppCompatActivity() {
         cbVisionKeepRight.isChecked = prefs.getBoolean("vision_keep_right", false)
         cbLaneProb.isChecked = prefs.getBoolean("lane_prob_enable", false)
         cbSafetyLegacy.isChecked = prefs.getBoolean("safety_legacy_mode", true)
+        cbLastLaneSuppress.isChecked = prefs.getBoolean("last_lane_suppress_en", true)
         cbDriveLog.isChecked = prefs.getBoolean("drive_log_en", true)
         etNaviMinSpeed.setText(prefs.getInt("navi_min_speed", 20).toString())
         etAtcDistH.setText(prefs.getInt("atc_dist_h", 2000).toString())
         etAtcDistL.setText(prefs.getInt("atc_dist_l", 500).toString())
         etForkDistH.setText(prefs.getInt("fork_dist_h", 80).toString())
         etForkDistL.setText(prefs.getInt("fork_dist_l", 30).toString())
+        etRelaxOffsetH.setText(prefs.getInt("solid_relax_offset_h", 200).toString())
+        etRelaxOffsetL.setText(prefs.getInt("solid_relax_offset_l", 100).toString())
         cbRampSlowdown.isChecked = prefs.getBoolean("ramp_slowdown_en", true)
         etRampDistH.setText(prefs.getInt("ramp_slowdown_dist_h", 400).toString())
         etRampDistL.setText(prefs.getInt("ramp_slowdown_dist_l", 200).toString())

@@ -385,7 +385,11 @@ fun MainActivity.AmapNavi(lane_line_valid: Boolean): Boolean {
                     //--------------------低速---------------------
                     else {
                         //检查车辆是否已靠边(开启了车道线检测)
-                        if (enableLaneChange) {
+                        //  左侧是路沿(无车道)，所以只看实线，不加车道数条件
+                        //  开关关闭时不判定，直接允许继续变道
+                        if (!last_lane_suppress_en) {
+                            enableLaneChange = true
+                        } else if (enableLaneChange) {
                             if (lane_line_valid && left_lane_type >= 1) //左侧为实线
                             {
                                 if ((now - disableLaneChangeTimer) > 5000) { //实线检测时间超过5秒
@@ -490,7 +494,11 @@ fun MainActivity.AmapNavi(lane_line_valid: Boolean): Boolean {
                             || (haveNavDisLane(navLane) && dis_lane_en)
                         ) {
                             //检查车辆是否已靠边(开启了车道线检测)
-                            if (enableLaneChange) {
+                            //  高速右侧可能是应急车道，所以要求"实线 且 右侧车道数<=1"
+                            //  开关关闭时不判定，直接允许继续变道
+                            if (!last_lane_suppress_en) {
+                                enableLaneChange = true
+                            } else if (enableLaneChange) {
                                 if (lane_line_valid && right_lane_type >= 1 && vLaneResult.rightLaneCnt <= 1) //右侧为实线并且右侧车道数小于等于1
                                 {
                                     if ((now - disableLaneChangeTimer) > 5000) { //实线检测时间超过5秒
@@ -718,14 +726,29 @@ fun MainActivity.AmapNavi(lane_line_valid: Boolean): Boolean {
                 }
                 //目标车道有效
                 else {
-                    // ===== 原"已到最边车道就取消变道"的抑制已移除 =====
-                    //  原因(实车证据): 视觉右侧车道数抖动(2→1)+右侧实线会触发"车辆已靠最右边"，
-                    //  之后**所有**靠右变道请求(含导航要求的靠边与岔道口变道)都被改成 KEEP，
-                    //  表现为"不会提前靠边""走在禁行车道上也不变道"。
-                    //  移除后仍有两道保护:
-                    //    1) 目标车道是否可用由 decideLaneWithAction 判定(高速已排除最右应急车道)
-                    //    2) 实线/盲区由安全门 LaneChangeSafetyCheck 拦截
-                    //  enableLaneChange 仍保留用于"已靠最左边/最右边"的语音提示。
+                    //有禁止变道标志(车辆已靠边)：该侧车道数<=1 且为实线 → 视为道路边界
+                    //  (高速最右即应急车道)，把该方向的变道请求压成 KEEP。
+                    //  设计意图(用户)：防止实线突然抖动成虚线后立即变道进入应急车道。
+                    //  例外：临近进匝道距离时解除 —— 进匝道必须借最右车道，
+                    //       不能因"已靠边"而错过路口(即使该侧被判为边界)。
+                    //       解除窗口 = 距路口 <= 进匝道距离(fork_dist_h/l) + last_lane_fork_relax_m(默认10m)。
+                    if (!enableLaneChange && action != LaneChangeAction.KEEP) {
+                        // 临匝道放宽窗口内解除该抑制(与实线放宽/激光屏蔽同源)：
+                        //   进匝道必须借最右可通行车道，不能因"已靠边"错过路口。
+                        if (!solidLineRelaxed(action, LaneChangePurpose.NAVI)) {
+                            if (laneChangeEdge == LaneChangeAction.LEFT) //靠左行驶请求
+                            {
+                                if (action == LaneChangeAction.LEFT && !doForkNow) {
+                                    action = LaneChangeAction.KEEP
+                                }
+                            } else if (laneChangeEdge == LaneChangeAction.RIGHT) //靠右行驶请求
+                            {
+                                if (action == LaneChangeAction.RIGHT && !doForkNow) {
+                                    action = LaneChangeAction.KEEP
+                                }
+                            }
+                        }
+                    }
 
                     //是否需要变道?
                     if (action != LaneChangeAction.KEEP) {
@@ -1062,6 +1085,9 @@ fun MainActivity.naviProcess() {
             } else {
                 simScene = null
                 resetLaneTypeFilter()
+                // 恢复模拟前的领航开关(与 DebugReceiver simstop 一致)
+                app_navi = simSavedAppNavi
+                app_road_navi = simSavedAppRoadNavi
                 Log.d("Overtake", "模拟场景结束")
             }
         }
@@ -1089,6 +1115,9 @@ fun MainActivity.naviProcess() {
 
         //运行时自检：把"实时调试要盯的判据"做进程序，异常统一输出 AmapAlert(见 HealthMonitor)
         HealthMonitor.tick(this)
+
+        //放宽状态变化时立即补发线型(不等视觉帧)：避免"命令已下发、CP 仍按实线拦"
+        publishLaneTypeIfChanged()
 
         //领航现场快照落盘(不开电脑跑车也能回来分析，见 logNavSnapshot 注释)
         logNavSnapshot()
@@ -1129,6 +1158,8 @@ fun MainActivity.logNavSnapshot() {
 
         val sb = StringBuilder(192)
         sb.append("hw=").append(if (bHighWay) 1 else 0)
+        //高德道路类型：原始 ROAD_TYPE / 换算后 gRoadCate(1=高速 0=快速 2=国道 8=公路)
+        sb.append(" rc=").append(rawRoadType).append('/').append(gRoadCate)
         sb.append(" v=").append(vEgoQ)
         sb.append(" eng=").append(if (st.engaged) 1 else 0)
         sb.append(" turn=").append(st.xTurnInfo).append('/').append(distQ)
@@ -1158,6 +1189,13 @@ fun MainActivity.logNavSnapshot() {
             if (laneChangeEdge != LaneChangeAction.KEEP &&
                 solidLineRelaxed(laneChangeEdge, LaneChangePurpose.NAVI)) 1 else 0
         )
+        // 激光侧方盲区 + 激光屏蔽"判据意图值"(与"实际发送值"分开：
+        //   模拟环境无 CP 连接时 sendLaneType 会提前返回，只有这个能验证判据)
+        sb.append(" lid=").append(if (st.lidar_lblind) 1 else 0).append('/').append(if (st.lidar_rblind) 1 else 0)
+        run {
+            val (supL, supR) = calcLidarSuppress()
+            sb.append(" sup=").append(if (supL) 1 else 0).append('/').append(if (supR) 1 else 0)
+        }
         sb.append(" cmd=").append(laneChangeCmdIndex)
 
         val line = sb.toString()

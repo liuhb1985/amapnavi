@@ -34,6 +34,16 @@ class KeepAliveService : Service() {
 
     private val binder = LocalBinder()
 
+    // lane 报文心跳：距上次发送超过该时长即无条件补发一帧
+    //   目的：让"激光屏蔽标志"与 lane 通道不再依赖视觉帧
+    //        (检测关闭 / 相机断流 / 取图失败时仍保持在线)
+    //   注意：心跳会让 CP 的 lane_online 长期为 true，因此"线型是否被采信"
+    //        改由 lane_valid 字段决定(见 sendLaneType 与 amap_navi.xiaogeLineValid)
+    private val laneHeartbeatMs = 1000L
+
+    @Volatile
+    private var lastLaneSendMs = 0L
+
     override fun onBind(intent: Intent?): IBinder = binder
 
     // ===================== 全局 scope（唯一） =====================
@@ -179,11 +189,36 @@ class KeepAliveService : Service() {
     fun sendLaneType(left_lane:Int, right_lane:Int){
         if(!::cmUdpService.isInitialized) return  // 防护
 
+        // ★ 导航要求该侧靠边/进匝道时，向 CP 发布"虚线(0)"，打开 CP 侧的实线闸门：
+        //   CP 侧 amap_navi.py 的 solid_line_blind() 直接由这里发布的 left_lane/right_lane
+        //   计算(>=1 视为实线) → 置 lane_blind → desire_helper 拒绝变道。
+        //   实车(2026-09-28 18:37 高速出口)：App 侧已放行并连续下发 8 次命令，
+        //   但 CP 因 lane_blind 始终停在 Prepare 不执行 → 全部超时，没进匝道。
+        //   放宽条件复用 App 安全门同款判定 solidLineRelaxed(临匝道窗口/连续岔路)，范围可控。
+        //   计算收敛到 MainActivity.calcPublishLaneType()(单一计算点)，
+        //   并把实际发布值记到 lastPubLaneL/R —— publishLaneTypeIfChanged() 靠它
+        //   在放宽状态变化时立即补发，不必等下一个视觉帧。
+        val (l, r) = MainActivity.instance?.calcPublishLaneType() ?: (left_lane to right_lane)
+        val (supL, supR) = MainActivity.instance?.calcLidarSuppress() ?: (false to false)
+        // 线型判据是否有效(检测开关开着 + 检测在跑 + 结果新鲜)：
+        //   心跳会让通道长期在线，CP 靠这个字段区分"在线且有判据"与"在线但检测已关闭/停摆"
+        val laneValid = laneTypeDetectValid()
+        lastPubLaneL = l
+        lastPubLaneR = r
+        lastPubSupL = supL
+        lastPubSupR = supR
+        lastLaneSendMs = System.currentTimeMillis()
+
         val laneJson = JSONObject().apply {
             put("resp", "lane")
             put("port", laneAppPort)
-            put("left_lane", left_lane)
-            put("right_lane", right_lane)
+            put("left_lane", l)
+            put("right_lane", r)
+            put("lane_valid", if (laneValid) 1 else 0)
+            // 临匝道临时屏蔽激光盲区：CP 侧归一化盲区只保留"摄像头"与"原车前雷达"
+            //   条件与实线放宽同源(solidLineRelaxed)；不发(=0)即恢复
+            put("sup_lidar_l", if (supL) 1 else 0)
+            put("sup_lidar_r", if (supR) 1 else 0)
         }.toString()
 
         when {
@@ -348,6 +383,11 @@ class KeepAliveService : Service() {
                     sendLaneType(left_lane_type, right_lane_type)
                     laneSendCnt++
                     if(laneSendCnt >= 100) laneSendCnt = 1
+                } else if (System.currentTimeMillis() - lastLaneSendMs >= laneHeartbeatMs) {
+                    // 心跳：视觉帧停摆(检测关闭 / 相机断流 / 取图失败)时，
+                    //   仍保持 lane 通道与激光屏蔽标志在线(否则 CP 3s 超时会复位屏蔽标志)
+                    //   线型是否被 CP 采信由 lane_valid 字段决定，不受心跳影响
+                    sendLaneType(left_lane_type, right_lane_type)
                 }
 
                 delay(50L)

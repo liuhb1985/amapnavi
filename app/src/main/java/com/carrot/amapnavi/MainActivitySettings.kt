@@ -402,12 +402,35 @@ fun MainActivity.loadUserSettings() {
         15f
     }
 
+    //"车辆已靠边"抑制变道(默认开)：该侧实线(+高速该侧车道数<=1)持续5秒 → 禁止继续往该方向变道
+    last_lane_suppress_en = if (prefs.contains("last_lane_suppress_en")) {
+        prefs.getBoolean("last_lane_suppress_en", true)
+    } else {
+        editor.putBoolean("last_lane_suppress_en", true)
+        true
+    }
+
     //连续岔路判定：下一步岔路距离上限(m，默认 500)
     fork_chain_dist_m = if (prefs.contains("fork_chain_dist_m")) {
         prefs.getInt("fork_chain_dist_m", 500)
     } else {
         editor.putInt("fork_chain_dist_m", 500)
         500
+    }
+
+    //临匝道放宽窗口偏移量(m，默认 高速200 / 公路100)：窗口 = 进匝道距离 + 本值
+    //  窗口内同时解除：实线判据 / 激光盲区 / "车辆已靠边"抑制(三者同源)
+    solid_relax_offset_h = if (prefs.contains("solid_relax_offset_h")) {
+        prefs.getInt("solid_relax_offset_h", 200)
+    } else {
+        editor.putInt("solid_relax_offset_h", 200)
+        200
+    }
+    solid_relax_offset_l = if (prefs.contains("solid_relax_offset_l")) {
+        prefs.getInt("solid_relax_offset_l", 100)
+    } else {
+        editor.putInt("solid_relax_offset_l", 100)
+        100
     }
 
     //导航靠边/进匝道：语音后等待(默认 0=不等，播报后立即下发)

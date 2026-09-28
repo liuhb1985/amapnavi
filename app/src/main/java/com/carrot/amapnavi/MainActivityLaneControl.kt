@@ -153,12 +153,67 @@ fun MainActivity.solidLineRelaxed(action: LaneChangeAction, purpose: LaneChangeP
     if (laneChangeEdge != action) return false
 
     val dist = opStateManager.state.xTurnDist
-    val forkDist = (if (bHighWay) fork_dist_h else fork_dist_l).toFloat()
-    // ① 已进入"进匝道距离 + 余量"范围(默认：进匝道距离前 15m 起解除)
-    if (forkDist > 0f && dist <= forkDist + solid_relax_margin_m) return true
+    // ① 已进入"放宽窗口"：进匝道距离(fork_dist_h/l) + 偏移量(solid_relax_offset_h/l)
+    //    以进匝道距离为基准做偏移 —— 该距离随道路类型/用户设置变化，偏移量能自动跟随。
+    //    窗口内同时解除：实线判据 / 激光盲区 / "车辆已靠边"抑制(三者同源)。
+    val offset = if (bHighWay) solid_relax_offset_h else solid_relax_offset_l
+    if (offset > 0) {
+        val forkDist = if (bHighWay) fork_dist_h else fork_dist_l
+        val relaxDist = (forkDist + offset).toFloat()
+        if (dist <= relaxDist) return true
+    }
 
     // ② 连续岔路：当前与下一步引导都是岔路(鱼骨线最易被误判成实线的路口)
     return isForkChain()
+}
+
+// -----------------------------
+// 向 CP 发布的线型值(单一计算点)
+//   App 自身的识别结果(left_lane_type/right_lane_type)保持不变——"实线就是实线"，
+//   只在"发布给 CP"这个出口放宽：导航要求该侧靠边且放宽成立时，实线按虚线(0)发。
+//   判据与安全门的实线豁免共用 solidLineRelaxed，保证两侧同源(不会一边放一边拦)。
+// -----------------------------
+fun MainActivity.calcPublishLaneType(): Pair<Int, Int> {
+    var l = left_lane_type
+    var r = right_lane_type
+    if (l >= 1 && solidLineRelaxed(LaneChangeAction.LEFT, LaneChangePurpose.NAVI)) l = 0
+    if (r >= 1 && solidLineRelaxed(LaneChangeAction.RIGHT, LaneChangePurpose.NAVI)) r = 0
+    return l to r
+}
+
+// -----------------------------
+// 临匝道"临时屏蔽激光盲区"：该方向是否生效
+//   条件与实线放宽 solidLineRelaxed 完全同源(临匝道窗口 / 连续岔路 + 方向与导航一致)。
+//   目的(实车)：激光雷达极易把匝道护栏、匝道墙、导流设施当成侧方障碍，
+//   在"导航明确要求变道、必须走"的匝道口把车拦住。
+//   生效期间由 App 通过 lane 报文通知 CP，把归一化盲区里的**激光来源**
+//   (侧方/前角/后角/车身)一并屏蔽，只保留"摄像头盲区"与"原车前雷达前侧"。
+//   恢复：条件一旦不成立即发 0(≤100ms，见 publishLaneTypeIfChanged)；
+//        App 停发 lane 报文时由 CP 侧 3s 超时兜底自动恢复。
+// -----------------------------
+fun MainActivity.lidarSuppressRelaxed(action: LaneChangeAction,
+                                      purpose: LaneChangePurpose = LaneChangePurpose.NAVI): Boolean =
+        solidLineRelaxed(action, purpose)
+
+// 当前要发给 CP 的激光屏蔽标志(左/右)
+fun MainActivity.calcLidarSuppress(): Pair<Boolean, Boolean> =
+        lidarSuppressRelaxed(LaneChangeAction.LEFT) to lidarSuppressRelaxed(LaneChangeAction.RIGHT)
+
+// -----------------------------
+// 放宽状态变化时立即补发线型(不等视觉帧)
+//   背景(实车 2026-09-28 18:37 高速出口)：安全门先放行并下发命令，而线型只在
+//   视觉帧(sendLaneResultFlag，约 250ms 一次)才发布 → CP 手里仍是"实线"，
+//   命令停在 Prepare 直至超时(当日连续 8 次)。
+//   决策循环(100ms)里比对"将要发布的值"，一变就立刻补发一帧；
+//   正常发布通道(视觉帧 / 停发递减)保持不变。
+// -----------------------------
+fun MainActivity.publishLaneTypeIfChanged() {
+    val svc = keepAliveService ?: return
+    val (l, r) = calcPublishLaneType()
+    val (supL, supR) = calcLidarSuppress()
+    if (l == lastPubLaneL && r == lastPubLaneR && supL == lastPubSupL && supR == lastPubSupR) return
+    // 线型或激光屏蔽标志任一变化(典型：刚进入/刚离开匝道放宽窗口) → 立即发一帧
+    svc.sendLaneType(left_lane_type, right_lane_type)
 }
 
 // -----------------------------
@@ -455,12 +510,14 @@ private fun MainActivity.LaneChangeSafetyCheckRaw(
         if (action == LaneChangeAction.LEFT) {
             if (s.l_front_blind) return -2
             else if (s.left_blindspot) return -4
-            else if (s.lidar_lblind) return -8
+            else if (s.lidar_lblind && !lidarSuppressRelaxed(action, purpose)) return -8
             else if (left_lane_type == 1 && !solidLineRelaxed(action, purpose)) return -1
         } else if (action == LaneChangeAction.RIGHT) {
             if (s.r_front_blind) return -2
             else if (s.right_blindspot) return -4
-            else if (s.lidar_rblind) return -8
+            // 临匝道临时屏蔽激光：激光极易把匝道护栏/匝道墙当成侧方障碍
+            //   仅导航变道生效(传 purpose)，超车仍严格
+            else if (s.lidar_rblind && !lidarSuppressRelaxed(action, purpose)) return -8
             else if (right_lane_type == 1 && !solidLineRelaxed(action, purpose)) return -1
         }
         if (action == LaneChangeAction.LEFT_TURN) {
