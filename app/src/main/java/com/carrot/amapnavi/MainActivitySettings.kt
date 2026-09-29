@@ -418,19 +418,19 @@ fun MainActivity.loadUserSettings() {
         500
     }
 
-    //临匝道放宽窗口偏移量(m，默认 高速200 / 公路100)：窗口 = 进匝道距离 + 本值
+    //临匝道放宽窗口偏移量(m，默认 高速10 / 公路5)：窗口 = 进匝道距离 + 本值
     //  窗口内同时解除：实线判据 / 激光盲区 / "车辆已靠边"抑制(三者同源)
     solid_relax_offset_h = if (prefs.contains("solid_relax_offset_h")) {
-        prefs.getInt("solid_relax_offset_h", 200)
+        prefs.getInt("solid_relax_offset_h", 10)
     } else {
-        editor.putInt("solid_relax_offset_h", 200)
-        200
+        editor.putInt("solid_relax_offset_h", 10)
+        10
     }
     solid_relax_offset_l = if (prefs.contains("solid_relax_offset_l")) {
-        prefs.getInt("solid_relax_offset_l", 100)
+        prefs.getInt("solid_relax_offset_l", 5)
     } else {
-        editor.putInt("solid_relax_offset_l", 100)
-        100
+        editor.putInt("solid_relax_offset_l", 5)
+        5
     }
 
     //导航靠边/进匝道：语音后等待(默认 0=不等，播报后立即下发)

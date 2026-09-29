@@ -474,7 +474,7 @@
                 android:layout_height="36dp"
                 android:inputType="number"
                 android:gravity="center"
-                android:text="200"
+                android:text="10"
                 android:textSize="14sp" />
 
             <Button
@@ -498,7 +498,7 @@
                 android:layout_height="36dp"
                 android:inputType="number"
                 android:gravity="center"
-                android:text="100"
+                android:text="5"
                 android:textSize="14sp" />
 
             <Button

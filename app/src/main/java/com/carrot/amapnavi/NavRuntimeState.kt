@@ -192,8 +192,8 @@ var fork_chain_dist_m = 500      // 连续岔路判定：下一步岔路距离�
 //   背景：导航给的"最右"是**可通行车道**，而视觉最右是应急车道，两者差一条 ——
 //   导航会一路要求变到"最右可通行车道"，被实线/已靠边压制就会错过匝道。
 //   设为 0 = 关闭该窗口(只保留连续岔路判定)。
-var solid_relax_offset_h = 200   // 高速偏移量(等效窗口 = fork_dist_h + 本值)
-var solid_relax_offset_l = 100   // 公路偏移量(等效窗口 = fork_dist_l + 本值)
+var solid_relax_offset_h = 10    // 高速偏移量(等效窗口 = fork_dist_h + 本值，默认 10m)
+var solid_relax_offset_l = 5     // 公路偏移量(等效窗口 = fork_dist_l + 本值，默认 5m)
 
 // -----------------------------
 // "车辆已靠边"抑制变道(设置页开关，默认开)

@@ -211,8 +211,8 @@ class NavSettingActivity : AppCompatActivity() {
                 .putInt("atc_dist_l", etAtcDistL.text.toString().toIntOrNull() ?: 500)
                 .putInt("fork_dist_h", etForkDistH.text.toString().toIntOrNull() ?: 80)
                 .putInt("fork_dist_l", etForkDistL.text.toString().toIntOrNull() ?: 30)
-                .putInt("solid_relax_offset_h", etRelaxOffsetH.text.toString().toIntOrNull() ?: 200)
-                .putInt("solid_relax_offset_l", etRelaxOffsetL.text.toString().toIntOrNull() ?: 100)
+                .putInt("solid_relax_offset_h", etRelaxOffsetH.text.toString().toIntOrNull() ?: 10)
+                .putInt("solid_relax_offset_l", etRelaxOffsetL.text.toString().toIntOrNull() ?: 5)
                 .putBoolean("ramp_slowdown_en", cbRampSlowdown.isChecked)
                 .putInt("ramp_slowdown_dist_h", etRampDistH.text.toString().toIntOrNull() ?: 400)
                 .putInt("ramp_slowdown_dist_l", etRampDistL.text.toString().toIntOrNull() ?: 200)
@@ -228,8 +228,8 @@ class NavSettingActivity : AppCompatActivity() {
         // "车辆已靠边"抑制开关：立即生效(见 NavRuntimeState.last_lane_suppress_en)
         last_lane_suppress_en = cbLastLaneSuppress.isChecked
         // 临匝道放宽窗口偏移量：立即生效(见 solidLineRelaxed)
-        solid_relax_offset_h = etRelaxOffsetH.text.toString().toIntOrNull() ?: 200
-        solid_relax_offset_l = etRelaxOffsetL.text.toString().toIntOrNull() ?: 100
+        solid_relax_offset_h = etRelaxOffsetH.text.toString().toIntOrNull() ?: 10
+        solid_relax_offset_l = etRelaxOffsetL.text.toString().toIntOrNull() ?: 5
     }
 
     private fun load() {
@@ -261,8 +261,8 @@ class NavSettingActivity : AppCompatActivity() {
         etAtcDistL.setText(prefs.getInt("atc_dist_l", 500).toString())
         etForkDistH.setText(prefs.getInt("fork_dist_h", 80).toString())
         etForkDistL.setText(prefs.getInt("fork_dist_l", 30).toString())
-        etRelaxOffsetH.setText(prefs.getInt("solid_relax_offset_h", 200).toString())
-        etRelaxOffsetL.setText(prefs.getInt("solid_relax_offset_l", 100).toString())
+        etRelaxOffsetH.setText(prefs.getInt("solid_relax_offset_h", 10).toString())
+        etRelaxOffsetL.setText(prefs.getInt("solid_relax_offset_l", 5).toString())
         cbRampSlowdown.isChecked = prefs.getBoolean("ramp_slowdown_en", true)
         etRampDistH.setText(prefs.getInt("ramp_slowdown_dist_h", 400).toString())
         etRampDistL.setText(prefs.getInt("ramp_slowdown_dist_l", 200).toString())
