@@ -117,6 +117,21 @@ var overtakeLastLogTime = 0L                           // 上次记录决策原�
 var naviTakeoverUntil = 0L
 const val NAVI_TAKEOVER_HOLD_MS = 3000L
 
+// -----------------------------
+// 有"推荐车道/禁行车道"时禁止超车(超车设置页开关，默认开)
+//   导航车道数组里出现 "*"(推荐车道) 或 "X"(禁行车道) → 直接不允许超车。
+//   实时判定，不走上面的导航接管粘滞窗口(车道引导消失即恢复超车)。
+//   背景：原 isStopPyOvertake 只把这两种情况写进 py_overtake_disable(已无消费方)，
+//         真正拦超车的只有 decideOvertakeLane 里的"目标车道禁行"一条，推荐车道不拦。
+//         这里把两者一起接回超车禁令，并可随时用开关关掉。
+// -----------------------------
+var overtake_block_on_nav_lane_hint = true
+
+// 本帧导航车道的特征标志(由 isStopPyOvertake 填充，供 autoOvertake 判定)
+//   与 py_overtake_disable 分开：那个标志还混着靠边/岔路/雷达离线等原因
+var navLaneHasBlocked = false    // 有禁行车道(X)
+var navLaneHasSuggested = false  // 有推荐车道(*)
+
 // 当前是否处于"导航接管"(含粘滞窗口)
 fun naviTakeoverActive(): Boolean = System.currentTimeMillis() < naviTakeoverUntil
 

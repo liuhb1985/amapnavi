@@ -273,6 +273,8 @@ fun MainActivity.AmapNavi(lane_line_valid: Boolean): Boolean {
     laneChangeEdge = LaneChangeAction.KEEP   //成员变量(见 MainActivity.laneChangeEdge)，每帧重置
     var action = LaneChangeAction.KEEP
     py_overtake_disable = false
+    navLaneHasBlocked = false      //有禁行/推荐车道标志每帧重置(导航关闭时不留残值)
+    navLaneHasSuggested = false
 
     //检查是否要关闭超车功能
     if ((!bHighWay && app_road_navi) || (bHighWay && app_navi)) {
@@ -919,9 +921,14 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
     //   (日志里显示"超车功能关闭"，但超车实际仍在工作)。
     //   超车与导航的互斥现在只在 naviFlag 为真时生效(见 AmapNavi 返回处)。
 
-    // ============ 1. 基础条件判断(激光雷达在线/OP定速/超车开关/领航未接管) ============
+    //有推荐/禁行车道时临时禁止超车(超车设置页开关，默认开)；车道引导消失即恢复超车
+    val navLaneHintBlocked = overtake_block_on_nav_lane_hint &&
+            (navLaneHasBlocked || navLaneHasSuggested)
+
+    // ============ 1. 基础条件判断(激光雷达在线/OP定速/超车开关/领航未接管/无导航车道引导) ============
     if (!(s.lidar_l && s.lidar_r                       //激光雷达在线
                 && s.engaged && !naviFlag              //开启了op定速并且领航未控制
+                && !navLaneHintBlocked                 //无推荐/禁行车道
                 && ((!bHighWay && app_road_overtake) || (bHighWay && app_overtake)))) {
 
         //条件原因(同时用于日志与诊断面板)
@@ -932,6 +939,7 @@ fun MainActivity.autoOvertake(naviFlag: Boolean) {
         if (!bHighWay && !app_road_overtake) condReason += "公路超车未打开，"
         if (bHighWay && !app_overtake) condReason += "高速超车未打开，"
         if (naviFlag) condReason += "领航控制中，"
+        if (navLaneHintBlocked) condReason += if (navLaneHasBlocked) "有禁行车道，" else "有推荐车道，"
 
         if (app_overtake_valid != -1) {
             app_overtake_valid = -1

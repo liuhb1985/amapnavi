@@ -160,6 +160,16 @@
             android:textColor="#000000"
             android:padding="0dp" />
 
+        <CheckBox
+            android:id="@+id/cbOvertakeBlockNavLaneHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="有推荐/禁行车道时禁止超车"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
         <!-- 侧向危险阈值：固定距离(m) 或 绝对速度时距(s)，前后分别设置 -->
         <TextView
             android:layout_width="wrap_content"

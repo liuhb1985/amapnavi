@@ -46,6 +46,11 @@ fun MainActivity.isStopPyOvertake(
         }
     }
 
+    // 记录本帧导航车道特征：供 autoOvertake 的"有推荐/禁行车道时禁止超车"判据使用
+    //   (不直接复用 py_overtake_disable —— 它还混着靠边/岔路/转弯/雷达离线等原因)
+    navLaneHasBlocked = blocked_flag
+    navLaneHasSuggested = suggested_flag
+
     if(blocked_flag || suggested_flag) {
         py_overtake_disable = true
         if(blocked_flag){

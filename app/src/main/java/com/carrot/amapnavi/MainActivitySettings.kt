@@ -509,6 +509,14 @@ fun MainActivity.loadUserSettings() {
         editor.putBoolean("app_thresh_follow_cp", true)
         true
     }
+    //有推荐/禁行车道时禁止超车(超车设置页开关，默认开)
+    //  导航车道数组里出现 "*"(推荐) 或 "X"(禁行) → 本帧不允许超车(实时判定，见 autoOvertake)
+    overtake_block_on_nav_lane_hint = if (prefs.contains("overtake_block_on_nav_lane_hint")) {
+        prefs.getBoolean("overtake_block_on_nav_lane_hint", true)
+    } else {
+        editor.putBoolean("overtake_block_on_nav_lane_hint", true)
+        true
+    }
     lidar_front_dist_mode = prefs.getInt("lidar_front_dist_mode", 0)
     lidar_front_dist_m = prefs.getFloat("lidar_front_dist_m", 5f)
     lidar_front_time_s = prefs.getFloat("lidar_front_time_s", 1.2f)

@@ -68,6 +68,8 @@ class DebugReceiver : BroadcastReceiver() {
             "solid_relax_offset_l" to Spec("solid_relax_offset_l", 'i'),
             // "车辆已靠边"抑制变道(默认开)：该侧实线(+高速该侧车道数<=1)持续5秒 → 禁止继续变道
             "last_lane_suppress_en" to Spec("last_lane_suppress_en", 'b'),
+            // 有推荐/禁行车道时禁止超车(默认开)：导航车道含 "*"/"X" → 本帧不允许超车
+            "overtake_block_on_nav_lane_hint" to Spec("overtake_block_on_nav_lane_hint", 'b'),
             // 导航靠边/进匝道时"语音后等待"毫秒数(默认 0=不等，立即下发；普通变道仍用 1500)
             "navi_edge_speak_delay_ms" to Spec("navi_edge_speak_delay_ms", 'i'),
             // 导航靠边/进匝道时 Prepare 状态超时毫秒数(默认 700，普通变道为 2000)
@@ -476,6 +478,7 @@ class DebugReceiver : BroadcastReceiver() {
                 if (key == "drive_log_en") drive_log_en = v
                 if (key == "solid_relax_en") solid_relax_en = v
                 if (key == "last_lane_suppress_en") last_lane_suppress_en = v
+                if (key == "overtake_block_on_nav_lane_hint") overtake_block_on_nav_lane_hint = v
                 if (a != null) when (key) {
                     "app_navi" -> a.app_navi = v
                     "app_road_navi" -> a.app_road_navi = v
@@ -576,6 +579,7 @@ class DebugReceiver : BroadcastReceiver() {
                 "drive_log_en" -> drive_log_en
                 "solid_relax_en" -> solid_relax_en
                 "last_lane_suppress_en" -> last_lane_suppress_en
+                "overtake_block_on_nav_lane_hint" -> overtake_block_on_nav_lane_hint
                 "navi_speak" -> a.navi_speak
                 "navi_speak_first" -> a.navi_speak_first
                 "navi_blind_dec_speed" -> a.navi_blind_dec_speed

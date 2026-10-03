@@ -24,6 +24,7 @@ class OvertakeSettingActivity : AppCompatActivity() {
     private lateinit var cbRoad: CheckBox
     private lateinit var cbLidarSelfCheck: CheckBox
     private lateinit var cbThreshFollowCp: CheckBox
+    private lateinit var cbBlockNavLaneHint: CheckBox
     private lateinit var etReverseCooldown: EditText
 
     // 侧向危险阈值：固定距离(m) / 绝对速度时距(s)，前后各一套
@@ -57,6 +58,7 @@ class OvertakeSettingActivity : AppCompatActivity() {
         cbRoad = findViewById(R.id.cbOvertakeSettingRoad)
         cbLidarSelfCheck = findViewById(R.id.cbOvertakeSettingLidarSelfCheck)
         cbThreshFollowCp = findViewById(R.id.cbOvertakeSettingThreshFollowCp)
+        cbBlockNavLaneHint = findViewById(R.id.cbOvertakeBlockNavLaneHint)
 
         rgFrontThreshMode = findViewById(R.id.rgFrontThreshMode)
         etFrontThresh = findViewById(R.id.etFrontThresh)
@@ -190,6 +192,7 @@ class OvertakeSettingActivity : AppCompatActivity() {
                 .putBoolean("app_road_overtake", cbRoad.isChecked)
                 .putBoolean("app_lidar_self_check", cbLidarSelfCheck.isChecked)
                 .putBoolean("app_thresh_follow_cp", cbThreshFollowCp.isChecked)
+                .putBoolean("overtake_block_on_nav_lane_hint", cbBlockNavLaneHint.isChecked)
                 .putInt("lidar_front_dist_mode", if (frontIsTime()) 1 else 0)
                 .putFloat("lidar_front_dist_m", frontDistM)
                 .putFloat("lidar_front_time_s", frontTimeS)
@@ -213,6 +216,7 @@ class OvertakeSettingActivity : AppCompatActivity() {
         cbRoad.isChecked = prefs.getBoolean("app_road_overtake", false)
         cbLidarSelfCheck.isChecked = prefs.getBoolean("app_lidar_self_check", true)
         cbThreshFollowCp.isChecked = prefs.getBoolean("app_thresh_follow_cp", true)
+        cbBlockNavLaneHint.isChecked = prefs.getBoolean("overtake_block_on_nav_lane_hint", true)
         frontDistM = prefs.getFloat("lidar_front_dist_m", 5f)
         frontTimeS = prefs.getFloat("lidar_front_time_s", 1.2f)
         rearDistM = prefs.getFloat("lidar_rear_dist_m", 10f)
