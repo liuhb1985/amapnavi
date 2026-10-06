@@ -156,8 +156,13 @@ fun convert_tbt_type(icon: Int?): Int {
         11   -> 51  // 靠右行驶 -> notification straight直行
         12   -> 51  // 进入环岛 -> notification straight直行
         13   -> 51  // 离开环岛 -> notification straight直行
-        14   -> 142 // 收费站 -> rotary straight直行
-        16   -> 153 // 隧道 -> straight
+        // 14 收费站：CP 的收费站码是 153/154/249(xTurnInfo=6)。
+        //    原先发 142，而 142 在 CP 是 "rotary straight"(环岛直行, xTurnInfo=5)，
+        //    会把收费站当成进环岛——已按 CP 的 turn_type_mapping 纠正为 153。
+        14   -> 153 // 收费站 -> 收费站(TG)
+        // 16 隧道：CP 没有隧道转向码（它靠 szPosRoadName 含"隧道"判断），
+        //    原先发 153 会让 CP 误判成收费站，改为按普通直行处理。
+        16   -> 51  // 隧道 -> notification straight直行
         65   -> 7    // 走左侧岔路 -> fork left
         66   -> 6    // 走右侧岔路 -> fork left
         else -> -1   // 未知或未匹配

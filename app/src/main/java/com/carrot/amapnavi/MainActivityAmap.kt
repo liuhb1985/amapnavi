@@ -331,9 +331,8 @@ fun MainActivity.updateNaviState(extras: Map<String, Any?>): Pair<Boolean, Strin
         updateField("carrotIndex", extras["carrotIndex"]?.toString()?.toIntOrNull(), { carrotIndex = it }, { carrotIndex })
         updateField("carrotCmd", extras["carrotCmd"]?.toString(), { carrotCmd = it }, { carrotCmd })
         updateField("carrotArg", extras["carrotArg"]?.toString(), { carrotArg = it }, { carrotArg })
-        updateField("goalPosX", extras["arrivePOILongitude"]?.toString()?.toDoubleOrNull(), { goalPosX = it }, { goalPosX })
-        updateField("goalPosY", extras["arrivePOILatitude"]?.toString()?.toDoubleOrNull(), { goalPosY = it }, { goalPosY })
-        updateField("szGoalName", extras["endPOIName"]?.toString(), { szGoalName = it }, { szGoalName })
+        // 注：arrivePOILongitude/Latitude、endPOIName 对应的 goalPosX/goalPosY/szGoalName
+        // 已从 NaviState 移除——CP 侧只解析不消费，发了也没用。
         updateField("nSdiType", extras["CAMERA_TYPE"]?.toString()?.toIntOrNull()?:-1, { nSdiTypeMain = it }, { nSdiTypeMain })
         updateField("nSdiSpeedLimit", extras["CAMERA_SPEED"]?.toString()?.toIntOrNull(), { nSdiSpeedLimit = it }, { nSdiSpeedLimit })
         updateField("nSdiDist", extras["CAMERA_DIST"]?.toString()?.toIntOrNull(), { nSdiDist = it }, { nSdiDist })
@@ -350,7 +349,7 @@ fun MainActivity.updateNaviState(extras: Map<String, Any?>): Pair<Boolean, Strin
         updateField("vpPosPointLat", extras["CAR_LATITUDE"]?.toString()?.toDoubleOrNull(), { vpPosPointLat = it }, { vpPosPointLat })
         updateField("vpPosPointLon", extras["CAR_LONGITUDE"]?.toString()?.toDoubleOrNull(), { vpPosPointLon = it }, { vpPosPointLon })
         updateField("nPosAngle", extras["CAR_DIRECTION"]?.toString()?.toFloatOrNull(), { nPosAngle = it }, { nPosAngle })
-        updateField("nPosSpeed", extras["CUR_SPEED"]?.toString()?.toFloatOrNull(), { nPosSpeed = it }, { nPosSpeed })
+        // 注：CUR_SPEED 对应的 nPosSpeed 已从 NaviState 移除（CP 不消费）
         updateRoadCateField(extras)
         updateSpeedField(extras)
         updateCameraField(extras)
@@ -392,10 +391,33 @@ fun MainActivity.updateNaviState(extras: Map<String, Any?>): Pair<Boolean, Strin
         sdi_type = 1 //类型转为固定式测速摄像头
         if(sdi_speed_limit < 60) sdi_speed_limit = 60 //摄像头限速小于60则强制为60
     }
-    //有导航红灯辅助降速，有红灯摄像头并且有距离
-    if(nTrafficSpeedLimit > 0 && sdi_type_org == 6 && sdi_dist >= 0){
-        sdi_type = 1 //强制为测速摄像头
-        sdi_speed_limit = nTrafficSpeedLimit //路口速度
+    // ---------------------------------------------------------------
+    // 红灯辅助降速：把「路口限速」写进摄像头限速通道下发给 CP
+    //
+    // 两条注入路径：
+    //  ① 原路径：有闯红灯摄像头(CAMERA_TYPE 2/13 → 转换后 6) 且距离有效，
+    //     直接借用它的距离，在到达电子眼(=停止线)时把限速压到 nTrafficSpeedLimit。
+    //  ② 兜底路径（red_light_no_camera 开关，默认关）：路口没有电子眼时，
+    //     60073 红绿灯广播不携带距离字段，只能借用导航 TBT 距离
+    //     （到下一个引导动作的距离，红绿灯通常在路口）。
+    //     为规避「下一个 TBT 其实是更远的路口」导致提前几百米误降速，
+    //     只在 TBT 距离 <= red_light_max_dist(默认 200m) 时才注入。
+    // ---------------------------------------------------------------
+    redLightInjectSource = 0
+    if (nTrafficSpeedLimit > 0) {
+        if (sdi_type_org == 6 && sdi_dist >= 0) {
+            sdi_type = 1 //强制为测速摄像头
+            sdi_speed_limit = nTrafficSpeedLimit //路口速度
+            redLightInjectSource = 1
+        } else if (red_light_no_camera) {
+            val tbtDist = naviState.nTBTDist ?: -1
+            if (tbtDist in 0..red_light_max_dist) {
+                sdi_type = 1
+                sdi_speed_limit = nTrafficSpeedLimit
+                sdi_dist = tbtDist
+                redLightInjectSource = 2
+            }
+        }
     }
 
     //收费站特殊处理
@@ -463,8 +485,38 @@ fun MainActivity.updateNaviState(extras: Map<String, Any?>): Pair<Boolean, Strin
     opStateManager.state.nTurnInfo = naviState.nTBTTurnType
     opStateManager.state.xTurnInfo = convert_x_tbt_type(naviState.nTBTTurnType)
 
+    applyCommonOutFields()
     val newJson = naviState.toJson()
     return Pair(true, newJson)
+}
+
+/* =========================================================
+ * 填 CP 支持、但此前一直没用的通用字段（每次下发前调用）
+ *
+ * - epochTime / timezone：CP 在 carrotIndex % 60 == 0 时用它校时，
+ *   不填的话 CP 端时间可能不准（影响日志时间戳与按时间触发的策略）。
+ * - latitude / longitude / heading / accuracy：CP 的手机 GPS 冗余通道，
+ *   「3 秒内没有导航数据」时启用，且 accuracy < 15 米才采信。
+ *   隧道里高德断流时这是 CP 唯一的位置参考。
+ *
+ * 未开启对应开关时一律置 null，Gson 会整字段跳过 —— 不改变原有报文。
+ * ========================================================= */
+fun MainActivity.applyCommonOutFields() {
+    naviState.epochTime = System.currentTimeMillis() / 1000
+    naviState.timezone = java.util.TimeZone.getDefault().id
+
+    val loc = if (phone_gps_enable) phoneGpsProvider?.lastLocation else null
+    if (loc != null && loc.hasAccuracy() && loc.accuracy <= PhoneGpsProvider.MAX_ACCURACY_M) {
+        naviState.latitude = loc.latitude
+        naviState.longitude = loc.longitude
+        naviState.heading = if (loc.hasBearing()) loc.bearing else null
+        naviState.accuracy = loc.accuracy
+    } else {
+        naviState.latitude = null
+        naviState.longitude = null
+        naviState.heading = null
+        naviState.accuracy = null
+    }
 }
 
 fun MainActivity.parseDriveWay(extras: Map<*, *>?) {

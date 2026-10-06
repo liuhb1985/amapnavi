@@ -188,6 +188,22 @@ fun MainActivity.loadUserSettings() {
         editor.putBoolean("lane_color", false)
         false
     }
+    // 1b. 无闯红灯摄像头时也下发（TBT 距离兜底）
+    red_light_no_camera = if (prefs.contains("red_light_no_camera")) {
+        prefs.getBoolean("red_light_no_camera", false)
+    } else {
+        editor.putBoolean("red_light_no_camera", false)
+        false
+    }
+
+    // 1c. 兜底通道作用距离上限（米）
+    red_light_max_dist = if (prefs.contains("red_light_max_dist")) {
+        prefs.getInt("red_light_max_dist", 200)
+    } else {
+        editor.putInt("red_light_max_dist", 200)
+        200
+    }
+
     // 2. 红灯减速最低速度
     red_light_min_speed_limit = if (prefs.contains("red_light_min_speed_limit")) {
         prefs.getInt("red_light_min_speed_limit", 1)
@@ -237,10 +253,32 @@ fun MainActivity.loadUserSettings() {
         30
     }
     max_speed_limit = if (prefs.contains("max_speed_limit")) {
-        prefs.getInt("max_speed_limit", 130)
+        // CP 侧 nRoadLimitSpeed > 200 会按 "(n-20)/10" 反解(历史放大编码)，
+        // 例如 250 会被解析成 23 km/h——这里必须与 CP 保持一致地上限夹住
+        prefs.getInt("max_speed_limit", 130).coerceIn(30, 200)
     } else {
         editor.putInt("max_speed_limit", 130)
         130
+    }
+
+    // ---- 与 CP 对齐新增的开关 ----
+    phone_gps_enable = if (prefs.contains("phone_gps_enable")) {
+        prefs.getBoolean("phone_gps_enable", false)
+    } else {
+        editor.putBoolean("phone_gps_enable", false)
+        false
+    }
+    traffic_detect_cmd = if (prefs.contains("traffic_detect_cmd")) {
+        prefs.getBoolean("traffic_detect_cmd", false)
+    } else {
+        editor.putBoolean("traffic_detect_cmd", false)
+        false
+    }
+    lane_stop_when_invalid = if (prefs.contains("lane_stop_when_invalid")) {
+        prefs.getBoolean("lane_stop_when_invalid", true)
+    } else {
+        editor.putBoolean("lane_stop_when_invalid", true)
+        true
     }
     //6. 导航红灯辅助降速时间
     navi_traffic_assist_time = if (prefs.contains("navi_traffic_assist_time")) {

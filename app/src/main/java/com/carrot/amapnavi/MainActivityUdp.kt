@@ -157,6 +157,47 @@ fun MainActivity.handleCarrotManUdpJson(json: JSONObject, packetAddress: String,
     }
 }
 
+/* =========================================================
+ * 红绿灯检测注入 CP：carrotCmd = DETECT
+ *
+ * CP 侧(carrot_man.py) 的命令白名单包含 DETECT，carrot_serv._update_cmd 解析
+ *   carrotArg = "<state>,<v1>,<v2>,<v3>"
+ *   state ∈ Red Light / Yellow Light / Green Light / Left turn
+ *   v1,v2 = 坐标；v3 = 置信度
+ * 用于给 CP 的 trafficState 提供一个独立于摄像头的信源。
+ *
+ * 为什么值得做：CP 自己的红绿灯靠视觉模型，逆光 / 大雨 / 前方大车遮挡时会失效；
+ * 高德的灯态来自路口信号灯数据，是完全独立的另一个信源，两者互补。
+ *
+ * 注意：与变道命令共用 nextLaneCmdIndex() 递增源——CP 靠 carrotIndex 变化
+ * 判断"这是新命令"，序号不变会被当成重复命令丢弃。
+ * ========================================================= */
+fun MainActivity.sendTrafficDetectIfChanged() {
+    if (!traffic_detect_cmd) return
+    val status = nTrafficLightStatus
+    if (status == lastTrafficDetectSent) return          // 只在状态变化时下发
+
+    val state = when (status) {
+        red_light -> "Red Light"
+        green_light -> "Green Light"
+        yellow_light -> "Yellow Light"
+        else -> null
+    }
+    if (state == null) return
+
+    // 倒计时可用时作为置信度参考；不可用给固定值
+    val conf = if (nTrafficLightSeconds > 0) 100 else 80
+    val index = nextLaneCmdIndex()
+    val json = JSONObject().apply {
+        put("carrotIndex", index)
+        put("carrotCmd", "DETECT")
+        put("carrotArg", "$state,0,0,$conf")
+    }
+    cmUdpServiceSend(json.toString(), port = carrotManOpPort)
+    lastTrafficDetectSent = status
+    AppLogger.log(this, "TRAFFIC", "红灯注入CP: DETECT index=$index arg=${json.optString("carrotArg")}(高德status=$status)")
+}
+
 // -----------------------------
 // 高德广播监听（导航 / 红绿灯数据）
 // -----------------------------
@@ -185,6 +226,8 @@ fun MainActivity.startListening() {
             if (keyType == 60073){
                 updateTrafficState(extras)
                 lastTrafficRecvTime = System.currentTimeMillis()
+                // 把高德红绿灯注入 CP（与 CP 自己的视觉红绿灯互补）
+                sendTrafficDetectIfChanged()
             }
 
             //导航消息

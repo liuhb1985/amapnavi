@@ -213,6 +213,55 @@
                 android:layout_marginStart="8dp"/>
         </LinearLayout>
 
+        <!-- 无电子眼路口也下发红灯限速（用导航 TBT 距离兜底） -->
+        <LinearLayout
+            android:id="@+id/cbLayoutRedLightNoCamera"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            android:layout_marginTop="0dp">
+
+            <CheckBox
+                android:id="@+id/cbRedLightNoCamera"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="无电子眼路口也降速"
+                android:textSize="13sp"
+                android:textColor="#000000"
+                android:padding="0dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="作用距离≤"
+                android:textSize="12sp"
+                android:textColor="#333333"
+                android:layout_marginStart="8dp"/>
+
+            <EditText
+                android:id="@+id/etRedLightMaxDist"
+                android:layout_width="48dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:gravity="start|center_vertical"
+                android:text="200"
+                android:textSize="12sp"
+                android:textColor="#000000"
+                android:backgroundTint="#888888"
+                android:background="@android:color/white"
+                android:paddingStart="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="m"
+                android:textSize="12sp"
+                android:textColor="#333333"
+                android:layout_marginStart="4dp"/>
+        </LinearLayout>
+
         <!-- 红灯减速维持时间 -->
         <LinearLayout
             android:id="@+id/cbLayoutNaviTrafficAssistTime"
@@ -1037,6 +1086,58 @@
                 android:text="+"
                 android:layout_marginStart="8dp"/>
         </LinearLayout>
+
+        <!-- ============ 与 CP(carrot) 协议对齐的新增开关 ============ -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#DDDDDD"
+            android:layout_marginTop="6dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="CP 协议增强(需 CP 支持对应字段)"
+            android:textSize="12sp"
+            android:textColor="#333333"
+            android:textStyle="bold"
+            android:layout_marginTop="4dp"/>
+
+        <CheckBox
+            android:id="@+id/cbPhoneGps"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="上报手机GPS(隧道/高德断流时给CP定位)"
+            android:textSize="12sp"
+            android:textColor="#000000"
+            android:padding="0dp"/>
+
+        <CheckBox
+            android:id="@+id/cbTrafficDetectCmd"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="高德红绿灯注入CP(DETECT,与CP视觉互补)"
+            android:textSize="12sp"
+            android:textColor="#000000"
+            android:padding="0dp"/>
+
+        <CheckBox
+            android:id="@+id/cbLaneStopWhenInvalid"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="车道线判据失效时停发lane包(让CP超时清零)"
+            android:textSize="12sp"
+            android:textColor="#000000"
+            android:padding="0dp"/>
+
+        <!-- 导航源探针：接入百度车机版等新地图前，用来抓真实广播/通知栏样本 -->
+        <Button
+            android:id="@+id/btnOpenNavProbe"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="导航源探针(抓新地图协议)"
+            android:textSize="12sp"
+            android:layout_marginTop="8dp" />
 
         <!-- 底部按钮 -->
         <LinearLayout

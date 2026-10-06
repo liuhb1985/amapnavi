@@ -646,6 +646,129 @@
             android:scrollbars="vertical" />
     </ScrollView>
 
+    <!-- ================= 采集卡预览（HDMI 转 USB / UVC） =================
+         默认只显示标题行，点「展开」才显示预览画面与操作按钮，
+         避免在车机小屏上长期占用空间。 -->
+    <LinearLayout
+        android:id="@+id/uvcCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="4dp"
+        android:background="#E8E8E8"
+        android:padding="4dp">
+
+        <!-- 标题行 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="采集卡预览"
+                android:textSize="13sp"
+                android:textColor="#333333"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvUvcBrief"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="未启动"
+                android:textSize="10sp"
+                android:textColor="#666666"
+                android:layout_marginEnd="6dp" />
+
+            <Button
+                android:id="@+id/btnUvcToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="展开"
+                android:textSize="11sp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp" />
+        </LinearLayout>
+
+        <!-- 预览主体（默认隐藏） -->
+        <LinearLayout
+            android:id="@+id/uvcBody"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <!-- ★ TextureView 本身绝对不能带 android:background：
+                 实机(MIUI / Android 13+) inflate 时会在 View.<init> → setBackground 抛异常，
+                 直接导致 setContentView 崩溃、App 打不开。
+                 （崩溃栈：Error inflating class android.view.TextureView
+                   Caused by InvocationTargetException ← View.setBackground）
+                 黑底改由外层 FrameLayout 提供。 -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="180dp"
+                android:layout_marginTop="4dp"
+                android:background="@android:color/black">
+
+                <TextureView
+                    android:id="@+id/uvcPreview"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tvUvcStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textSize="10sp"
+                android:textColor="#333333"
+                android:lineSpacingExtra="2dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical">
+
+                <Button
+                    android:id="@+id/btnUvcRetry"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="重新连接"
+                    android:textSize="11sp"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp"
+                    android:background="@drawable/btn_blue" />
+
+                <Button
+                    android:id="@+id/btnUvcUsbPerm"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="申请USB权限"
+                    android:textSize="11sp"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:layout_marginStart="8dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp" />
+            </LinearLayout>
+        </LinearLayout>
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -679,6 +802,7 @@
                 android:textColor="#000000"
                 android:scrollbars="vertical" />
         </ScrollView>
+    </LinearLayout>
     </LinearLayout>
 </LinearLayout>
 

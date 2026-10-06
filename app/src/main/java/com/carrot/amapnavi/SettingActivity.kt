@@ -1,6 +1,7 @@
 package com.carrot.amapnavi
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.*
@@ -14,6 +15,14 @@ class SettingActivity : AppCompatActivity() {
 
     private lateinit var cbLayoutCpMinSpeedLimt : LinearLayout
     private lateinit var cbLayoutRedLightMinSpeedLimt : LinearLayout
+    private lateinit var cbLayoutRedLightNoCamera : LinearLayout
+    private lateinit var cbRedLightNoCamera: CheckBox
+    private lateinit var etRedLightMaxDist: EditText
+
+    // ---- 与 CP 协议对齐的新增开关 ----
+    private lateinit var cbPhoneGps: CheckBox
+    private lateinit var cbTrafficDetectCmd: CheckBox
+    private lateinit var cbLaneStopWhenInvalid: CheckBox
     private lateinit var cbLayoutNaviTrafficAssistTime : LinearLayout
     private lateinit var etLayoutLaneDetectInterval : LinearLayout
 
@@ -103,6 +112,9 @@ class SettingActivity : AppCompatActivity() {
 
         cbLayoutCpMinSpeedLimt = findViewById(R.id.cbLayoutCpMinSpeedLimt)
         cbLayoutRedLightMinSpeedLimt = findViewById(R.id.cbLayoutRedLightMinSpeedLimt)
+        cbLayoutRedLightNoCamera = findViewById(R.id.cbLayoutRedLightNoCamera)
+        cbRedLightNoCamera = findViewById(R.id.cbRedLightNoCamera)
+        etRedLightMaxDist = findViewById(R.id.etRedLightMaxDist)
         cbLayoutNaviTrafficAssistTime = findViewById(R.id.cbLayoutNaviTrafficAssistTime)
         etLayoutLaneDetectInterval = findViewById(R.id.etLayoutLaneDetectInterval)
 
@@ -180,6 +192,16 @@ class SettingActivity : AppCompatActivity() {
         btnSaveSetting = findViewById(R.id.btnSaveSetting)
         btnCancelSetting = findViewById(R.id.btnCancelSetting)
 
+        findViewById<Button>(R.id.btnOpenNavProbe).setOnClickListener {
+            startActivity(Intent(this, com.carrot.amapnavi.probe.NavProbeActivity::class.java))
+        }
+
+        cbPhoneGps = findViewById(R.id.cbPhoneGps)
+        cbTrafficDetectCmd = findViewById(R.id.cbTrafficDetectCmd)
+        cbLaneStopWhenInvalid = findViewById(R.id.cbLaneStopWhenInvalid)
+
+
+
         loadSettings()
         setupButtons()
     }
@@ -256,6 +278,7 @@ class SettingActivity : AppCompatActivity() {
 
                 cbLayoutCpMinSpeedLimt.visibility = View.GONE
                 cbLayoutRedLightMinSpeedLimt.visibility = View.GONE
+                cbLayoutRedLightNoCamera.visibility = View.GONE
                 cbLayoutNaviTrafficAssistTime.visibility = View.GONE
             }
         }
@@ -271,8 +294,10 @@ class SettingActivity : AppCompatActivity() {
         cbRedLightTrafficAssist.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
                 cbLayoutRedLightMinSpeedLimt.visibility = View.VISIBLE
+                cbLayoutRedLightNoCamera.visibility = View.VISIBLE
             } else {
                 cbLayoutRedLightMinSpeedLimt.visibility = View.GONE
+                cbLayoutRedLightNoCamera.visibility = View.GONE
             }
         }
 
@@ -323,6 +348,8 @@ class SettingActivity : AppCompatActivity() {
                 .putBoolean("lane_detect", cbLaneDetect.isChecked)
                 .putBoolean("lane_color", cbLaneColor.isChecked)
                 .putInt("red_light_min_speed_limit", etRedLightMinSpeedLimt.text.toString().toIntOrNull() ?: 1)
+                .putBoolean("red_light_no_camera", cbRedLightNoCamera.isChecked)
+                .putInt("red_light_max_dist", etRedLightMaxDist.text.toString().toIntOrNull()?.coerceIn(30, 1000) ?: 200)
                 .putInt("cp_min_speed_limit", etCpMinSpeedLimt.text.toString().toIntOrNull() ?: 20)
                 .putInt("road_speed_limit_percent", etRoadSpeedLimitPercent.text.toString().toIntOrNull() ?: 0)
                 .putInt("road_speed_limit_kph", etRoadSpeedLimitKph.text.toString().toIntOrNull() ?: 0)
@@ -330,7 +357,13 @@ class SettingActivity : AppCompatActivity() {
                 .putInt("offset_road", etOffsetRoad.text.toString().toIntOrNull() ?: 20)
                 .putInt("top_pad_dp", etTopPad.text.toString().toIntOrNull() ?: 5)
                 .putInt("min_speed_limit", etMinSpeedLimit.text.toString().toIntOrNull() ?: 30)
-                .putInt("max_speed_limit", etMaxSpeedLimit.text.toString().toIntOrNull() ?: 130)
+                // CP 侧 nRoadLimitSpeed > 200 会按 "(n-20)/10" 反解成离谱低速（250 → 23），
+                // 这里必须与 CP 一致地把上限夹住，避免用户手滑导致车辆被限速到 20 多
+                .putInt("max_speed_limit",
+                    (etMaxSpeedLimit.text.toString().toIntOrNull() ?: 130).coerceIn(30, 200))
+                .putBoolean("phone_gps_enable", cbPhoneGps.isChecked)
+                .putBoolean("traffic_detect_cmd", cbTrafficDetectCmd.isChecked)
+                .putBoolean("lane_stop_when_invalid", cbLaneStopWhenInvalid.isChecked)
                 .putInt("station_dist_offset", etStationDistOffset.text.toString().toIntOrNull() ?: 0)
                 .putInt("station_speed", etStationSpeed.text.toString().toIntOrNull() ?: 15)
                 .putInt("lane_detect_interval", etLaneDetectInterval.text.toString().toIntOrNull() ?: 500)
@@ -363,6 +396,8 @@ class SettingActivity : AppCompatActivity() {
         cbLaneDetect.isChecked = prefs.getBoolean("lane_detect", true)
         cbLaneColor.isChecked = prefs.getBoolean("lane_color", false)
         etRedLightMinSpeedLimt.setText(prefs.getInt("red_light_min_speed_limit", 1).toString())
+        cbRedLightNoCamera.isChecked = prefs.getBoolean("red_light_no_camera", false)
+        etRedLightMaxDist.setText(prefs.getInt("red_light_max_dist", 200).toString())
         etCpMinSpeedLimt.setText(prefs.getInt("cp_min_speed_limit", 20).toString())
         etRoadSpeedLimitPercent.setText(prefs.getInt("road_speed_limit_percent", 0).toString())
         etRoadSpeedLimitKph.setText(prefs.getInt("road_speed_limit_kph", 0).toString())
@@ -370,7 +405,10 @@ class SettingActivity : AppCompatActivity() {
         etOffsetRoad.setText(prefs.getInt("offset_road", 15).toString())
         etTopPad.setText(prefs.getInt("top_pad_dp", 5).toString())
         etMinSpeedLimit.setText(prefs.getInt("min_speed_limit", 30).toString())
-        etMaxSpeedLimit.setText(prefs.getInt("max_speed_limit", 130).toString())
+        etMaxSpeedLimit.setText(prefs.getInt("max_speed_limit", 130).coerceIn(30, 200).toString())
+        cbPhoneGps.isChecked = prefs.getBoolean("phone_gps_enable", false)
+        cbTrafficDetectCmd.isChecked = prefs.getBoolean("traffic_detect_cmd", false)
+        cbLaneStopWhenInvalid.isChecked = prefs.getBoolean("lane_stop_when_invalid", true)
         etStationDistOffset.setText(prefs.getInt("station_dist_offset", 0).toString())
         etStationSpeed.setText(prefs.getInt("station_speed", 0).toString())
         etLaneDetectInterval.setText(prefs.getInt("lane_detect_interval", 500).toString())

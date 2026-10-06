@@ -19,6 +19,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebChromeClient
 import android.view.View
+import android.view.TextureView
 import androidx.core.view.children
 import android.view.ViewGroup
 import java.security.MessageDigest
@@ -121,6 +122,17 @@ class MainActivity : AppCompatActivity() {
     internal lateinit var layoutOvertakeDebug: LinearLayout
     internal lateinit var btnOvertakeDebug: Button
     internal lateinit var btnOvertakeDebugClose: Button
+
+    // ---- 采集卡预览相关控件 ----
+    internal lateinit var uvcCard: LinearLayout
+    internal lateinit var uvcBody: LinearLayout
+    internal lateinit var uvcPreview: TextureView
+    internal lateinit var tvUvcStatus: TextView
+    internal lateinit var tvUvcBrief: TextView
+    internal lateinit var btnUvcToggle: Button
+    internal lateinit var btnUvcRetry: Button
+    internal lateinit var btnUvcUsbPerm: Button
+
     internal var overtakeDebugRefreshJob: Job? = null
     // 雷达卡片文本的上一次输出(内容没变就不重复写日志，避免刷屏)
     internal var radarCardsLogLast: String = ""
@@ -230,12 +242,34 @@ class MainActivity : AppCompatActivity() {
     internal var naviTrafficAssistLast = false
     internal var red_light_min_speed_limit = 1
     internal var cp_min_speed_limit = 20
+
+    // 无闯红灯摄像头时也下发红灯限速（用导航 TBT 距离兜底），默认关闭
+    // 背景：60073 红绿灯广播不带距离字段，原逻辑只在有闯红灯摄像头(CAMERA_TYPE 2/13)
+    // 时才下发，导致没有电子眼的路口红灯限速永远发不出去。
+    internal var red_light_no_camera = false
+    // 兜底通道的作用距离上限（米）：TBT 距离超过此值不注入，避免离路口很远就误降速
+    internal var red_light_max_dist = 200
+    // 本次红灯限速的注入来源（诊断用）：0=未注入 1=闯红灯摄像头 2=TBT距离兜底
+    internal var redLightInjectSource = 0
     internal var road_speed_limit_percent = 0
     internal var road_speed_limit_kph = 0
     internal var offset_highway = 20
     internal var offset_road = 15
     internal var min_speed_limit = 30
     internal var max_speed_limit = 130
+
+    // ---- 与 CP 对齐新增的开关 ----
+    /** 上报手机 GPS 给 CP 作为定位冗余（CP 在 3 秒无导航数据时使用），默认关：需定位权限且耗电 */
+    internal var phone_gps_enable = false
+    /** 把高德红绿灯状态用 carrotCmd=DETECT 注入 CP（与其视觉红绿灯互补），默认关 */
+    internal var traffic_detect_cmd = false
+    /** 车道线判据失效(检测关闭/停摆)时停止发 lane 包，让 CP 3 秒超时清零，默认开 */
+    internal var lane_stop_when_invalid = true
+
+    /** 手机 GPS 采集器（phone_gps_enable 打开后才创建） */
+    internal var phoneGpsProvider: PhoneGpsProvider? = null
+    /** 上一次已下发给 CP 的红绿灯检测状态，用于只在变化时下发 */
+    internal var lastTrafficDetectSent: Int = -999
     internal var station_dist_offset = 50
     internal var station_speed = 10
     internal var station_keep_time = 10
@@ -556,18 +590,35 @@ class MainActivity : AppCompatActivity() {
 
     //程序创建函数
     override fun onCreate(savedInstanceState: Bundle?) {
+        // ★ 第一件事：挂上崩溃捕获器（写盘到 /sdcard/AmapNavi/crash/），
+        //   车上没有 adb 时，这是拿到闪退堆栈的唯一途径
+        CrashLogger.install(this)
+        CrashLogger.mark(this, "onCreate 进入")
         super.onCreate(savedInstanceState)
         supportActionBar?.hide()
         setContentView(R.layout.activity_main)
+        CrashLogger.mark(this, "setContentView 完成")
 
         Global.deviceId = getDeviceId(this)
         instance = this
+        CrashLogger.mark(this, "deviceId 完成")
 
         webView = findViewById(R.id.webViewSection)
         btnAppOverTake = findViewById(R.id.btnAppOverTake)
         //btnLaneDetect = findViewById(R.id.btnLaneDetect)
         btnNavSetting = findViewById(R.id.btnNavSetting)
         //btnImportSetting = findViewById(R.id.btnImportSetting)
+
+        // 采集卡预览
+        uvcCard = findViewById(R.id.uvcCard)
+        uvcBody = findViewById(R.id.uvcBody)
+        uvcPreview = findViewById(R.id.uvcPreview)
+        tvUvcStatus = findViewById(R.id.tvUvcStatus)
+        tvUvcBrief = findViewById(R.id.tvUvcBrief)
+        btnUvcToggle = findViewById(R.id.btnUvcToggle)
+        btnUvcRetry = findViewById(R.id.btnUvcRetry)
+        btnUvcUsbPerm = findViewById(R.id.btnUvcUsbPerm)
+        CrashLogger.mark(this, "采集卡控件 findViewById 完成")
 
         layoutSystemButtons = findViewById(R.id.layoutSystemButtons)
         imageViewLayout = findViewById(R.id.imageViewLinear)
@@ -635,10 +686,33 @@ class MainActivity : AppCompatActivity() {
         tvVersion.text = "V" + versionName
 
         startSoundPolling() // 启动声音轮询
+        CrashLogger.mark(this, "声音轮询已启动")
+
+        setupUvcPreview() // 采集卡预览（HDMI 转 USB）
+        CrashLogger.mark(this, "setupUvcPreview 完成")
+
+        // 诊断：卡片最终是否可见、在屏幕什么位置
+        // （visibility: 0=VISIBLE 4=INVISIBLE 8=GONE；y+h 超出 screenH 即在屏幕外）
+        uvcCard.post {
+            runCatching {
+                val loc = IntArray(2)
+                uvcCard.getLocationOnScreen(loc)
+                CrashLogger.mark(
+                    this,
+                    "uvcCard: card=${uvcCard.visibility} body=${uvcBody.visibility} " +
+                            "y=${loc[1]} h=${uvcCard.height} screenH=${resources.displayMetrics.heightPixels}"
+                )
+            }
+        }
 
         // 保存第1行之外控件的原始可见性
         val viewVisibilityMap = mutableMapOf<View, Int>()
         for ((index, view) in container.children.withIndex()) {
+            // 采集卡卡片不受这套「隐藏/连点3次恢复」机制管理：
+            // 它是 container 的最后一个子控件，index 必然 > 4，
+            // 不排除的话一启动就被 GONE，用户在界面上永远看不到这个功能。
+            // 卡片默认只显示一行标题，占高极小，常显不影响主界面。
+            if (view === uvcCard) continue
             if (index > 4) {  // 第0个子控件是顶部速度栏，保持可见
                 viewVisibilityMap[view] = view.visibility
                 if (view.visibility == View.VISIBLE) {
@@ -1018,6 +1092,14 @@ class MainActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_CAMERA_PERMISSION) {
+            onUvcPermissionResult(grantResults)
+            return
+        }
+        if (requestCode == REQ_LOCATION_PERMISSION) {
+            syncPhoneGps()
+            return
+        }
         if (requestCode != REQ_STORAGE_PERMISSION) return
 
         val idx = permissions.indexOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
@@ -1038,10 +1120,17 @@ class MainActivity : AppCompatActivity() {
         action?.invoke()
     }
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        // 采集卡：系统「打开方式」chooser / 开机恢复通知走这里
+        intent?.let { handleUvcIntent(it) }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         receiver?.let { unregisterReceiver(it) }
         receiver = null // FIX
+        unregisterUvcUsbReceiver()  // 采集卡 USB 插拔广播
         sendJob?.cancel()
         //cmUdpService.stop()
 
@@ -1056,11 +1145,35 @@ class MainActivity : AppCompatActivity() {
     companion object {
         @Volatile
         var instance: MainActivity? = null
+
+        /** 手机 GPS 定位权限申请码 */
+        const val REQ_LOCATION_PERMISSION = 10087
     }
 
     override fun onResume() {
         super.onResume()
         loadUserSettings()
+        syncPhoneGps()
+    }
+
+    /**
+     * 按 phone_gps_enable 开关启停手机 GPS 采集（上报给 CP 作为定位冗余）。
+     * 缺权限时发起运行时申请；用户拒绝就保持关闭，不反复弹窗。
+     */
+    private fun syncPhoneGps() {
+        if (!phone_gps_enable) {
+            phoneGpsProvider?.stop()
+            phoneGpsProvider = null
+            return
+        }
+        val provider = phoneGpsProvider ?: PhoneGpsProvider(this).also { phoneGpsProvider = it }
+        if (!provider.hasPermission()) {
+            androidx.core.app.ActivityCompat.requestPermissions(
+                this, PhoneGpsProvider.PERMISSIONS, REQ_LOCATION_PERMISSION
+            )
+            return
+        }
+        provider.start()
     }
 
     // 返回键：超车诊断页显示时先关掉诊断页回主界面，而不是直接退出 App

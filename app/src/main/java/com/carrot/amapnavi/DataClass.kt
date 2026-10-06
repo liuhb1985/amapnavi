@@ -181,28 +181,30 @@ data class OpState(
         var doLaneForkNow: Int = 0,
 )
 
-// 后台结构体，用于收集高德导航字段
+/* =========================================================
+ * 后台结构体，用于收集高德导航字段（JSON 直发 CP 的 UDP 7706）
+ *
+ * 与 CP(carrot_serv.update) 对齐后的两点说明：
+ * 1. 已移除 CP 侧「只存不消费」的死字段：goalPosX/goalPosY/szGoalName、
+ *    nSdiSection/nSdiBlockSpeed/nSdiPlusSpeedLimit/nSdiPlusBlockType/
+ *    nSdiPlusBlockSpeed/nSdiPlusBlockDist/nPosSpeed。
+ *    这些字段发了 CP 也不用，留着只会在排障时误导（以为发了就该生效）。
+ * 2. 新增 CP 支持但此前没用的字段：epochTime/timezone（校时）、
+ *    latitude/longitude/heading/accuracy（手机 GPS 冗余）。
+ *    它们默认 null，Gson 会整字段跳过，不开开关时完全不改变报文。
+ * ========================================================= */
 data class NaviState(
         var carrotIndex: Int? = null,
         var carrotCmd: String? = null,
         var carrotArg: String? = null,
-        var goalPosX: Double? = null,
-        var goalPosY: Double? = null,
-        var szGoalName: String? = null,
         var nRoadLimitSpeed: Int? = -1,
         var nSdiType: Int? = -1,
         var nSdiSpeedLimit: Int? = 0,
-        var nSdiSection: Int? = -1,
         var nSdiDist: Int? = -1,
         var nSdiBlockType: Int? = -1,
-        var nSdiBlockSpeed: Int? = 0,
         var nSdiBlockDist: Int? = 0,
         var nSdiPlusType: Int? = -1,
-        var nSdiPlusSpeedLimit: Int? = 0,
         var nSdiPlusDist: Int? = 0,
-        var nSdiPlusBlockType: Int? = -1,
-        var nSdiPlusBlockSpeed: Int? = 0,
-        var nSdiPlusBlockDist: Int? = 0,
         var roadcate: Int? = 0,
         var nTBTDist: Int = 0,
         var nTBTTurnType: Int = -1,
@@ -219,7 +221,44 @@ data class NaviState(
         var vpPosPointLat: Double? = null,
         var vpPosPointLon: Double? = null,
         var nPosAngle: Float? = null,
-        var nPosSpeed: Float? = null
+
+        // ---- CP 已支持、此前未使用的字段（null = 不发送） ----
+        /** Unix 秒。CP 在 carrotIndex % 60 == 0 时用它校时 */
+        var epochTime: Long? = null,
+        /** 时区，默认 Asia/Seoul */
+        var timezone: String? = null,
+        /** 手机 GPS：CP 在 3 秒无导航数据时用；accuracy < 15 才采信 */
+        var latitude: Double? = null,
+        var longitude: Double? = null,
+        var heading: Float? = null,
+        var accuracy: Float? = null
 ) {
-    fun toJson(): String = Gson().toJson(this)
+    /**
+     * 序列化前把道路限速规范化：
+     * CP 侧 nRoadLimitSpeed <= 0 会被当成 30 km/h、> 200 会被当成
+     * "(n-20)/10" 反解（历史放大编码），两类都要在 App 侧先夹住，
+     * 否则一个非法值会让车莫名其妙被限速。
+     */
+    fun toJson(): String {
+        val limit = nRoadLimitSpeed
+        val safeLimit = when {
+            limit == null || limit <= 0 -> NAVI_LIMIT_FALLBACK
+            limit > NAVI_LIMIT_MAX -> NAVI_LIMIT_MAX
+            else -> limit
+        }
+        val backup = nRoadLimitSpeed
+        nRoadLimitSpeed = safeLimit
+        return try {
+            Gson().toJson(this)
+        } finally {
+            nRoadLimitSpeed = backup
+        }
+    }
+
+    private companion object {
+        /** 无有效限速时的兜底值（与 CP 的 30 一致） */
+        const val NAVI_LIMIT_FALLBACK = 30
+        /** CP 反解码的临界值：超过会被 (n-20)/10 解析成离谱的低速 */
+        const val NAVI_LIMIT_MAX = 200
+    }
 }

@@ -230,6 +230,7 @@ fun MainActivity.smoothSpeedLimit() {
 
                 //发送json
                 if (cmUdpServiceSendEnable) {
+                    applyCommonOutFields()
                     val jsonStr = naviState.toJson()
                     lastJsonToSend = jsonStr
                     cmUdpServiceSend(jsonStr, port = carrotManOpPort)
@@ -1171,6 +1172,10 @@ fun MainActivity.logNavSnapshot() {
         sb.append(" v=").append(vEgoQ)
         sb.append(" eng=").append(if (st.engaged) 1 else 0)
         sb.append(" turn=").append(st.xTurnInfo).append('/').append(distQ)
+        // 红灯限速注入来源：0=未注入 1=闯红灯摄像头 2=TBT距离兜底（诊断"红灯没下发"用）
+        if (redLightInjectSource != 0 || nTrafficSpeedLimit > 0) {
+            sb.append(" rl=").append(redLightInjectSource).append('/').append(nTrafficSpeedLimit)
+        }
         sb.append(" edge=").append(laneChangeEdge.name)
         sb.append(" en=").append(if (enableLaneChange) 1 else 0)
         sb.append(" dec=").append(lastValidLaneAction.name)

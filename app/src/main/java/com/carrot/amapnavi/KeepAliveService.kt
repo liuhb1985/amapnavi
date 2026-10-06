@@ -74,6 +74,9 @@ class KeepAliveService : Service() {
 
     // ===================== 生命周期 =====================
     override fun onCreate() {
+        // 服务常在开机后由 RestartReceiver 拉起(此时还没有 Activity)，
+        // 崩溃捕获必须在这里也挂一次，否则这一段崩了拿不到堆栈
+        CrashLogger.install(this)
         super.onCreate()
 
         createNotificationChannel()
@@ -384,10 +387,15 @@ class KeepAliveService : Service() {
                     laneSendCnt++
                     if(laneSendCnt >= 100) laneSendCnt = 1
                 } else if (System.currentTimeMillis() - lastLaneSendMs >= laneHeartbeatMs) {
-                    // 心跳：视觉帧停摆(检测关闭 / 相机断流 / 取图失败)时，
-                    //   仍保持 lane 通道与激光屏蔽标志在线(否则 CP 3s 超时会复位屏蔽标志)
-                    //   线型是否被 CP 采信由 lane_valid 字段决定，不受心跳影响
-                    sendLaneType(left_lane_type, right_lane_type)
+                    // 心跳：原实现是"无论判据是否有效都持续发"，靠 lane_valid 字段让 CP 区分。
+                    // 但实测 CP(amap_navi.py:609-618) 只解析 left_lane/right_lane，
+                    // 完全不读 lane_valid —— 判据失效时 CP 仍以为在线，会一直按陈旧线型拒变道。
+                    // 因此改为：判据失效时停发（含心跳），让 CP 的 3 秒超时把它清零，
+                    // 回退到 CP 自己的判据。lane_stop_when_invalid 关掉可恢复旧行为。
+                    val stopWhenInvalid = MainActivity.instance?.lane_stop_when_invalid ?: true
+                    if (!stopWhenInvalid || laneTypeDetectValid()) {
+                        sendLaneType(left_lane_type, right_lane_type)
+                    }
                 }
 
                 delay(50L)

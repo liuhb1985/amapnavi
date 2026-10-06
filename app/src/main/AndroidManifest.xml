@@ -10,12 +10,24 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.CAMERA"/>
 
+    <!-- 手机 GPS（可选开关 phone_gps_enable 打开后才采集）：
+         上报给 CP 作为定位冗余——CP 在 3 秒无导航数据时用它推算位置 -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <!-- 日志写到手机存储根目录 AmapNavi/（文件管理器可见，用户可自行挑选发送）；
          未授予时自动回退 app 私有目录 -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 
+    <!-- 采集卡（HDMI 转 USB）：USB Host 能力声明。
+         required=false：没有 OTG 的纯手机也能安装，只是采集卡功能不可用 -->
+    <uses-feature
+        android:name="android.hardware.usb.host"
+        android:required="false" />
+
     <application
+        android:name=".CarrotApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -76,6 +88,40 @@
             android:name=".WebViewActivity"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
 
+        <!-- USB 采集卡插入跳板：完全透明、无历史。
+             配合 usb_device_filter，用户在系统「打开方式」中选中本应用时，
+             系统会【自动授予 USB 权限、不弹授权窗】——部分 ROM 上唯一可靠路径 -->
+        <activity
+            android:name=".UsbAttachActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/uvc_device_filter" />
+        </activity>
+
+        <!-- 导航源探针：接入新地图(如百度车机版)前，抓取其真实广播/通知栏样本。
+             通知监听需用户在系统「通知使用权」中授权，平时不启用 -->
+        <service
+            android:name=".probe.NavProbeService"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <activity
+            android:name=".probe.NavProbeActivity"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -97,6 +143,18 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
+
+        <!-- 开机后探测采集卡：插着但未授权时发通知，引导用户点开预览区重新授权。
+             （该 Receiver 走开机广播路径，代码内已做完全异常隔离） -->
+        <receiver
+            android:name=".UsbBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
             </intent-filter>
         </receiver>
 
