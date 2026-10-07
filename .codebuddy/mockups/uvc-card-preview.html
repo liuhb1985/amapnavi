@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>AmapNavi 采集卡预览卡片 - 界面示意图</title>
+<style>
+  :root{
+    --card-bg:#E8E8E8;
+    --page:#FFFFFF;
+    --title:#333333;
+    --brief:#666666;
+    --status:#333333;
+    --blue:#2196F3;
+    --btn-def:#D6D7D7;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:#F2F3F5; color:#111;
+    font-family:"Microsoft YaHei","微软雅黑",-apple-system,Segoe UI,sans-serif;
+    padding:24px;
+  }
+  .wrap{display:flex; gap:28px; align-items:flex-start;}
+  .panel-label{
+    text-align:center; font-size:13px; color:#555; margin-bottom:8px; letter-spacing:.5px;
+  }
+  .panel-label b{color:#111;}
+
+  /* 手机外框 */
+  .phone{
+    width:400px; border-radius:10px; overflow:hidden;
+    border:1px solid #C9CCD1; background:var(--page);
+    box-shadow:0 6px 18px rgba(0,0,0,.14);
+  }
+  .statusbar{
+    height:22px; background:#EDEDED; border-bottom:1px solid #DCDCDC;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 8px; font-size:10px; color:#666;
+  }
+  .screen{padding:6px 8px 10px;}
+
+  /* --- 上方：原有主界面（简化示意） --- */
+  .row-speed{display:flex; align-items:center; gap:8px; margin-bottom:4px;}
+  .ring{
+    width:74px;height:74px;border-radius:50%;flex:0 0 auto;
+    border:4px solid #4CAF50; position:relative;
+    display:flex; align-items:center; justify-content:center;
+    background:conic-gradient(#4CAF50 0turn 0.62turn, #E0E0E0 0.62turn);
+  }
+  .ring-inner{
+    width:58px;height:58px;border-radius:50%;background:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px;font-weight:700;color:#222;
+  }
+  .meta{font-size:10px;color:#555;line-height:1.5;}
+  .meta .k{color:#888;}
+  .navinfo{font-size:11px;color:#222;margin:2px 0 4px;}
+  .navline{font-size:10px;color:#666;}
+  .radar{
+    border:1px solid #D0D0D0; border-radius:4px; padding:4px 6px;
+    font-size:9px; color:#444; line-height:1.6; margin-bottom:4px;
+    background:#FAFAFA;
+  }
+  .sysbtns{display:flex;gap:4px;margin:4px 0;}
+  .sysbtn{
+    font-size:9px;padding:2px 6px;border-radius:3px;
+    background:var(--btn-def); color:#333; border:1px solid #BFBFBF;
+  }
+  .dimmed{opacity:.55;}
+
+  /* --- 采集卡卡片（对应 uvcCard） --- */
+  .uvc-card{
+    background:var(--card-bg); padding:4px;
+  }
+  .uvc-head{display:flex;align-items:center;gap:6px;}
+  .uvc-title{font-size:13px;font-weight:700;color:var(--title);flex:1;}
+  .uvc-brief{font-size:10px;color:var(--brief);margin-right:6px;}
+  .uvc-btn{
+    font-size:11px;padding:2px 8px;border-radius:3px;border:none;
+    background:var(--btn-def);color:#333;border:1px solid #BFBFBF;
+  }
+  .uvc-body{display:block; margin-top:4px;}
+  .uvc-body.hidden{display:none;}
+
+  /* TextureView 预览区 180dp */
+  .preview{
+    height:180px; background:#000; margin-top:4px; position:relative; overflow:hidden;
+  }
+  .scene{position:absolute;inset:0;}
+  .sky{position:absolute;left:0;right:0;top:0;height:44%;
+       background:linear-gradient(#7FB3D5,#BFD9EA);}
+  .ground{position:absolute;left:0;right:0;top:44%;bottom:0;
+       background:linear-gradient(#6E6E6E,#3E3E3E);}
+  .road{position:absolute;left:50%;bottom:0;width:230px;height:100%;
+       transform:translateX(-50%) perspective(200px) rotateX(52deg);
+       background:#2B2B2B; border-left:2px solid #E9E9E9; border-right:2px solid #E9E9E9;}
+  .lane{position:absolute;left:50%;bottom:0;width:3px;height:100%;
+       transform:translateX(-50%);
+       background:repeating-linear-gradient(to top,#F0F0F0 0 12px,transparent 12px 30px);}
+  .car{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);
+       width:74px;height:26px;background:#C0392B;border-radius:4px 4px 3px 3px;}
+  .hud{
+    position:absolute;left:6px;top:6px;font-size:9px;color:#B9FFB9;
+    text-shadow:0 0 3px #000; line-height:1.5;
+  }
+  .watermark{
+    position:absolute;right:6px;bottom:5px;font-size:9px;color:rgba(255,255,255,.55);
+  }
+
+  .uvc-status{font-size:10px;color:var(--status);margin-top:4px;line-height:1.5;}
+  .uvc-actions{display:flex;gap:8px;align-items:center;margin-top:4px;}
+  .btn-blue{background:var(--blue);color:#fff;border:none;border-radius:4px;
+            font-size:11px;padding:2px 10px;}
+  .btn-plain{background:var(--btn-def);color:#333;border:1px solid #BFBFBF;border-radius:4px;
+            font-size:11px;padding:2px 10px;}
+
+  .logrow{font-size:9px;color:#777;margin-top:6px;border-top:1px dashed #C8C8C8;padding-top:4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ========== 左：收起状态 ========== -->
+  <div>
+    <div class="panel-label"><b>状态 ①</b>：卡片默认收起（只占一行标题，预览已停）</div>
+    <div class="phone">
+      <div class="statusbar"><span>10:54</span><span>AmapNavi</span><span>100%</span></div>
+      <div class="screen">
+        <div class="row-speed">
+          <div class="ring"><div class="ring-inner">62</div></div>
+          <div class="meta">
+            <div><span class="k">当前/限速</span> 62 / 100</div>
+            <div><span class="k">前方</span> 1.2 km 靠右行驶</div>
+          </div>
+        </div>
+        <div class="navinfo">G15 沈海高速 · 距离出口 3.4 km</div>
+        <div class="navline">车道：推荐 2 道 ｜ 左右均未阻挡</div>
+        <div class="radar">前 18.5m ｜ 毫米波 L 12.0m R 9.8m ｜ 激光 四角正常 ｜ EGO 62</div>
+        <div class="sysbtns"><span class="sysbtn">设置</span><span class="sysbtn">超车</span><span class="sysbtn">设备</span></div>
+
+        <!-- 采集卡卡片：收起 -->
+        <div class="uvc-card">
+          <div class="uvc-head">
+            <span class="uvc-title">采集卡预览</span>
+            <span class="uvc-brief">已关闭</span>
+            <span class="uvc-btn">展开</span>
+          </div>
+        </div>
+
+        <div class="logrow">导航日志 · RawLog …</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 右：展开 + 已连接 ========== -->
+  <div>
+    <div class="panel-label"><b>状态 ②</b>：点「展开」后显示画面，直连通道出图</div>
+    <div class="phone">
+      <div class="statusbar"><span>10:55</span><span>AmapNavi</span><span>100%</span></div>
+      <div class="screen">
+        <div class="row-speed">
+          <div class="ring"><div class="ring-inner">62</div></div>
+          <div class="meta">
+            <div><span class="k">当前/限速</span> 62 / 100</div>
+            <div><span class="k">前方</span> 1.2 km 靠右行驶</div>
+          </div>
+        </div>
+        <div class="navinfo">G15 沈海高速 · 距离出口 3.4 km</div>
+        <div class="navline">车道：推荐 2 道 ｜ 左右均未阻挡</div>
+        <div class="radar">前 18.5m ｜ 毫米波 L 12.0m R 9.8m ｜ 激光 四角正常 ｜ EGO 62</div>
+        <div class="sysbtns"><span class="sysbtn">设置</span><span class="sysbtn">超车</span><span class="sysbtn">设备</span></div>
+
+        <!-- 采集卡卡片：展开 -->
+        <div class="uvc-card">
+          <div class="uvc-head">
+            <span class="uvc-title">采集卡预览</span>
+            <span class="uvc-brief">已连接</span>
+            <span class="uvc-btn">收起</span>
+          </div>
+          <div class="uvc-body">
+            <div class="preview">
+              <div class="scene">
+                <div class="sky"></div>
+                <div class="ground"></div>
+                <div class="road"></div>
+                <div class="lane"></div>
+                <div class="car"></div>
+              </div>
+              <div class="hud">1280x720 @ alt=3<br>~2940 kbps ｜ 30 fps</div>
+              <div class="watermark">TextureView · HDMI 输入（示意）</div>
+            </div>
+            <div class="uvc-status">已连接：MacroSilicon USB Video</div>
+            <div class="uvc-actions">
+              <span class="btn-blue">重新连接</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="logrow">采集卡: 已连接 MacroSilicon USB Video</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 右二：异常态（未授权） ========== -->
+  <div>
+    <div class="panel-label"><b>状态 ③</b>：ROM 秒拒 / 系统层打不开 → 给出人工指引</div>
+    <div class="phone">
+      <div class="statusbar"><span>10:56</span><span>AmapNavi</span><span>100%</span></div>
+      <div class="screen">
+        <div class="row-speed dimmed">
+          <div class="ring"><div class="ring-inner">62</div></div>
+          <div class="meta">
+            <div><span class="k">当前/限速</span> 62 / 100</div>
+            <div><span class="k">前方</span> 1.2 km 靠右行驶</div>
+          </div>
+        </div>
+        <div class="navinfo">G15 沈海高速 · 距离出口 3.4 km</div>
+        <div class="navline">车道：推荐 2 道 ｜ 左右均未阻挡</div>
+        <div class="radar">前 18.5m ｜ 毫米波 L 12.0m R 9.8m ｜ 激光 四角正常 ｜ EGO 62</div>
+        <div class="sysbtns"><span class="sysbtn">设置</span><span class="sysbtn">超车</span><span class="sysbtn">设备</span></div>
+
+        <div class="uvc-card">
+          <div class="uvc-head">
+            <span class="uvc-title">采集卡预览</span>
+            <span class="uvc-brief">异常</span>
+            <span class="uvc-btn">收起</span>
+          </div>
+          <div class="uvc-body">
+            <div class="preview" style="display:flex;align-items:center;justify-content:center;">
+              <span style="color:#8A8A8A;font-size:11px;">无信号 · 等待打开设备</span>
+            </div>
+            <div class="uvc-status">采集卡已识别，但底层无法打开设备。<br>
+              常见原因：OTG 供电已关闭 / 系统 USB 授权记录失效 / USB Host 驱动异常。<br><br>
+              请依次尝试：<br>
+              ① 设置 → 更多设置 → OTG 连接（开启后再观察）<br>
+              ② 完全拔出采集卡 10 秒后重新插入<br>
+              ③ 重启手机后重新插入，在系统「打开方式」中选择本应用<br><br>
+              修复后点下方「重新连接」即可恢复。</div>
+            <div class="uvc-actions">
+              <span class="btn-blue">重新连接</span>
+              <span class="btn-plain">申请USB权限</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="logrow">采集卡权限: USB 权限申请被系统拦截…</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

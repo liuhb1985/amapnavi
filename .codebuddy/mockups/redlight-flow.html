@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>红灯辅助停车 - 判定流程（改造后）</title>
+<style>
+  body{
+    margin:0; padding:26px 30px 34px; background:#F4F5F7; color:#1a1a1a;
+    font-family:"Microsoft YaHei","微软雅黑",-apple-system,Segoe UI,sans-serif;
+  }
+  h1{font-size:19px;margin:0 0 3px;}
+  .sub{font-size:12px;color:#666;margin-bottom:18px;}
+  .flow{max-width:1000px;}
+
+  .arw{text-align:center;color:#8A94A6;font-size:15px;line-height:1.1;margin:2px 0;}
+
+  .src{
+    display:flex;gap:12px;justify-content:center;margin-bottom:2px;
+  }
+  .src .b{
+    flex:1;background:#fff;border:1px solid #D5DAE2;border-left:4px solid #7E57C2;
+    border-radius:5px;padding:8px 10px;font-size:11.5px;line-height:1.55;
+  }
+  .src .b b{display:block;font-size:12px;margin-bottom:3px;color:#4527A0;}
+  code{
+    background:#F0F2F5;border-radius:3px;padding:0 3px;
+    font-family:Consolas,Menlo,monospace;font-size:11px;color:#B71C1C;
+  }
+
+  .dec{
+    background:#FFF8E1;border:1px solid #F0D9A8;border-left:4px solid #F9A825;
+    border-radius:5px;padding:9px 12px;font-size:12.5px;line-height:1.6;
+  }
+  .dec .tag{color:#8D6E00;font-size:10.5px;letter-spacing:.5px;}
+  .step{
+    background:#fff;border:1px solid #D5DAE2;border-left:4px solid #42A5F5;
+    border-radius:5px;padding:9px 12px;font-size:12.5px;line-height:1.6;
+  }
+  .no{
+    background:#FFEBEE;border:1px dashed #EF9A9A;color:#B71C1C;
+    border-radius:5px;padding:5px 10px;font-size:11px;display:inline-block;
+  }
+
+  .split{display:flex;gap:14px;align-items:stretch;margin:4px 0;}
+  .split>div{flex:1;display:flex;flex-direction:column;}
+
+  .merge{
+    background:#E8F5E9;border:1px solid #A5D6A7;border-left:4px solid #43A047;
+    border-radius:5px;padding:9px 12px;font-size:12.5px;line-height:1.6;
+  }
+
+  .newbox{
+    background:#fff;border:2px solid #43A047;border-radius:6px;padding:10px 12px;
+  }
+  .newbox .hd{font-size:12px;color:#2E7D32;font-weight:700;margin-bottom:6px;
+              display:flex;align-items:center;gap:6px;}
+  .pill{background:#43A047;color:#fff;font-size:9.5px;padding:1px 6px;border-radius:8px;}
+  .path{
+    display:flex;gap:8px;align-items:flex-start;padding:6px 0;
+    border-top:1px dashed #DDE1E7;font-size:11.5px;line-height:1.6;
+  }
+  .path:first-of-type{border-top:none;}
+  .pn{
+    flex:0 0 auto;width:19px;height:19px;border-radius:50%;color:#fff;
+    font-size:11px;display:flex;align-items:center;justify-content:center;
+  }
+  .p1{background:#1976D2;} .p2{background:#43A047;}
+  .ok{
+    background:#E8F5E9;border:1px solid #A5D6A7;border-radius:5px;
+    padding:6px 10px;font-size:11px;color:#1B5E20;margin-top:2px;
+  }
+  .foot{
+    margin-top:16px;font-size:11px;color:#666;line-height:1.7;
+    background:#fff;border:1px solid #D5DAE2;border-radius:5px;padding:10px 12px;
+  }
+  .foot b{color:#333;}
+  .kbd{background:#ECEFF1;border-radius:3px;padding:0 4px;font-family:Consolas,monospace;font-size:10.5px;}
+</style>
+</head>
+<body>
+<h1>红灯辅助停车 · 判定流程</h1>
+<div class="sub">amapnavi <code>com.carrot.amapnavi</code> ｜ 绿色虚框为本次新增的「无电子眼兜底通道」</div>
+
+<div class="flow">
+
+  <div class="src">
+    <div class="b"><b>A · 高德 KEY_TYPE 60073</b>
+      <code>trafficLightStatus</code>=2 红灯 / 3 绿灯 / 4 黄灯<br>
+      <code>redLightCountDownSeconds</code> 倒计时</div>
+    <div class="b"><b>B · 高德 KEY_TYPE 10001</b>
+      <code>TRAFFIC_LIGHT_NUM</code> 当前剩余灯数<br>
+      <code>routeRemainTrafficLightNum</code> 全程剩余</div>
+    <div class="b"><b>C · CP 回传 UDP 7705</b>
+      <code>trafficState</code>=1 红（CP 视觉）<br>
+      <code>xState</code>=3 e停车（CP 已决策）</div>
+  </div>
+
+  <div class="arw">▼</div>
+
+  <div class="dec">
+    <span class="tag">◇ 总闸</span>　<code>navi_traffic_assist == true</code>？
+    <div style="margin-top:4px"><span class="no">否 → 整个模块不跑（<b>默认关</b>）</span></div>
+  </div>
+
+  <div class="arw">▼ 是</div>
+
+  <div class="dec">
+    <span class="tag">◇ 道路类型</span>　<code>naviState.roadcate ∉ {0 快速, 1 高速}</code>？
+    <div style="margin-top:4px"><span class="no">否（在高速/快速路）→ 不启用，红灯辅助只在国道/公路生效</span></div>
+  </div>
+
+  <div class="arw">▼ 是</div>
+
+  <div class="split">
+    <div>
+      <div class="dec" style="min-height:74px">
+        <span class="tag">◇ 分支① OP 视觉</span><br>
+        <code>xState==e2eStop</code><br>
+        <code>xTrafficState==traffic_red</code><br>
+        <code>cp_traffic_assist</code>
+      </div>
+      <div class="arw">▼ 是</div>
+      <div class="step">nTrafficSpeedLimit = <b>cp_min_speed_limit</b><br><span style="color:#888;font-size:11px">默认 20 km/h（配合 CP 自己停车，不越权刹停）</span></div>
+    </div>
+    <div>
+      <div class="dec" style="min-height:74px">
+        <span class="tag">◇ 分支② 高德导航</span><br>
+        <code>nTrafficCnt &gt; 0</code><br>
+        <code>nTrafficLightStatus==red_light</code><br>
+        <code>redlight_traffic_assist</code>
+      </div>
+      <div class="arw">▼ 是</div>
+      <div class="step">nTrafficSpeedLimit = <b>red_light_min_speed_limit</b><br><span style="color:#888;font-size:11px">默认 1 km/h（≈ 停车）</span></div>
+    </div>
+  </div>
+
+  <div class="arw">▼</div>
+
+  <div class="merge">
+    <b>置位 + 打时间戳</b>　<code>xTrafficRedState = true</code>
+    <div style="font-size:11px;color:#555;margin-top:4px">
+      释放条件（任一满足即 <code>nTrafficSpeedLimit = -1</code>）：
+      ① 持续超过 <code>navi_traffic_assist_time</code>（默认 10s）
+      ② 超过 5s 未收到 60073 广播
+      ③ 摄像头编号变化 / 总闸关闭
+    </div>
+  </div>
+
+  <div class="arw">▼</div>
+
+  <div class="newbox">
+    <div class="hd">注入下发 <span class="pill">本次改造</span>
+      <span style="font-weight:400;color:#666;font-size:11px">—— 把「路口限速」写进摄像头限速通道</span></div>
+
+    <div class="path">
+      <div class="pn p1">①</div>
+      <div><b>原路径：</b><code>sdi_type_org == 6</code>（闯红灯摄像头，高德 <code>CAMERA_TYPE</code> 2/13）且 <code>sdi_dist &gt;= 0</code><br>
+      → <code>sdi_type=1</code>，<code>限速=nTrafficSpeedLimit</code>，<code>距离=CAMERA_DIST</code>　<span style="color:#2E7D32">标记 <code>rl=1</code></span></div>
+    </div>
+
+    <div class="path">
+      <div class="pn p2">②</div>
+      <div><b>新增兜底：</b><code>red_light_no_camera</code> 开启（<b>默认关</b>）且 <code>TBT 距离 ∈ [0, red_light_max_dist]</code>（默认 200m）<br>
+      → <code>sdi_type=1</code>，<code>限速=nTrafficSpeedLimit</code>，<code>距离=nTBTDist</code>　<span style="color:#2E7D32">标记 <code>rl=2</code></span>
+      <div style="color:#8D6E00;font-size:11px;margin-top:3px">
+        ⚠ 60073 广播<b>不带距离字段</b>，只能借 TBT（到下一个引导动作）的距离；
+        加 200m 上限是为了防止「下一个 TBT 其实是更远的路口」导致提前几百米误降速。</div></div>
+    </div>
+  </div>
+
+  <div class="arw">▼</div>
+
+  <div class="ok">UDP → 7706 下发给 CP　→　路口限速生效（1 km/h ≈ 停）</div>
+
+  <div class="foot">
+    <b>怎么确认生效：</b>日志里新增诊断字段 <span class="kbd">rl=来源/限速值</span>
+    —— <span class="kbd">rl=1/x</span> 走闯红灯摄像头通道，<span class="kbd">rl=2/x</span> 走 TBT 兜底通道，
+    <span class="kbd">rl=0/x</span> 表示<b>算出了限速但没发出去</b>（本次要解决的正是这个情况）。<br>
+    <b>开启步骤：</b>设置页 → 勾选 <b>APP辅助停车</b> → 勾选 <b>导航红灯辅助</b> → 如需无电子眼路口也生效，再勾选 <b>无电子眼路口也降速</b>。
+  </div>
+
+</div>
+</body>
+</html>
