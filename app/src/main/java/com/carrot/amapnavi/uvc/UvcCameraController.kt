@@ -102,6 +102,9 @@ class UvcCameraController(private val context: Context) {
     private var sizeCandidates: List<Size> = emptyList()
     private var sizeAttempt = 0
 
+    /** 诊断日志节流时间戳 */
+    private var lastDiagLogMs = 0L
+
     /** 直连实例单飞防抖 */
     private var lastDirectStartAt = 0L
     private var lastDirectState: UvcState? = null
@@ -238,11 +241,22 @@ class UvcCameraController(private val context: Context) {
      */
     @Synchronized
     fun tryOpen() {
-        val surface = pendingSurface ?: return
+        // 节流输出诊断（30 秒一次）：车上只看日志就能知道是没设备/没权限/没外置摄像头
+        val nowMs = System.currentTimeMillis()
+        if (nowMs - lastDiagLogMs > 30_000L) {
+            lastDiagLogMs = nowMs
+            UvcLog.i(TAG, "诊断: ${diagnose().replace('\n', ' ')}")
+        }
+
+        val surface = pendingSurface ?: run {
+            UvcLog.w(TAG, "tryOpen 跳过：pendingSurface 为空（预览区未展开或已停流）")
+            return
+        }
 
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
             != PackageManager.PERMISSION_GRANTED
         ) {
+            UvcLog.w(TAG, "tryOpen 跳过：未授予 CAMERA 权限")
             postState(UvcState.PermissionDenied)
             return
         }
@@ -761,6 +775,47 @@ class UvcCameraController(private val context: Context) {
         } catch (_: Exception) {
             true
         }
+
+    /**
+     * 诊断摘要：给界面显示用，把"为什么没画面"的原因直接摆出来。
+     *
+     * 车上排查采集卡最难的是看不到日志，这个摘要会显示在预览区下方，
+     * 让用户不连电脑也能判断卡在哪一步（没设备 / 没权限 / 没外置摄像头 / 协商失败）。
+     */
+    fun diagnose(): String {
+        return try {
+            val sb = StringBuilder()
+            val usbDev = findUsbVideoDevice()
+            val usbName = findUsbVideoDeviceName()
+            val ext = findExternalCameraId()
+            val camPerm = ContextCompat.checkSelfPermission(
+                context, Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED
+
+            sb.append("USB设备: ").append(usbName ?: "无")
+            if (usbDev != null) {
+                sb.append(" (VID=0x").append(Integer.toHexString(usbDev.vendorId))
+                    .append(" 权限=").append(if (usbHasPermission(usbDev)) "有" else "无").append(')')
+            }
+            sb.append('\n')
+            sb.append("外置摄像头(camera2): ").append(ext ?: "无")
+            sb.append(" ｜ 相机权限: ").append(if (camPerm) "有" else "无")
+            sb.append('\n')
+            sb.append("当前通道: ").append(
+                when {
+                    directStreamer != null -> "USB直连"
+                    currentCameraId != null -> "camera2($currentCameraId)"
+                    else -> "未建立"
+                }
+            )
+            if (directHardFailures > 0) sb.append(" ｜ 直连硬失败: ").append(directHardFailures)
+            if (camera2FailedOnce) sb.append(" ｜ camera2曾失败")
+            if (usbOpenBlocked) sb.append(" ｜ 系统层打不开")
+            sb.toString()
+        } catch (t: Throwable) {
+            "诊断失败: $t"
+        }
+    }
 
     /** 启动诊断快照：一次性输出 USB 设备/权限/camera2 外置通道实况 */
     private fun logUsbDiagnostics() {

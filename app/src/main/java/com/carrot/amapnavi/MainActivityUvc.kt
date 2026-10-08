@@ -159,7 +159,13 @@ internal fun MainActivity.collapseUvc() {
 
 private fun MainActivity.applyUvcState(state: UvcState) {
     val hint = state.toHint()
-    tvUvcStatus.text = hint
+    // 没出画面时把诊断摘要一起显示：车上看不到日志，靠这几行就能判断卡在哪一步
+    tvUvcStatus.text = if (state is UvcState.Streaming) {
+        hint
+    } else {
+        val diag = runCatching { uvcController?.diagnose() }.getOrNull()
+        if (diag.isNullOrEmpty()) hint else "$hint\n---\n$diag"
+    }
     tvUvcBrief.text = when (state) {
         is UvcState.Streaming -> "已连接"
         is UvcState.Opening, is UvcState.AwaitingUsbPermission -> "连接中"
