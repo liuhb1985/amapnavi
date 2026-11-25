@@ -1,0 +1,75 @@
+update 函数中使用的字段
+
+按逻辑分类整理：
+
+通用信息
+"carrotIndex" → 当前消息序号 / 帧索引
+"epochTime" → 时间戳，用于同步系统时间
+"timezone" → 时区
+
+指令信息
+"carrotCmd" → 指令名
+"carrotArg" → 指令参数
+"carrotCmdIndex" → 对应的 carrotIndex
+
+目标点 / 导航目的地
+"goalPosX", "goalPosY" → 目标坐标
+"szGoalName" → 目标名称
+
+道路限速信息
+"nRoadLimitSpeed" → 道路限速 (会做一些自动调节逻辑)
+SDI（Speed / Signal / Danger）相关
+"nSdiType" → SDI类型
+"nSdiSpeedLimit" → SDI限速
+"nSdiSection" → SDI路段编号
+"nSdiDist" → SDI距离
+"nSdiBlockType" → SDI区块类型
+"nSdiBlockSpeed" → SDI区块限速
+"nSdiBlockDist" → SDI区块距离
+"nSdiPlusType" → SDI增强类型
+"nSdiPlusSpeedLimit" → SDI增强限速
+"nSdiPlusDist" → SDI增强距离
+"nSdiPlusBlockType" → SDI增强区块类型
+"nSdiPlusBlockSpeed" → SDI增强区块限速
+"nSdiPlusBlockDist" → SDI增强区块距离
+
+道路类型
+"roadcate" → 当前道路类别
+"xroadcate" → 内部使用的道路类别
+Turn-By-Turn（TBT，下一个转弯）信息
+"nTBTDist" → 当前转弯剩余距离
+"nTBTTurnType" → 当前转弯类型
+"szTBTMainText" → 当前转弯显示文本
+"szNearDirName" → 临近道路名称
+"szFarDirName" → 远处道路名称
+"nTBTNextRoadWidth" → 下一个道路宽度
+"nTBTDistNext" → 下一个转弯剩余距离
+"nTBTTurnTypeNext" → 下一个转弯类型
+"szTBTMainTextNext" → 下一个转弯显示文本
+
+当前位置 / GPS
+"nGoPosDist" → 当前位置到目标的距离
+"nGoPosTime" → 当前位置到目标预计时间
+"szPosRoadName" → 当前所在道路
+"vpPosPointLat", "vpPosPointLon" → GPS坐标
+"nPosAngle" → 当前方向
+"nPosSpeed" → 当前车速
+
+
+与之前高德导航 JSON 对应
+update 函数字段	高德 JSON 对应字段	说明
+nTBTTurnType	"ICON"	下一个转弯类型
+nTBTDist	"SEG_REMAIN_DIS"	下一个转弯剩余距离（米）
+szTBTMainText	"NEXT_ROAD_NAME"	下一个道路名称文本
+nTBTTurnTypeNext	"NEXT_NEXT_TURN_ICON"	下下一个转弯类型
+nTBTDistNext	可能 "NEXT_SEG_REMAIN_DIS"	下下一个转弯剩余距离
+szTBTMainTextNext	"NEXT_NEXT_ROAD_NAME"	下下一个道路名称
+nRoadLimitSpeed	"LIMITED_SPEED"	道路限速
+vpPosPointLatNavi / vpPosPointLonNavi	"CAR_LATITUDE" / "CAR_LONGITUDE"	当前车GPS
+nPosSpeed	"CUR_SPEED"	当前车速
+szPosRoadName	"CUR_ROAD_NAME"	当前道路名称
+nGoPosDist	"ROUTE_REMAIN_DIS"	到目的地剩余距离
+nGoPosTime	"ROUTE_REMAIN_TIME"	到目的地剩余时间
+szGoalName	"endPOIName"	目的地名称
+szNearDirName	-	临近道路名称（可能高德 JSON 无直接对应）
+szFarDirName	-	远处道路名称（可能高德 JSON 无直接对应）

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 按下状态（深黄色） -->
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#FBC02D"/> <!-- 深黄 -->
+            <corners android:radius="4dp"/>
+        </shape>
+    </item>
+
+    <!-- 默认状态（亮黄色） -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFEB3B"/> <!-- 浅黄 -->
+            <corners android:radius="4dp"/>
+        </shape>
+    </item>
+
+</selector>

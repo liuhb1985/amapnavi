@@ -1,0 +1,513 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 超车功能专用设置页：入口在"超车"诊断页里 -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/overtakeSettingScrollView"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+    <LinearLayout
+        android:id="@+id/overtakeSettingContent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="16dp">
+
+        <!-- 设置分页入口 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/btnGotoGeneral"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:minHeight="42dp"
+                android:minWidth="0dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:text="通用参数"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnGotoNav"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:minHeight="42dp"
+                android:minWidth="0dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:text="领航参数"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnGotoOvertake"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:minHeight="42dp"
+                android:minWidth="0dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:text="超车参数"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="超车设置"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#000000" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="超车模式"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <RadioGroup
+            android:id="@+id/rgOvertakeSettingMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/rbOvertakeSettingFastMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="激进"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <RadioButton
+                android:id="@+id/rbOvertakeSettingNormalMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="常规"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <RadioButton
+                android:id="@+id/rbOvertakeSettingSlowMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="保守"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+        </RadioGroup>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <CheckBox
+                android:id="@+id/cbOvertakeSettingHighway"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="高速超车"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+
+            <CheckBox
+                android:id="@+id/cbOvertakeSettingRoad"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="公路超车"
+                android:textSize="14sp"
+                android:textColor="#000000"
+                android:padding="0dp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="侧向变道安全(激光雷达)"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <CheckBox
+            android:id="@+id/cbOvertakeSettingLidarSelfCheck"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="激光自算判据(关掉则只用CP下发的标志)"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <CheckBox
+            android:id="@+id/cbOvertakeSettingThreshFollowCp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="阈值跟随CP(关掉则用下面自己设的阈值)"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <CheckBox
+            android:id="@+id/cbOvertakeBlockNavLaneHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="有推荐/禁行车道时禁止超车"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:padding="0dp" />
+
+        <!-- 侧向危险阈值：固定距离(m) 或 绝对速度时距(s)，前后分别设置 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="侧向危险阈值(关掉'阈值跟随CP'后生效)"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="4dp">
+
+            <TextView
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="前方"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <RadioGroup
+                android:id="@+id/rgFrontThreshMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:id="@+id/rbFrontThreshFix"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="固定距离"
+                    android:textSize="13sp"
+                    android:textColor="#000000" />
+
+                <RadioButton
+                    android:id="@+id/rbFrontThreshTime"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="速度时距"
+                    android:textSize="13sp"
+                    android:textColor="#000000" />
+            </RadioGroup>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+
+            <Button
+                android:id="@+id/btnMinusFrontThresh"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etFrontThresh"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="numberDecimal"
+                android:gravity="center"
+                android:text="5.0"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusFrontThresh"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="+"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvFrontThreshUnit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="m"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="10dp">
+
+            <TextView
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="后方"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <RadioGroup
+                android:id="@+id/rgRearThreshMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:id="@+id/rbRearThreshFix"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="固定距离"
+                    android:textSize="13sp"
+                    android:textColor="#000000" />
+
+                <RadioButton
+                    android:id="@+id/rbRearThreshTime"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="速度时距"
+                    android:textSize="13sp"
+                    android:textColor="#000000" />
+            </RadioGroup>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+
+            <Button
+                android:id="@+id/btnMinusRearThresh"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etRearThresh"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="numberDecimal"
+                android:gravity="center"
+                android:text="10.0"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusRearThresh"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="+"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvRearThreshUnit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="m"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+        </LinearLayout>
+
+        <!-- 相对速度时距：外推接近用（危险距离 = 距离 - 接近速度 × 时距），0 = 不外推 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="相对速度时距(外推接近)"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="4dp">
+
+            <TextView
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="前方"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <Button
+                android:id="@+id/btnMinusFrontVrel"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etFrontVrel"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="numberDecimal"
+                android:gravity="center"
+                android:text="4.0"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusFrontVrel"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="+"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="s"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="4dp">
+
+            <TextView
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="后方"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <Button
+                android:id="@+id/btnMinusRearVrel"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etRearVrel"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="numberDecimal"
+                android:gravity="center"
+                android:text="4.0"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusRearVrel"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="+"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="s"
+                android:textSize="14sp"
+                android:textColor="#000000" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="反向变道冷却(秒)：防止刚变过去又变回来"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnMinusReverseCooldown"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="-"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etReverseCooldown"
+                android:layout_width="72dp"
+                android:layout_height="36dp"
+                android:inputType="number"
+                android:gravity="center"
+                android:text="20"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPlusReverseCooldown"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:text="+"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnSaveOvertakeSetting"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="保存"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnCancelOvertakeSetting"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="12dp"
+                android:text="返回"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

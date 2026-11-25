@@ -1,0 +1,1331 @@
+package com.carrot.amapnavi
+
+import android.util.Log
+import android.view.View
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+
+/* =========================================================
+ * 导航主处理模块
+ *   - 行驶距离推算 / 限速平滑 / 车道线有效性
+ *   - 高德导航领航（AmapNavi）/ 自动超车（autoOvertake）
+ *   - 定时超时检测
+ * 说明：本文件中的函数均为 MainActivity 的扩展函数。
+ * ========================================================= */
+
+fun MainActivity.travelDistProcess() {
+    val state = opStateManager.state
+
+    val now = System.currentTimeMillis()
+    val elapsed_time = now - lastTravelTime
+    lastTravelTime = now
+
+    if (travelDistTimeValid) {
+        //计算距离路口的距离
+        var v_ego = state.vEgo ?: 0
+        if (state.xTurnInfo >= 0 && v_ego > 0 && state.nTurnDist >= 0) {
+            val elapsed_dist = elapsed_time * v_ego / 3600.0f //车辆经过的距离, v_ego单位为km/h
+            if (state.xTurnDist > -200) {
+                state.xTurnDist -= elapsed_dist
+                Log.d("Navi", String.format("xTurnDist: %.1f m", state.xTurnDist))
+            }
+        }
+    }
+    travelDistTimeValid = true
+}
+
+// -----------------------------
+// 匝道/分岔提前减速
+// -----------------------------
+// 背景：进匝道时高德道路限速和 OP 视觉减速都太晚，车会高速冲进匝道才开始减速。
+// 做法：在进匝道/分岔前 ramp_slowdown_dist 米处开始，把下发到 OP 的道路限速
+//       压到 ramp_slowdown_speed，由 CP 按道路限速提前把车速降下来。
+//       仅对匝道/分岔引导(ForkLeft/ForkRight)生效，转弯(TurnLeft/TurnRight)不处理。
+//       进入匝道后维持 ramp_hold_time 秒才撤销：否则刚进匝道就撤销，而高德/视觉
+//       减速还没接上，速度会被重新提起来。
+// 把下发到 OP 的道路限速压到匝道限速以内(只压不抬)
+//   smooth_speed_limit 打开时交给爬坡逻辑逐周期下降，否则直接下发。
+//   不依赖高德广播是否到来，保证进入减速区时立刻开始限速。
+private fun MainActivity.applyRampLimit(speed: Int) {
+    if (speed <= 0) return
+    if (smooth_speed_limit) {
+        if (nRoadLimitSpeedRamp < 0 || nRoadLimitSpeedRamp > speed) {
+            nRoadLimitSpeedRamp = speed
+            nRoadLimitSpeedRampCnt = 6
+        }
+    } else {
+        val cur = naviState.nRoadLimitSpeed
+        if (cur == null || cur > speed) {
+            naviState.nRoadLimitSpeed = speed
+            nRoadLimitSpeedRamp = speed
+        }
+    }
+}
+
+// 撤销匝道减速后恢复限速：回到最近一次高德道路限速，下一次广播会重算完整值
+private fun MainActivity.restoreLimitAfterRamp() {
+    val restore = nAmapLimitSpeedLast
+    if (restore <= 0) return          // 没有可恢复的高德限速，等下一次广播
+    if (smooth_speed_limit) {
+        if (nRoadLimitSpeedRamp != restore) {
+            nRoadLimitSpeedRamp = restore
+            nRoadLimitSpeedRampCnt = 6
+        }
+    } else {
+        if (naviState.nRoadLimitSpeed != restore) {
+            naviState.nRoadLimitSpeed = restore
+            nRoadLimitSpeedRamp = restore
+        }
+    }
+}
+
+// -----------------------------
+// 匝道减速曲线规划
+// -----------------------------
+// 目标：从用户设定的距离开始减速，到"分岔距离"处刚好降到目标速度。
+//   - 减速按匀减速(v² 线性)规划，减速度恒定 → 体感平缓，接近无感减速
+//   - 如果用户设的距离不够减速(区间长度 < 所需距离)，自动把起点往外扩，
+//     保证到分岔点能降到目标速度，而不是猛刹
+//   - 起点与起始速度在激活瞬间锁定，整个减速过程按同一条曲线走
+private const val RAMP_DECEL_MS2 = 0.9f      // 规划用舒适减速度(m/s²)
+
+private fun kmhToMs(v: Float) = v / 3.6f
+
+// 规划减速起点距离(m)：max(用户设定距离, 分岔距离 + 所需减速距离)
+fun MainActivity.rampPlanStartDist(userDist: Float, endDist: Float, targetSpeedKmh: Int): Float {
+    val vEgo = ((opStateManager.state.vEgo ?: 0).coerceAtLeast(0)).toFloat()
+    // 起始速度取"当前车速"与"目标速度"的较大者：车已经比目标慢时曲线退化为恒等于目标速度
+    val v0 = kmhToMs(maxOf(vEgo, targetSpeedKmh.toFloat()))
+    val v1 = kmhToMs(targetSpeedKmh.toFloat())
+    val needDist = if (v0 > v1) (v0 * v0 - v1 * v1) / (2f * RAMP_DECEL_MS2) else 0f
+    return maxOf(userDist, endDist + needDist)
+}
+
+// 曲线上的目标限速(km/h)：dist 在 [endDist, startDist] 之间按
+//   v(dist) = sqrt(v1² + (v0²-v1²) × (dist-endDist)/(startDist-endDist))
+// 插值，等价于该区间内减速度恒定。
+private fun rampCurveSpeed(dist: Float, startDist: Float, endDist: Float,
+                           v0Kmh: Float, v1Kmh: Float): Float {
+    if (dist >= startDist) return v0Kmh
+    if (dist <= endDist) return v1Kmh
+    val frac = (dist - endDist) / (startDist - endDist)
+    val v0 = kmhToMs(v0Kmh)
+    val v1 = kmhToMs(v1Kmh)
+    val vSq = v1 * v1 + (v0 * v0 - v1 * v1) * frac
+    return maxOf(kotlin.math.sqrt(vSq) * 3.6f, v1Kmh)
+}
+
+fun MainActivity.rampSlowdownProcess() {
+    val now = System.currentTimeMillis()
+    val s = opStateManager.state
+    val turn = s.xTurnInfo
+    val dist = s.xTurnDist
+
+    val isFork = (turn == TurnInfo_ForkLeft || turn == TurnInfo_ForkRight)
+    val userDist = (if (bHighWay) ramp_slowdown_dist_h else ramp_slowdown_dist_l).toFloat()
+    val forkDist = (if (bHighWay) fork_dist_h else fork_dist_l).toFloat()
+    val targetSpeed = if (bHighWay) ramp_slowdown_speed_h else ramp_slowdown_speed_l
+
+    // 减速起点：按用户设定距离开始；若距离不够减速则自动往外扩，
+    // 保证到"分岔距离"处刚好降到目标速度。已激活时用锁定值，避免反复进出。
+    val startDist = if (rampSlowdownActive && rampSlowdownLockedDist > 0f) {
+        rampSlowdownLockedDist
+    } else {
+        rampPlanStartDist(userDist, forkDist, targetSpeed)
+    }
+
+    val inZone = ramp_slowdown_en && isFork && targetSpeed > 0 &&
+            startDist > 0f && dist >= 0f && dist <= startDist
+
+    if (inZone) {
+        if (!rampSlowdownActive) {
+            rampSlowdownActive = true
+            lastRampLogBucket = -1
+            rampSlowdownLockedDist = startDist
+            rampSlowdownV0 = maxOf((s.vEgo ?: 0).coerceAtLeast(0).toFloat(), targetSpeed.toFloat())
+            val msg = "${nowTimeStr()} 匝道提前减速开始(${if (bHighWay) "高速" else "公路"}" +
+                    "当前${dist.toInt()}m, 起点${startDist.toInt()}m(设定${userDist.toInt()}m/分岔${forkDist.toInt()}m), " +
+                    "实际车速${s.vEgo ?: 0}km/h, 曲线起点${rampSlowdownV0.toInt()}km/h → ${targetSpeed}km/h" +
+                    (if (rampSlowdownV0 <= targetSpeed) "[车速已≤目标，无需减速]" else "")
+            Log.d("Ramp", msg)
+            showLaneDebug(msg)
+        }
+        rampSlowdownSpeed = targetSpeed
+        // 每周期刷新：离开减速区后再维持 ramp_hold_time 秒才撤销
+        rampSlowdownUntil = now + ramp_hold_time * 1000L
+
+        // 本周期的目标限速：沿匀减速曲线取值。
+        // applyRampLimit 只压不抬，所以限速会随曲线单调、平缓地下降 → 接近无感减速。
+        val curve = rampCurveSpeed(dist, rampSlowdownLockedDist, forkDist,
+                rampSlowdownV0, targetSpeed.toFloat())
+        // 记录"曲线当前值"：下发限速时与该值取较小值(而不是固定目标速度)，
+        // 这样减速才会沿曲线平滑下降，同时更高德限速也不会把它抬起来
+        rampActiveLimit = kotlin.math.ceil(curve).toInt()
+        applyRampLimit(rampActiveLimit)
+
+        // 减速过程日志：每跨 50m 记一次，用于核对限速是否逐档下降(而不是一步到目标)
+        val bucket = (dist / 50f).toInt()
+        if (bucket != lastRampLogBucket) {
+            lastRampLogBucket = bucket
+            Log.d("Ramp", "${nowTimeStr()} 匝道减速中: 距分岔${dist.toInt()}m 曲线限速=${rampActiveLimit}km/h " +
+                    "(实际车速${s.vEgo ?: 0}km/h)")
+        }
+        return
+    }
+
+    // 不在减速区：已进匝道或引导已切换，维持期内保持目标限速，避免速度立刻被提起来
+    if (rampSlowdownActive) {
+        if (now < rampSlowdownUntil) {
+            rampActiveLimit = rampSlowdownSpeed      // 维持期：压住目标速度
+            applyRampLimit(rampSlowdownSpeed)
+            return
+        }
+        rampSlowdownActive = false
+        rampSlowdownSpeed = -1
+        rampActiveLimit = -1                         // 撤销：不再参与取小
+        rampSlowdownLockedDist = 0f
+        rampSlowdownV0 = 0f
+        restoreLimitAfterRamp()
+        val msg = "${nowTimeStr()} 匝道提前减速结束(维持${ramp_hold_time}s 后撤销)"
+        Log.d("Ramp", msg)
+        showLaneDebug(msg)
+    }
+}
+
+//平滑道路限速
+fun MainActivity.smoothSpeedLimit() {
+    val now = System.currentTimeMillis()
+    //限速爬坡
+    if (smooth_speed_limit) {
+        if (naviState.nRoadLimitSpeed != null) {
+            var nRoadLimitSpeedTmp = naviState.nRoadLimitSpeed ?: -1
+            //匝道提前减速：与"曲线当前值"取小(不被高德抬高，但采纳更低的限速)
+            var rampTarget = nRoadLimitSpeedRamp
+            if (rampActiveLimit > 0 && (rampTarget < 0 || rampTarget > rampActiveLimit)) {
+                rampTarget = rampActiveLimit
+            }
+            if ((rampTarget != nRoadLimitSpeedTmp) || (nRoadLimitSpeedRampCnt > 0)) { //速度未爬坡完成或者还有发送次数
+                //发送次数递减
+                if ((rampTarget == nRoadLimitSpeedTmp) && (nRoadLimitSpeedRampCnt > 0)) {
+                    nRoadLimitSpeedRampCnt--
+                }
+
+                //限速爬坡
+                if (rampTarget >= 0) {
+                    if (rampTarget > nRoadLimitSpeedTmp) {
+                        nRoadLimitSpeedTmp++
+                    } else if (rampTarget < nRoadLimitSpeedTmp) {
+                        nRoadLimitSpeedTmp--
+                    }
+                    naviState.nRoadLimitSpeed = nRoadLimitSpeedTmp
+                } else {
+                    naviState.nRoadLimitSpeed = rampTarget
+                }
+
+                //发送json
+                if (cmUdpServiceSendEnable) {
+                    applyCommonOutFields()
+                    val jsonStr = naviState.toJson()
+                    lastJsonToSend = jsonStr
+                    cmUdpServiceSend(jsonStr, port = carrotManOpPort)
+
+                    lastUdpSendTime = now
+                    //updateRawLog(jsonStr, bShowRawLog)
+                }
+            }
+        }
+    }
+}
+
+fun MainActivity.laneLineProcess(): Boolean {
+    val now = System.currentTimeMillis()
+    if (laneDetectCnt == 0) {
+        return false
+    }
+    //首次检测
+    if (prevlaneDetectCnt < 0) {
+        prevlaneDetectCnt = laneDetectCnt
+        lastLaneValidTime = now
+        return true
+    }
+    //超时1秒后检测次数没有变化
+    if (((now - lastLaneValidTime) > 1000L) && (prevlaneDetectCnt == laneDetectCnt)) {
+        return false
+    }
+    //检测次数变化，说明车道线检测正在工作
+    if (prevlaneDetectCnt != laneDetectCnt) {
+        lastLaneValidTime = now
+        prevlaneDetectCnt = laneDetectCnt
+    }
+
+    return true
+}
+
+fun MainActivity.AmapNavi(lane_line_valid: Boolean): Boolean {
+    val now = System.currentTimeMillis()
+    val nowTime = nowTimeStr()
+
+    laneChangeEdge = LaneChangeAction.KEEP   //成员变量(见 MainActivity.laneChangeEdge)，每帧重置
+    var action = LaneChangeAction.KEEP
+    py_overtake_disable = false
+    navLaneHasBlocked = false      //有禁行/推荐车道标志每帧重置(导航关闭时不留残值)
+    navLaneHasSuggested = false
+
+    //检查是否要关闭超车功能
+    if ((!bHighWay && app_road_navi) || (bHighWay && app_navi)) {
+        isStopPyOvertake(navLane)
+    }
+
+    if (!navi_blind_dec_speed) {
+        blindDecSpeedEnable = false
+        blindDecSpeedPause = false
+        blindDecSpeedOffset = 0
+    }
+
+    //导航处理
+    if (opStateManager.state.lidar_l && opStateManager.state.lidar_r && //激光雷达在线
+        !naviDataTimeout && opStateManager.state.engaged && ((!bHighWay && app_road_navi) || (bHighWay && app_navi))
+    ) { //开启了APP导航和开启了op定速，并且开启了导航
+        if (carState.vEgo > (navi_min_speed / 3.6)) { //车辆非静止状态
+            if (app_navi_valid != 1) {
+                app_navi_valid = 1
+                val msg = "${nowTime} 领航功能正常工作中"
+                Log.d("LaneState", msg)
+                showLaneDebug(msg)
+
+                atcInfoShow = 0
+            }
+
+            var doForkNow = false
+
+            //检查引导类型和引导距离是否有变化(有来设置各种重置标志)
+            if ((lastXTurnInfo != opStateManager.state.xTurnInfo) || (lastNTurnDistMax != opStateManager.state.nTurnDistMax)) {
+                resetSuggestLaneTimer = true
+                enableLaneChange = true
+                enableLaneChangeTimer = now
+                disableLaneChangeTimer = now
+            }
+
+            //检查是否要靠边行驶或转弯
+            if (opStateManager.state.xTurnInfo >= 0) {
+
+                //引导类型有变化，重置变道操作
+                if (lastXTurnInfo != opStateManager.state.xTurnInfo) {
+                    val msg = "${nowTime} 导航(${getxTurnInfoDesc(opStateManager.state.xTurnInfo)}->${getxTurnInfoDesc(lastXTurnInfo)}), ${opStateManager.state.xTurnDist}米，重置状态"
+                    Log.d("LaneState", msg)
+                    showLaneDebug(msg)
+
+                    resetLaneAction()
+                } else if (lastNTurnDistMax != opStateManager.state.nTurnDistMax) {
+                    val msg = "${nowTime} 导航(${getxTurnInfoDesc(opStateManager.state.xTurnInfo)}),${lastNTurnDistMax}m->${opStateManager.state.nTurnDistMax}m，重置状态"
+                    Log.d("LaneState", msg)
+                    showLaneDebug(msg)
+
+                    resetLaneAction()
+                }
+
+                //------------------------------------------------------------------------------------------------------------
+                //左变道或者左转
+                if (opStateManager.state.xTurnInfo == TurnInfo_ForkLeft || opStateManager.state.xTurnInfo == TurnInfo_TurnLeft) {
+                    //--------------------高速---------------------
+                    if (bHighWay) { //高速
+                        //重置禁止变道相关变量
+                        enableLaneChange = true
+                        disableLaneChangeTimer = now
+                        enableLaneChangeTimer = now
+
+                        var atc_dist_h_tmp = atc_dist_h
+                        //设置的变道距离比导航引导的最大距离还大(设置自动变道靠边距离为80%)
+                        if (opStateManager.state.nTurnDistMax > 0 && atc_dist_h_tmp > opStateManager.state.nTurnDistMax * 0.8f) {
+                            atc_dist_h_tmp = (opStateManager.state.nTurnDistMax * 0.8f).toInt()
+                            if (atc_dist_h_tmp < fork_dist_h) {
+                                atc_dist_h_tmp = fork_dist_h
+                            }
+                        }
+
+                        //距离路口的距离小于设定的靠左行驶的距离(打方向盘靠边行驶)
+                        if (fork_dist_h > 0 && opStateManager.state.xTurnDist > fork_dist_h && opStateManager.state.xTurnDist <= atc_dist_h_tmp) {
+                            if (keep_left_en) {
+                                laneChangeEdge = LaneChangeAction.LEFT
+                                py_overtake_disable = true
+                                py_overtake_disable_reason = "准备靠左行驶"
+
+                                if (1 != atcInfoShow) {
+                                    atcInfoShow = 1
+                                    atcInfoChange = true
+                                    val msg =
+                                        "${nowTime} 高速:路口${opStateManager.state.xTurnDist.toInt()}米，小于${atc_dist_h}米，允许靠左行驶"
+                                    Log.d("LaneState", msg)
+                                    showLaneDebug(msg)
+                                }
+                            }
+                        }
+                        //距离路口的距离小于设定的进左路口的距离(打方向盘进路口)
+                        else if (fork_dist_h > 0 && opStateManager.state.xTurnDist < fork_dist_h && opStateManager.state.xTurnInfo == TurnInfo_ForkLeft) {
+                            laneChangeEdge = LaneChangeAction.LEFT
+                            opStateManager.state.doLaneForkNow = LaneChangeAction.LEFT.value //立即左变道请求
+                            doForkNow = true
+                            py_overtake_disable = true
+                            py_overtake_disable_reason = "准备进左岔路"
+
+                            if (2 != atcInfoShow) {
+                                atcInfoShow = 2
+                                atcInfoChange = true
+                                val msg = "${nowTime} 高速:路口${opStateManager.state.xTurnDist.toInt()}米，小于${fork_dist_h}米，向左进岔路"
+                                Log.d("LaneState", msg)
+                                showLaneDebug(msg)
+                            }
+                        } else {
+                            atcInfoShow = 0
+                        }
+                    }
+                    //--------------------低速---------------------
+                    else {
+                        //检查车辆是否已靠边(开启了车道线检测)
+                        //  左侧是路沿(无车道)，所以只看实线，不加车道数条件
+                        //  开关关闭时不判定，直接允许继续变道
+                        if (!last_lane_suppress_en) {
+                            enableLaneChange = true
+                        } else if (enableLaneChange) {
+                            if (lane_line_valid && left_lane_type >= 1) //左侧为实线
+                            {
+                                if ((now - disableLaneChangeTimer) > 5000) { //实线检测时间超过5秒
+                                    enableLaneChange = false //禁止继续往左变道
+                                    enableLaneChangeTimer = now
+
+                                    appSpeakFile = "audio_last_lane" //车辆已靠边
+                                    var msg = ""
+                                    msg = "${nowTime} 车辆已靠最左边"
+                                    Log.d("LaneCmd", msg)
+                                    showLaneDebug(msg)
+                                }
+                            } else {
+                                disableLaneChangeTimer = now
+                            }
+                        } else {
+                            if (lane_line_valid && left_lane_type < 1) //左侧为虚线或无车道线
+                            {
+                                val threshold = when {
+                                    nav_mode >= 3 -> 5000
+                                    nav_mode == 2 -> 2000
+                                    else -> 1000
+                                }
+
+                                if ((now - enableLaneChangeTimer) > threshold) //虚线检测时间超过指定时间
+                                {
+                                    enableLaneChange = true //允许继续往左变道
+                                    disableLaneChangeTimer = now
+
+                                    appSpeakFile = "audio_new_lane" //出现新车道
+                                    var msg = ""
+                                    msg = "${nowTime} 车辆左侧出现新车道"
+                                    Log.d("LaneCmd", msg)
+                                    showLaneDebug(msg)
+                                }
+                            } else {
+                                enableLaneChangeTimer = now
+                            }
+                        }
+
+                        var atc_dist_l_tmp = atc_dist_l
+                        //设置的变道距离比导航引导的最大距离还大(设置自动变道靠边距离为80%)
+                        if (opStateManager.state.nTurnDistMax > 0 && atc_dist_l_tmp > opStateManager.state.nTurnDistMax * 0.8f) {
+                            atc_dist_l_tmp = (opStateManager.state.nTurnDistMax * 0.8f).toInt()
+                            if (atc_dist_l_tmp < fork_dist_l) {
+                                atc_dist_l_tmp = fork_dist_l
+                            }
+                        }
+
+                        //距离路口的距离小于设定的靠左行驶的距离(打方向盘靠边行驶)
+                        if (fork_dist_l > 0 && opStateManager.state.xTurnDist >= fork_dist_l && opStateManager.state.xTurnDist <= atc_dist_l_tmp) {
+                            if (keep_left_en) {
+                                laneChangeEdge = LaneChangeAction.LEFT
+                                py_overtake_disable = true
+                                py_overtake_disable_reason = "准备靠左行驶"
+
+                                if (1 != atcInfoShow) {
+                                    atcInfoShow = 1
+                                    atcInfoChange = true
+                                    val msg =
+                                        "${nowTime} 公路:路口${opStateManager.state.xTurnDist.toInt()}米，小于${atc_dist_l}米，允许靠左行驶"
+                                    Log.d("LaneState", msg)
+                                    showLaneDebug(msg)
+                                }
+                            }
+                        }
+                        //距离路口的距离小于设定的左转弯的距离(打方向盘进路口)
+                        else if (fork_dist_l > 0 && opStateManager.state.xTurnDist < fork_dist_l && opStateManager.state.xTurnInfo == TurnInfo_TurnLeft && nav_turn) {
+                            laneChangeEdge = LaneChangeAction.LEFT_TURN
+                            py_overtake_disable = true
+                            py_overtake_disable_reason = "准备向左转弯"
+
+                            if (2 != atcInfoShow) {
+                                atcInfoShow = 2
+                                atcInfoChange = true
+                                val msg = "${nowTime} 公路:路口${opStateManager.state.xTurnDist.toInt()}米，小于${fork_dist_l}米，向左转弯"
+                                Log.d("LaneState", msg)
+                                showLaneDebug(msg)
+                            }
+                        } else {
+                            atcInfoShow = 0
+                        }
+                    }
+                }
+                //------------------------------------------------------------------------------------------------------------
+                //右变道或者右转
+                else if (opStateManager.state.xTurnInfo == TurnInfo_ForkRight || opStateManager.state.xTurnInfo == TurnInfo_TurnRight) {
+                    //---------------------高速--------------------
+                    if (bHighWay) //高速
+                    {
+                        var atc_dist_h_tmp = atc_dist_h
+                        //设置的变道距离比导航引导的最大距离还大(设置自动变道靠边距离为80%)
+                        if (opStateManager.state.nTurnDistMax > 0 && atc_dist_h_tmp > opStateManager.state.nTurnDistMax * 0.8f) {
+                            atc_dist_h_tmp = (opStateManager.state.nTurnDistMax * 0.8f).toInt()
+                            if (atc_dist_h_tmp < fork_dist_h) {
+                                atc_dist_h_tmp = fork_dist_h
+                            }
+                        }
+
+                        //进入提前变道靠边范围或存在禁止车道时
+                        if ((fork_dist_h > 0 && opStateManager.state.xTurnDist >= fork_dist_h && opStateManager.state.xTurnDist <= atc_dist_h_tmp)
+                            || (haveNavDisLane(navLane) && dis_lane_en)
+                        ) {
+                            //检查车辆是否已靠边(开启了车道线检测)
+                            //  高速右侧可能是应急车道，所以要求"实线 且 右侧车道数<=1"
+                            //  开关关闭时不判定，直接允许继续变道
+                            if (!last_lane_suppress_en) {
+                                enableLaneChange = true
+                            } else if (enableLaneChange) {
+                                if (lane_line_valid && right_lane_type >= 1 && vLaneResult.rightLaneCnt <= 1) //右侧为实线并且右侧车道数小于等于1
+                                {
+                                    if ((now - disableLaneChangeTimer) > 5000) { //实线检测时间超过5秒
+                                        enableLaneChange = false //禁止继续往右变道
+                                        enableLaneChangeTimer = now
+
+                                        appSpeakFile = "audio_last_lane" //车辆已靠边
+                                        var msg = ""
+                                        msg = "${nowTime} 车辆已靠最右边"
+                                        Log.d("LaneCmd", msg)
+                                        showLaneDebug(msg)
+                                    }
+                                } else {
+                                    disableLaneChangeTimer = now
+                                }
+                            } else {
+                                if (lane_line_valid && right_lane_type < 1) //右侧为虚线或无车道线
+                                {
+                                    val threshold = when {
+                                        nav_mode >= 3 -> 5000
+                                        nav_mode == 2 -> 2000
+                                        else -> 1000
+                                    }
+
+                                    if ((now - enableLaneChangeTimer) > threshold) //虚线检测时间超过指定时间
+                                    {
+                                        enableLaneChange = true //允许继续往右变道
+                                        disableLaneChangeTimer = now
+
+                                        appSpeakFile = "audio_new_lane" //出现新车道
+                                        var msg = ""
+                                        msg = "${nowTime} 车辆右侧出现新车道"
+                                        Log.d("LaneCmd", msg)
+                                        showLaneDebug(msg)
+                                    }
+                                } else {
+                                    enableLaneChangeTimer = now
+                                }
+                            }
+                        } else {
+                            //重置禁止变道相关变量
+                            enableLaneChange = true
+                            disableLaneChangeTimer = now
+                            enableLaneChangeTimer = now
+                        }
+
+                        //距离路口的距离小于设定的靠右行驶的距离(打方向盘靠边行驶)
+                        if (fork_dist_h > 0 && opStateManager.state.xTurnDist >= fork_dist_h && opStateManager.state.xTurnDist <= atc_dist_h_tmp) {
+                            //已在进匝道的检测距离范围内(检测是否出现虚线)
+                            //if(lane_line_valid && opStateManager.state.xTurnDist < (fork_dist_h + HIGHWAY_LANE_LINE_TRIG_DIST_OFFSET))
+                            if (false) {
+                                //右侧为虚线，变道
+                                if (right_lane_type == 0) {
+                                    opStateManager.state.doLaneForkNow = LaneChangeAction.RIGHT.value //立即右变道请求
+                                    doForkNow = true
+                                    py_overtake_disable = true
+                                    py_overtake_disable_reason = "准备向右变道"
+
+                                    if (3 != atcInfoShow) {
+                                        atcInfoShow = 3
+                                        atcInfoChange = true
+                                        val msg = "${nowTime} 高速:路口${opStateManager.state.xTurnDist.toInt()}米，检测到虚线，立即向右变道"
+                                        Log.d("LaneState", msg)
+                                        showLaneDebug(msg)
+                                    }
+                                }
+                            } else {
+                                if (keep_right_en) {
+                                    laneChangeEdge = LaneChangeAction.RIGHT
+                                    py_overtake_disable = true
+                                    py_overtake_disable_reason = "准备靠右行驶"
+
+                                    if (1 != atcInfoShow) {
+                                        atcInfoShow = 1
+                                        atcInfoChange = true
+                                        val msg =
+                                            "${nowTime} 高速:路口${opStateManager.state.xTurnDist.toInt()}米，小于${atc_dist_h}米，允许靠右行驶"
+                                        Log.d("LaneState", msg)
+                                        showLaneDebug(msg)
+                                    }
+                                }
+                            }
+                        }
+                        //检查是否需要变道进岔路
+                        else if (fork_dist_h > 0 && opStateManager.state.xTurnDist < fork_dist_h && opStateManager.state.xTurnInfo == TurnInfo_ForkRight) {
+                            laneChangeEdge = LaneChangeAction.RIGHT
+                            opStateManager.state.doLaneForkNow = LaneChangeAction.RIGHT.value //立即右变道请求
+                            doForkNow = true
+                            py_overtake_disable = true
+                            py_overtake_disable_reason = "准备进右岔路"
+
+                            if (2 != atcInfoShow) {
+                                atcInfoShow = 2
+                                atcInfoChange = true
+                                val msg = "${nowTime} 高速:路口${opStateManager.state.xTurnDist.toInt()}米，小于${fork_dist_h}米，向右进岔路"
+                                Log.d("LaneState", msg)
+                                showLaneDebug(msg)
+                            }
+                        } else {
+                            atcInfoShow = 0
+                        }
+                    }
+                    //--------------------低速---------------------
+                    else {
+                        var atc_dist_l_tmp = atc_dist_l
+                        //设置的变道距离比导航引导的最大距离还大
+                        if (opStateManager.state.nTurnDistMax > 0 && atc_dist_l_tmp > opStateManager.state.nTurnDistMax * 0.8f) {
+                            atc_dist_l_tmp = (opStateManager.state.nTurnDistMax * 0.8f).toInt()
+                            if (atc_dist_l_tmp < fork_dist_l) {
+                                atc_dist_l_tmp = fork_dist_l
+                            }
+                        }
+
+                        //检查是否需要变道或者转弯
+                        if (fork_dist_l > 0 && opStateManager.state.xTurnDist >= fork_dist_l && opStateManager.state.xTurnDist <= atc_dist_l_tmp) {
+                            if (keep_right_en) {
+                                laneChangeEdge = LaneChangeAction.RIGHT
+                                py_overtake_disable = true
+                                py_overtake_disable_reason = "准备靠右行驶"
+
+                                if (1 != atcInfoShow) {
+                                    atcInfoShow = 1
+                                    atcInfoChange = true
+                                    val msg =
+                                        "${nowTime} 公路:路口${opStateManager.state.xTurnDist.toInt()}米，小于${atc_dist_l}米，允许靠右行驶"
+                                    Log.d("LaneState", msg)
+                                    showLaneDebug(msg)
+                                }
+                            }
+                        } else if (fork_dist_l > 0 && opStateManager.state.xTurnDist < fork_dist_l && opStateManager.state.xTurnInfo == TurnInfo_TurnRight && nav_turn) {
+                            laneChangeEdge = LaneChangeAction.RIGHT_TURN
+                            py_overtake_disable = true
+                            py_overtake_disable_reason = "准备向右转弯"
+
+                            if (2 != atcInfoShow) {
+                                atcInfoShow = 2
+                                atcInfoChange = true
+                                val msg = "${nowTime} 公路:路口${opStateManager.state.xTurnDist.toInt()}米，小于${fork_dist_l}米，向右转弯"
+                                Log.d("LaneState", msg)
+                                showLaneDebug(msg)
+                            }
+                        } else {
+                            atcInfoShow = 0
+                        }
+                    }
+                } else { //无需控制的引导类型
+                    atcInfoShow = 0
+                }
+            } else {
+                atcInfoShow = 0
+            }
+
+            //重置立即变道状态
+            if (atcInfoShow == 0) {
+                opStateManager.state.doLaneForkNow = LaneChangeAction.KEEP.value
+            }
+            //更新最后的状态
+            lastXTurnInfo = opStateManager.state.xTurnInfo
+            lastNTurnDistMax = opStateManager.state.nTurnDistMax
+
+            var targetIdx = -1
+            var visualIdx = -1
+
+            //-----------------------------------------
+            //是否需要左转弯?
+            if (laneChangeEdge == LaneChangeAction.LEFT_TURN) {
+                action = LaneChangeAction.LEFT_TURN
+                if (lastValidLaneAction != action || atcInfoChange) { //变道状态有变化
+                    val msg = "${nowTime} 引导${lastValidLaneAction}->${action}变化，重置状态"
+                    Log.d("LaneState", msg)
+                    showLaneDebug(msg)
+
+                    resetLaneAction()
+                    atcInfoChange = false
+                }
+                lastValidLaneAction = action
+                prevLaneAction = action
+                validLaneActionDbTime = now
+                Log.d("LaneDecision", "LEFT_TURN, ${validLaneActionDbTime}")
+            }
+            //-----------------------------------------
+            //是否需要右转弯?
+            else if (laneChangeEdge == LaneChangeAction.RIGHT_TURN) {
+                action = LaneChangeAction.RIGHT_TURN
+                if (lastValidLaneAction != action || atcInfoChange) { //变道状态有变化
+                    val msg = "${nowTime} 引导${lastValidLaneAction}->${action}变化，重置状态"
+                    Log.d("LaneState", msg)
+                    showLaneDebug(msg)
+
+                    resetLaneAction()
+                    atcInfoChange = false
+                }
+                lastValidLaneAction = action
+                prevLaneAction = action
+                validLaneActionDbTime = now
+                Log.d("LaneDecision", "RIGHT_TURN, ${validLaneActionDbTime}")
+            }
+            //-----------------------------------------
+            //当前未在变道中状态中(未发送命令/未在变道中)
+            else if ((!laneCmdSent || (!inLaneChangeStarting && !inLaneChangeFinishing)) || (nav_mode == 1)) {
+                //车道决策(targetIdx从0开始，从左往右，visualIdx从0开始，从右往左)
+                var (_targetIdx, _action, _visualIdx) = decideLaneWithAction(vLaneResult, navLane, laneChangeEdge, bHighWay, road_median)
+                targetIdx = _targetIdx
+                action = _action
+                visualIdx = _visualIdx
+
+                //检查是否要执行变道或转弯
+                var resetLaneActionFlag = false
+
+                //目标车道无效
+                if (targetIdx < 0 && visualIdx < 0) {
+                    action = LaneChangeAction.KEEP
+                    if (lastValidLaneAction != action) {
+                        resetLaneActionFlag = true
+
+                        val msg = "${nowTime} 无目标车道 index=$targetIdx, visual=$visualIdx, 保持当前车道行驶"
+                        Log.w("LaneDecision", msg)
+                        showLaneDebug(msg)
+                    }
+                    lastValidLaneAction = action
+                    prevLaneAction = action
+                    validLaneActionDbTime = now
+                    // 原此处每 100ms 打印一次 "targetIdxInvalid"，把日志刷到 MB 级且无信息量
+                    // (状态变化时上面那句 Log.w 已经记过一次)，故只保留状态变化日志。
+                }
+                //目标车道有效
+                else {
+                    //有禁止变道标志(车辆已靠边)：该侧车道数<=1 且为实线 → 视为道路边界
+                    //  (高速最右即应急车道)，把该方向的变道请求压成 KEEP。
+                    //  设计意图(用户)：防止实线突然抖动成虚线后立即变道进入应急车道。
+                    //  例外：临近进匝道距离时解除 —— 进匝道必须借最右车道，
+                    //       不能因"已靠边"而错过路口(即使该侧被判为边界)。
+                    //       解除窗口 = 距路口 <= 进匝道距离(fork_dist_h/l) + last_lane_fork_relax_m(默认10m)。
+                    if (!enableLaneChange && action != LaneChangeAction.KEEP) {
+                        // 临匝道放宽窗口内解除该抑制(与实线放宽/激光屏蔽同源)：
+                        //   进匝道必须借最右可通行车道，不能因"已靠边"错过路口。
+                        if (!solidLineRelaxed(action, LaneChangePurpose.NAVI)) {
+                            if (laneChangeEdge == LaneChangeAction.LEFT) //靠左行驶请求
+                            {
+                                if (action == LaneChangeAction.LEFT && !doForkNow) {
+                                    action = LaneChangeAction.KEEP
+                                }
+                            } else if (laneChangeEdge == LaneChangeAction.RIGHT) //靠右行驶请求
+                            {
+                                if (action == LaneChangeAction.RIGHT && !doForkNow) {
+                                    action = LaneChangeAction.KEEP
+                                }
+                            }
+                        }
+                    }
+
+                    //是否需要变道?
+                    if (action != LaneChangeAction.KEEP) {
+                        //当前请求有变化
+                        if (action != prevLaneAction) {
+                            val msg = "${nowTime} 引导${prevLaneAction}->${action}变化，启动稳定计时"
+                            Log.d("LaneState", msg)
+                            showLaneDebug(msg)
+
+                            resetLaneAction()
+                            validLaneActionDbTime = now //重置计时
+                        }
+                        prevLaneAction = action
+
+                        //引导类型已稳定（超过1秒）或者有立即变道请求
+                        val validLaneStableTime = if (nav_mode == 3) { 1000L } else { 500L }
+                        if (now - validLaneActionDbTime > validLaneStableTime || doForkNow || nav_mode == 1) {
+                            if (lastValidLaneAction != action) { //变道状态有变化
+                                var msg = ""
+                                if (doForkNow) {
+                                    msg = "${nowTime} 引导${lastValidLaneAction}->${action}变化，重置状态"
+                                } else {
+                                    msg = "${nowTime} 引导${lastValidLaneAction}->${action}稳定，重置状态"
+                                }
+                                Log.d("LaneState", msg)
+                                showLaneDebug(msg)
+
+                                resetLaneAction()
+                            }
+
+                            lastValidLaneAction = action
+                        } else {
+                            action = lastValidLaneAction //保留上次的操作
+                        }
+                    }
+                    //保持当前车道行驶
+                    else {
+                        if (lastValidLaneAction != action) {
+                            resetLaneActionFlag = true
+                        }
+                        lastValidLaneAction = action
+                        prevLaneAction = action
+                        validLaneActionDbTime = now
+                        Log.d("LaneDecision", "LaneChangeAction.KEEP, ${validLaneActionDbTime}")
+                    }
+                }
+                lastTargetIdx = targetIdx
+                lastVisualIdx = visualIdx
+
+                //是否要终止变道
+                if (action == LaneChangeAction.KEEP) {
+                    if (resetLaneActionFlag) {
+                        var laneText = buildLaneText(vLaneResult, laneAction, visualLaneIdx)
+                        vLaneText = laneText
+
+                        val navPart = if (!vNavLaneText.isNullOrBlank()) {
+                            "导航$vNavLaneText, "
+                        } else {
+                            ""
+                        }
+                        val msg = "${nowTime} ${navPart}视觉$vLaneText, 保持"
+                        Log.d("LaneState", msg)
+                        showLaneDebug(msg)
+
+                        validLaneActionDbTime = now
+
+                        //重置变道状态
+                        resetLaneAction()
+                    }
+                }
+            }
+
+            //执行动作
+            doLaneChangeAction(action, laneChangeEdge, targetIdx, visualIdx)
+        } else {
+            if (app_navi_valid != 0) {
+                app_navi_valid = 0
+                val speedKph = carState.vEgo * 3.6
+                val msg = "${nowTime} 车速过低(${speedKph.toInt()}km/h), 小于${navi_min_speed}km/h，暂停领航功能"
+                Log.d("LaneState", msg)
+                showLaneDebug(msg)
+
+                //重置变道状态
+                resetLaneAction()
+                validLaneActionDbTime = now
+            }
+
+            blindDecSpeedEnable = false
+            blindDecSpeedPause = false
+            blindDecSpeedOffset = 0
+            blindSafeTime = 0
+            //py_overtake_disable = true
+        }
+
+        // 处理变道状态
+        processLaneChangeState(opStateManager.state.atc_state)
+    } else {
+        //领航条件失效
+        if (app_navi_valid != -1) {
+            app_navi_valid = -1
+
+            var msg = "${nowTime} 条件不符合("
+            if (!opStateManager.state.lidar_l) {
+                msg += "左侧激光雷达不在线，"
+                py_overtake_disable = true
+                py_overtake_disable_reason = "左侧激光雷达不在线"
+            }
+            if (!opStateManager.state.lidar_r) {
+                msg += "右侧激光雷达不在线，"
+                py_overtake_disable = true
+                py_overtake_disable_reason = "右侧激光雷达不在线"
+            }
+            if (!opStateManager.state.engaged) {
+                msg += "OP定速未开，"
+                //py_overtake_disable = true
+            }
+            if (!bHighWay && !app_road_navi) {
+                msg += "公路车道领航未打开，"
+            }
+            if (bHighWay && !app_navi) {
+                msg += "高速车道领航未打开，"
+            }
+
+            Log.d("LaneState", msg)
+            showLaneDebug(msg)
+
+            //重置变道状态
+            resetLaneAction()
+            validLaneActionDbTime = now
+        }
+
+        blindDecSpeedEnable = false
+        blindDecSpeedPause = false
+        blindDecSpeedOffset = 0
+        blindSafeTime = 0
+    }
+
+    // ============ 导航接管判定(带粘滞窗口) ============
+    //  原实现只看"当前这一帧"的靠边意图(laneChangeEdge/laneCmdSent)，而导航引导
+    //  会在 KEEP 与 变道 之间反复抖动(日志里"引导KEEP->LEFT变化/稳定"反复出现)，
+    //  抖回 KEEP 的那一帧 naviFlag 变 false，超车就"乘虚而入"把命令发出去，
+    //  表现为"有导航引导时超车也在生效"、"同一方向连续两条变道命令"。
+    //  这里加粘滞：导航一旦有变道意图/已发命令/正在变道中，之后的
+    //  NAVI_TAKEOVER_HOLD_MS 内持续压制超车；导航变道完成后也留一段缓冲。
+    val naviIntent = laneChangeEdge != LaneChangeAction.KEEP || laneCmdSent ||
+            (atc_state_curr in PreLaneChange..LaneChangeFinishing)
+    if (app_navi_valid > 0 && naviIntent) {
+        naviTakeoverUntil = System.currentTimeMillis() + NAVI_TAKEOVER_HOLD_MS
+    }
+    return (app_navi_valid > 0) && (naviIntent || naviTakeoverActive())
+}
+
+fun MainActivity.autoOvertake(naviFlag: Boolean) {
+    val now = System.currentTimeMillis()
+    val nowTime = nowTimeStr()
+    val s = opStateManager.state
+    val p = currentOvertakeParams()
+
+    overtakeDebugNaviFlag = naviFlag        //供诊断面板显示"领航"状态
+
+    var overtakeMinSpeed = 30
+    if (bHighWay) {
+        overtakeMinSpeed = 60
+    }
+
+    // (已移除)原"KT 超车开关打开时把 py_overtake_disable 置真并提示'KT超车已接管'"的段落：
+    //   Python 侧超车控制器已删除，该标志当前没有任何消费方，保留提示反而误导
+    //   (日志里显示"超车功能关闭"，但超车实际仍在工作)。
+    //   超车与导航的互斥现在只在 naviFlag 为真时生效(见 AmapNavi 返回处)。
+
+    //有推荐/禁行车道时临时禁止超车(超车设置页开关，默认开)；车道引导消失即恢复超车
+    val navLaneHintBlocked = overtake_block_on_nav_lane_hint &&
+            (navLaneHasBlocked || navLaneHasSuggested)
+
+    // ============ 1. 基础条件判断(激光雷达在线/OP定速/超车开关/领航未接管/无导航车道引导) ============
+    if (!(s.lidar_l && s.lidar_r                       //激光雷达在线
+                && s.engaged && !naviFlag              //开启了op定速并且领航未控制
+                && !navLaneHintBlocked                 //无推荐/禁行车道
+                && ((!bHighWay && app_road_overtake) || (bHighWay && app_overtake)))) {
+
+        //条件原因(同时用于日志与诊断面板)
+        var condReason = ""
+        if (!s.lidar_l) condReason += "左侧激光雷达不在线，"
+        if (!s.lidar_r) condReason += "右侧激光雷达不在线，"
+        if (!s.engaged) condReason += "OP未定速，"
+        if (!bHighWay && !app_road_overtake) condReason += "公路超车未打开，"
+        if (bHighWay && !app_overtake) condReason += "高速超车未打开，"
+        if (naviFlag) condReason += "领航控制中，"
+        if (navLaneHintBlocked) condReason += if (navLaneHasBlocked) "有禁行车道，" else "有推荐车道，"
+
+        if (app_overtake_valid != -1) {
+            app_overtake_valid = -1
+            val msg = "${nowTime} 条件不符合(${condReason})"
+
+            Log.d("Overtake", msg)
+            showLaneDebug(msg)
+
+            //重置超车状态
+            resetOvertakeAction()
+        }
+        clearOvertakeRuntime()
+        logOvertakeStage("1-基础条件", "不超车", condReason)
+        return
+    }
+
+    // ============ 2. 处理超车变道状态机(每周期调用：检测变道完成/驾驶员干预/超时) ============
+    processOvertakeLaneChangeState(s.atc_state)
+
+    // ============ 3. 车速门限 ============
+    val vEgo = s.vEgo ?: 0
+    if (vEgo < overtakeMinSpeed) { //车辆速度允许超车
+        if (app_overtake_valid != 0) {
+            app_overtake_valid = 0
+            val msg = "${nowTime} 车速过低(${vEgo}km/h), 小于${overtakeMinSpeed}km/h，暂停超车功能"
+            Log.d("Overtake", msg)
+            showLaneDebug(msg)
+
+            //重置变道状态
+            resetOvertakeAction()
+            validLaneActionDbTime = now
+        }
+        clearOvertakeRuntime()
+        logOvertakeStage("3-车速门限", "暂停", "车速${vEgo}km/h<${overtakeMinSpeed}km/h")
+        return
+    }
+
+    if (app_overtake_valid != 1) {
+        app_overtake_valid = 1
+        val msg = "${nowTime} 超车功能正常工作中"
+        Log.d("Overtake", msg)
+        showLaneDebug(msg)
+    }
+
+    // ============ 4. 变道命令已发送或正在收尾，等待状态机完成 ============
+    if (overtakeCmdSent || overtakeActionPause) {
+        overtakeInProgress = true
+        logOvertakeStage("4-等待变道完成", "进行中",
+            "cmdSent=${overtakeCmdSent} pause=${overtakeActionPause} atc=${s.atc_state}")
+        return
+    }
+    overtakeInProgress = false
+
+    // ============ 5. 超车冷却 ============
+    if (now < overtakeCooldownUntil) {
+        overtakeTriggerStableTime = 0L
+        logOvertakeReason("${nowTime} 超车冷却中(${p.modeName})")
+        logOvertakeStage("5-冷却", "不超车", "剩余${overtakeCooldownUntil - now}ms")
+        return
+    }
+
+    // ============ 5.5 前车 cut-in(插队)抑制 ============
+    // 每周期先做插队检测：有车并入时 drel 突降/vrel 瞬态极负，
+    // 若直接当成"前车慢"就会出现"刚被插队就立刻变道"。窗口内不触发并清零稳定计时。
+    updateCutInDetection()
+    if (isCutInSuppressing()) {
+        overtakeTriggerStableTime = 0L
+        logOvertakeReason("${nowTime} 前车插入抑制中：$cutInReason")
+        logOvertakeStage("6-cutIn抑制", "不超车", "剩${cutInSuppressUntil - now}ms | $cutInReason")
+        return
+    }
+
+    // ============ 6. 超车触发条件评估 ============
+    val (trigger, triggerReason) = evaluateOvertakeTrigger()
+    if (!trigger) {
+        overtakeTriggerStableTime = 0L
+        logOvertakeReason("${nowTime} 不超车：$triggerReason")
+        logOvertakeStage("6-触发评估", "不超车", triggerReason)
+        return
+    }
+    //要求触发条件稳定一段时间，避免雷达数据抖动导致误触发
+    if (overtakeTriggerStableTime == 0L) {
+        overtakeTriggerStableTime = now
+        logOvertakeStage("6-触发稳定", "计时开始", "需稳定${p.stableTime}ms | $triggerReason")
+        return
+    }
+    if (now - overtakeTriggerStableTime < p.stableTime) {
+        logOvertakeStage("6-触发稳定", "等待中",
+            "已${now - overtakeTriggerStableTime}ms/${p.stableTime}ms | $triggerReason")
+        return
+    }
+
+    // ============ 7. 左右两侧安全性评估(毫米波雷达 + 激光雷达侧向数据) ============
+    val leftEval = evaluateOvertakeSide(LaneChangeAction.LEFT)
+    val rightEval = evaluateOvertakeSide(LaneChangeAction.RIGHT)
+
+    //收集可用方向：保守模式仅允许左侧超车，常规/激进允许左右两侧
+    val candidates = ArrayList<OvertakeSideEval>(2)
+    if (leftEval.safe) candidates.add(leftEval)
+    if (rightEval.safe && p.allowRightOvertake) candidates.add(rightEval)
+    if (candidates.isEmpty()) {
+        logOvertakeReason("${nowTime} 不超车：两侧均不安全(左:${leftEval.reason}; 右:${rightEval.reason})")
+        logOvertakeStage("7-两侧评估", "不超车",
+            "两侧均不安全(左:${leftEval.reason}; 右:${rightEval.reason})")
+        return
+    }
+
+    //激进模式取评分更高的方向；常规/保守优先左侧超车
+    val ordered = if (p.preferLeftFirst) {
+        candidates.sortedBy { if (it.side == LaneChangeAction.LEFT) 0 else 1 }
+    } else {
+        candidates.sortedByDescending { it.score }
+    }
+
+    // ============ 8. 导航车道校验并执行 ============
+    for (c in ordered) {
+        if (decideOvertakeLane(vLaneResult, navLane, c.side, bHighWay, road_median).second == c.side) {
+            logOvertakeReason("${nowTime} 超车(${c.side}/${p.modeName}): ${c.reason} | $triggerReason")
+            logOvertakeStage("8-执行超车", "超车${c.side}", "${c.reason} | $triggerReason")
+            doOvertakeAction(c.side)
+            return
+        }
+    }
+
+    logOvertakeReason("${nowTime} 不超车：导航车道不允许(${ordered[0].reason})")
+    logOvertakeStage("8-导航校验", "不超车", "导航车道不允许(${ordered[0].reason})")
+}
+
+
+//导航处理
+fun MainActivity.naviProcess() {
+    //单飞保护：并发进来直接跳过本周期(见 NavRuntimeState.naviProcessBusy)
+    if (!naviProcessBusy.compareAndSet(false, true)) return
+    try {
+
+        //行驶路程处理(先更新到路口的剩余距离)
+        travelDistProcess()
+        //匝道提前减速(须先于限速下发：限速下发要用到本周期的减速状态)
+        rampSlowdownProcess()
+        //平滑道路限速
+        smoothSpeedLimit()
+        //车道线有效检测
+        var lane_line_valid = laneLineProcess()
+        laneLineValid = lane_line_valid
+
+        //端到端模拟注入(仅调试用，见 DebugReceiver cmd=sim)
+        // 必须放在 laneLineValid 赋值之后，否则会被 laneLineProcess() 的结果覆盖
+        if (simScene != null) {
+            if (System.currentTimeMillis() < simHoldUntil) {
+                applySimScene(simScene!!, simTick++)
+            } else {
+                simScene = null
+                resetLaneTypeFilter()
+                // 恢复模拟前的领航开关(与 DebugReceiver simstop 一致)
+                app_navi = simSavedAppNavi
+                app_road_navi = simSavedAppRoadNavi
+                Log.d("Overtake", "模拟场景结束")
+            }
+        }
+
+        //高德导航
+        var naviFlag = AmapNavi(lane_line_valid)
+        //超车功能
+        autoOvertake(naviFlag)
+
+        //导航变道场景标志(遗留)：靠边/岔路/转弯/推荐车道/禁行车道时会被置真。
+        //  注：Python 侧超车控制器已删除，该标志当前无消费方，这里只作场景变化日志用；
+        //      原文案"超车功能关闭/打开"会误导(超车并未被关闭)，故去掉。
+        if (py_overtake_disable_prev != py_overtake_disable) {
+            py_overtake_disable_prev = py_overtake_disable
+
+            val nowTime = nowTimeStr()
+            val msg = if (py_overtake_disable) {
+                "$nowTime ${py_overtake_disable_reason}"
+            } else {
+                "$nowTime 导航变道场景结束"
+            }
+            Log.d("LaneState", msg)
+            showLaneDebug(msg)
+        }
+
+        //运行时自检：把"实时调试要盯的判据"做进程序，异常统一输出 AmapAlert(见 HealthMonitor)
+        HealthMonitor.tick(this)
+
+        //放宽状态变化时立即补发线型(不等视觉帧)：避免"命令已下发、CP 仍按实线拦"
+        publishLaneTypeIfChanged()
+
+        //领航现场快照落盘(不开电脑跑车也能回来分析，见 logNavSnapshot 注释)
+        logNavSnapshot()
+    } finally {
+        naviProcessBusy.set(false)
+    }
+}
+
+// -----------------------------
+// 领航现场快照(落盘，供"不开电脑"离线分析)
+//   每个决策周期(100ms)末尾调用；为避免刷屏做三层收敛：
+//     1) 快变字段量化(车速按 2km/h、路口距离按 10m)
+//     2) 与上一行完全相同则不写
+//     3) 最短间隔 NAV_SNAP_MIN_MS(500ms)
+//   落盘走主日志 AppLogger(自身不判断开关，故无条件写)：
+//     /sdcard/AmapNavi/app/yyyy-MM-dd.log
+//     无存储权限时 → Android/data/com.carrot.amapnavi/files/logs/app/yyyy-MM-dd.log
+//   一行覆盖现场排查所需：道路/车速/接管 + 引导(xTurn类型·距离) + 靠边意图 +
+//   导航车道数组 + 视觉车道(左右 cnt/id) + 车线类型 + 决策/目标 + 命令序号。
+//   注：整个过程包在 try 里——日志任何异常都不允许影响行车决策。
+// -----------------------------
+private var navSnapLast = ""
+private var navSnapLastMs = 0L
+private const val NAV_SNAP_MIN_MS = 500L
+
+fun MainActivity.logNavSnapshot() {
+    // 行车日志总开关(设置页"行车日志(调试用)"，默认开)；关掉后不写盘
+    if (!drive_log_en) return
+    try {
+        val now = System.currentTimeMillis()
+        if (now - navSnapLastMs < NAV_SNAP_MIN_MS) return
+
+        val st = opStateManager.state
+        val v = vLaneResult
+        val nl = navLane
+        val vEgoQ = ((st.vEgo ?: 0) / 2) * 2   // vEgo 为 Int?，2km/h 粒度
+        val distQ = (st.xTurnDist / 10).toInt() * 10
+
+        val sb = StringBuilder(192)
+        sb.append("hw=").append(if (bHighWay) 1 else 0)
+        //高德道路类型：原始 ROAD_TYPE / 换算后 gRoadCate(1=高速 0=快速 2=国道 8=公路)
+        sb.append(" rc=").append(rawRoadType).append('/').append(gRoadCate)
+        sb.append(" v=").append(vEgoQ)
+        sb.append(" eng=").append(if (st.engaged) 1 else 0)
+        sb.append(" turn=").append(st.xTurnInfo).append('/').append(distQ)
+        // 红灯限速注入来源：0=未注入 1=闯红灯摄像头 2=TBT距离兜底（诊断"红灯没下发"用）
+        if (redLightInjectSource != 0 || nTrafficSpeedLimit > 0) {
+            sb.append(" rl=").append(redLightInjectSource).append('/').append(nTrafficSpeedLimit)
+        }
+        sb.append(" edge=").append(laneChangeEdge.name)
+        sb.append(" en=").append(if (enableLaneChange) 1 else 0)
+        sb.append(" dec=").append(lastValidLaneAction.name)
+        sb.append(" tgt=").append(lastTargetIdx).append('/').append(lastVisualIdx)
+        sb.append(" | nav=").append(nl.validCount)
+        if (nl.validCount > 0) {
+            sb.append('[')
+            for (i in 0 until nl.validCount) {
+                if (i > 0) sb.append('|')
+                sb.append(nl.laneStrArray.getOrNull(i) ?: "")
+            }
+            sb.append(']')
+        }
+        sb.append(" | vL=").append(v.leftLaneCnt).append('/').append(v.leftLaneId)
+        sb.append(" vR=").append(v.rightLaneCnt).append('/').append(v.rightLaneId)
+        sb.append(" solid=").append(left_lane_type).append('/').append(right_lane_type)
+        // CP(openpilot)侧下发的车道线判据：用来区分"App 侧实线拦截"与"CP 侧拒执行"
+        sb.append(" cpSolid=").append(if (st.blind_lane_l) 1 else 0).append('/').append(if (st.blind_lane_r) 1 else 0)
+        sb.append(" lnv=").append(if (laneLineValid) 1 else 0)
+        // 下一步引导(高德原始 icon / 距离)：用于核对"连续岔路"判定
+        sb.append(" next=").append(naviState.nTBTTurnTypeNext ?: -1).append('/').append(naviState.nTBTDistNext ?: -1)
+        // 实线放宽是否生效(临匝道/连续岔路)
+        sb.append(" relax=").append(
+            if (laneChangeEdge != LaneChangeAction.KEEP &&
+                solidLineRelaxed(laneChangeEdge, LaneChangePurpose.NAVI)) 1 else 0
+        )
+        // 激光侧方盲区 + 激光屏蔽"判据意图值"(与"实际发送值"分开：
+        //   模拟环境无 CP 连接时 sendLaneType 会提前返回，只有这个能验证判据)
+        sb.append(" lid=").append(if (st.lidar_lblind) 1 else 0).append('/').append(if (st.lidar_rblind) 1 else 0)
+        run {
+            val (supL, supR) = calcLidarSuppress()
+            sb.append(" sup=").append(if (supL) 1 else 0).append('/').append(if (supR) 1 else 0)
+        }
+        sb.append(" cmd=").append(laneChangeCmdIndex)
+
+        val line = sb.toString()
+        if (line == navSnapLast) return
+        navSnapLast = line
+        navSnapLastMs = now
+        Log.i("NavSnap", line)
+        AppLogger.log(this, "NavSnap", line)
+    } catch (e: Exception) {
+        // 日志失败绝不影响行车决策
+    }
+}
+
+fun MainActivity.startTimeoutChecker() {
+    // 防重复启动：UDP 初始化回调可能被多次触发，重复启动会让多个协程同时跑决策
+    if (!timeoutCheckerRunning.compareAndSet(false, true)) {
+        Log.w("Navi", "决策循环已在运行，忽略重复启动")
+        return
+    }
+    timeoutJob?.cancel()
+    timeoutJob = lifecycleScope.launch(Dispatchers.IO) {
+      try {
+        delay(5000)
+        var imageViewCheckTime = 0L
+
+        while (isActive) {
+            delay(100) // 每0.1秒检查一次
+            val now = System.currentTimeMillis()
+
+            //导航处理
+            naviProcess()
+
+            if (now - imageViewCheckTime > 1000) {
+                //视频画面显示控制的处理
+                if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                    withContext(Dispatchers.Main) {
+                        if ((video_show && lane_show_enable > 0) /*&& (lane_detect && lane_detect_enable > 0)*/) {
+                            if (imageViewLayout.visibility == View.GONE) {
+                                if (imageViewLayoutShowEnable) { //是否允许显示
+                                    imageViewLayout.visibility = View.VISIBLE
+                                }
+                            }
+                        } else {
+                            if (imageViewLayout.visibility == View.VISIBLE) {
+                                imageViewLayout.visibility = View.GONE
+                            }
+                        }
+                    }
+                    imageViewCheckTime = now
+                }
+            }
+
+            var elapsed = now - lastNaviReceiveTime
+
+            // 检查红绿灯数据是否超时（超过5秒）
+            if (now - lastTrafficRecvTime > 5_000) {
+                if (nTrafficSpeedLimit != -1) {
+                    nTrafficSpeedLimit = -1
+                    nTrafficSpeedLimitChange = true
+                }
+            }
+
+            if (!cmUdpServiceSendEnable) {
+                continue;
+            }
+
+            if (elapsed > 10_000) { // 超过10秒没收到数据
+                naviDataTimeout = true
+                if (lastTimeoutSendTime == 0L || now - lastTimeoutSendTime >= 1_000) { // 超时期间每1秒发送一次
+                    if (!carrotManIp.isNullOrEmpty()) {
+                        if (carState.vCruise > 0 && carState.vCruise <= 140) {
+                            var limit_speed = carState.vCruise
+                            val limitedJson = JSONObject().apply {
+                                put("nRoadLimitSpeed", limit_speed)
+                            }.toString()
+                            lastJsonToSend = limitedJson
+                            //cmUdpService.send(limitedJson)
+                            cmUdpServiceSend(limitedJson, port = carrotManOpPort)
+                            lastUdpSendTime = now
+                            lastTimeoutSendTime = now
+
+                            recvTimeoutCnt += 1
+                            val logShow = "接收广播超时(${recvTimeoutCnt}次)：发送数据包" + limitedJson
+                            if (!bShowRawLog) {
+                                clearRawLog()
+                            }
+                            setRawLogVisible(true)
+                            updateRawLog(logShow, true)
+                        }
+                    } else {
+                        val limitedJson = JSONObject().apply {
+                            put("port", carrotManAppPort)
+                        }.toString()
+                        lastJsonToSend = limitedJson
+                        //cmUdpService.send(limitedJson)
+                        cmUdpServiceSend(limitedJson, port = carrotManOpPort)
+                        lastUdpSendTime = now
+                        lastTimeoutSendTime = now
+
+                        recvTimeoutCnt += 1
+                        val logShow = "未连上设备：发送广播包(${recvTimeoutCnt}次)" + limitedJson
+                        if (!bShowRawLog) {
+                            clearRawLog()
+                        }
+                        setRawLogVisible(true)
+                        updateRawLog(logShow, true)
+                    }
+                }
+            } else {
+                // 收到新数据，重置计时
+                lastTimeoutSendTime = 0L
+                recvTimeoutCnt = 0
+            }
+        }
+      } finally {
+        // 协程退出(取消/异常)时释放标志，保证之后还能重新启动决策循环
+        timeoutCheckerRunning.set(false)
+      }
+    }
+}

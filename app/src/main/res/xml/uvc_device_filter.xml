@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  USB 设备过滤器（配合 UsbAttachActivity 的 USB_DEVICE_ATTACHED intent-filter）：
+  插入匹配设备时系统会提供「用 AmapNavi 打开」，用户选择后系统【自动授予
+  USB 设备权限，无需授权弹窗】——规避部分华为 ROM 上 requestPermission
+  弹窗不出现的问题。
+  MS2109 (VID=0x534d) 与通用 UVC 视频类（class 0x0E）采集卡均覆盖。
+-->
+<resources>
+    <!-- MS2109 及同系列 HDMI 采集卡（VID=0x534d 十进制 21325） -->
+    <usb-device vendor-id="21325" />
+    <!-- 通用 UVC 视频类设备（HDMI 转 USB 采集卡） -->
+    <usb-device class="14" subclass="1" />
+    <!-- 复合 UVC 设备（device class=0xEF, subclass=0x02），libuvc AAR 使用同一规则 -->
+    <usb-device class="239" subclass="2" />
+</resources>

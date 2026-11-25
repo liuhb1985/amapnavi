@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="8dp"
+    android:background="#FFFFFF">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="导航源探针（接入新地图前抓协议样本）"
+        android:textSize="14sp"
+        android:textColor="#000000"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="① 打开目标地图开始导航  ② 抓取广播/通知栏  ③ 导出日志给我，据此写字段映射"
+        android:textSize="10sp"
+        android:textColor="#666666"
+        android:layout_marginTop="2dp" />
+
+    <!-- 已安装的候选地图 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="本机候选地图/导航 App："
+        android:textSize="12sp"
+        android:textColor="#333333"
+        android:layout_marginTop="8dp" />
+
+    <TextView
+        android:id="@+id/tvProbePackages"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="(扫描中…)"
+        android:textSize="10sp"
+        android:textColor="#1A73E8"
+        android:lineSpacingExtra="2dp"
+        android:background="#F5F5F5"
+        android:padding="4dp" />
+
+    <!-- 广播 action 输入 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="8dp">
+
+        <EditText
+            android:id="@+id/etProbeActions"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="广播 action，多个用逗号分隔"
+            android:textSize="11sp"
+            android:inputType="text"
+            android:singleLine="true"
+            android:backgroundTint="#888888"
+            android:background="@android:color/white"
+            android:paddingStart="4dp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="4dp">
+
+        <Button
+            android:id="@+id/btnProbeBroadcast"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="开始抓广播"
+            android:textSize="11sp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:background="@drawable/btn_blue" />
+
+        <Button
+            android:id="@+id/btnProbeNotify"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="开启通知栏抓取"
+            android:textSize="11sp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:layout_marginStart="6dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp" />
+
+        <Button
+            android:id="@+id/btnProbeExport"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="导出"
+            android:textSize="11sp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:layout_marginStart="6dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp" />
+
+        <Button
+            android:id="@+id/btnProbeClear"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="清空"
+            android:textSize="11sp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:layout_marginStart="6dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="抓到的原始内容（最近 40 条）："
+        android:textSize="11sp"
+        android:textColor="#333333"
+        android:layout_marginTop="8dp" />
+
+    <ScrollView
+        android:id="@+id/scrollProbe"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:background="#F5F5F5"
+        android:padding="4dp">
+
+        <TextView
+            android:id="@+id/tvProbeLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="9sp"
+            android:textColor="#222222"
+            android:lineSpacingExtra="2dp"
+            android:textIsSelectable="true" />
+    </ScrollView>
+
+    <Button
+        android:id="@+id/btnProbeClose"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="关闭"
+        android:textSize="12sp"
+        android:layout_marginTop="6dp" />
+</LinearLayout>
