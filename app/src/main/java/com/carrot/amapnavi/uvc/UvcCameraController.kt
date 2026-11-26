@@ -49,6 +49,9 @@ class UvcCameraController(private val context: Context) {
         /** 常规重试间隔 */
         private const val RETRY_INTERVAL_MS = 5000L
 
+        /** 同一拓扑签名的事件防抖窗口，避免连发广播重复复位 */
+        private const val TOPOLOGY_DEBOUNCE_MS = 1500L
+
         /** 系统层封锁后的廉价自检间隔（不创建任何实例） */
         private const val BLOCKED_CHECK_INTERVAL_MS = 15000L
 
@@ -56,7 +59,7 @@ class UvcCameraController(private val context: Context) {
         private const val PREF_CAM2_HANG_ON_USB_PERM = "cam2_hang_on_usb_perm"
         private const val PREF_BAN_MIGRATED_V2 = "usb_auto_banned_v2_migrated"
 
-        /** 设备能力级失败：重试同一台设备没有意义，累计 2 次后熔断 */
+        /** 设备能力级失败：重试同一台设备没有意义，累计到阈值后熔断 */
         private fun isFatalDirectError(message: String): Boolean =
             message.contains("等时传输") ||
                     message.contains("Native UVC 打开失败") ||
@@ -64,6 +67,13 @@ class UvcCameraController(private val context: Context) {
                     message.contains("不支持的未压缩视频格式") ||
                     message.contains("NoSuchMethodError") ||
                     message.contains("Android USB API 未暴露")
+
+        /**
+         * libusb 通用错误 -99 可能由开关机/接口占用竞态引起，给多一次自愈机会；
+         * 其他明确能力级错误仍按 2 次熔断。
+         */
+        private fun fatalThresholdFor(message: String): Int =
+            if (message.contains("result=-99")) 3 else 2
     }
 
     /** 状态回调（主线程） */
@@ -136,18 +146,31 @@ class UvcCameraController(private val context: Context) {
     /** 诊断日志节流时间戳 */
     private var lastDiagLogMs = 0L
 
+    /** camera2 可用性回调是否已注册（Surface/ON_START/展开会重复调用 start） */
+    private var availabilityRegistered = false
+
+    /** 熔断错误只上报一次，避免 retryRunnable 每 5 秒刷整段诊断 */
+    private var directFusedReported = false
+
+    /** 同签名拓扑事件的防抖时间戳 */
+    private var lastTopologyEventMs = 0L
+
+    /** 最近一次致命失败时间，避免同一代际的重复错误快速累加 */
+    private var lastFatalAt = 0L
+
     /** 直连实例单飞防抖 */
     private var lastDirectStartAt = 0L
     private var lastDirectState: UvcState? = null
 
     private val availabilityCallback = object : CameraManager.AvailabilityCallback() {
         override fun onCameraAvailable(cameraId: String) {
-            UvcLog.i(TAG, "摄像头可用: $cameraId")
-            notifyUsbTopologyChanged()
+            // 这里的 cameraId 包含所有前后置摄像头，不能当作 USB 拓扑变化，
+            // 否则每插入一次会连发 15 次回调并反复清空 fuse/debounce。
+            UvcLog.d(TAG, "摄像头可用: $cameraId（非 USB 拓扑事件，仅记录）")
         }
 
         override fun onCameraUnavailable(cameraId: String) {
-            UvcLog.i(TAG, "摄像头不可用: $cameraId")
+            UvcLog.d(TAG, "摄像头不可用: $cameraId（非 USB 拓扑事件，仅记录）")
         }
     }
 
@@ -166,10 +189,13 @@ class UvcCameraController(private val context: Context) {
             backgroundHandler = Handler(backgroundThread!!.looper)
         }
         val bg = backgroundHandler
-        try {
-            cameraManager?.registerAvailabilityCallback(availabilityCallback, bg)
-        } catch (e: Exception) {
-            UvcLog.w(TAG, "注册摄像头监听失败: ${e.message}")
+        if (!availabilityRegistered) {
+            try {
+                cameraManager?.registerAvailabilityCallback(availabilityCallback, bg)
+                availabilityRegistered = cameraManager != null
+            } catch (e: Exception) {
+                UvcLog.w(TAG, "注册摄像头监听失败: ${e.message}")
+            }
         }
         logUsbDiagnostics()
         tryOpen()
@@ -178,15 +204,19 @@ class UvcCameraController(private val context: Context) {
 
     fun stop() {
         cameraGeneration++
+        directFusedReported = false
         retryHandler.removeCallbacks(retryRunnable)
         closeSession()
         stopDirect()
         runCatching { cameraDevice?.close() }
         cameraDevice = null
         currentCameraId = null
-        try {
-            cameraManager?.unregisterAvailabilityCallback(availabilityCallback)
-        } catch (_: Exception) {
+        if (availabilityRegistered) {
+            try {
+                cameraManager?.unregisterAvailabilityCallback(availabilityCallback)
+            } catch (_: Exception) {
+            }
+            availabilityRegistered = false
         }
         releaseBackgroundThread()
         pendingSurface = null
@@ -250,6 +280,7 @@ class UvcCameraController(private val context: Context) {
      * USB 拓扑变化（拔出/换口重插）：清零防抖与失败锁，
      * 让重插后的首次 tryOpen 能立即重建链路。
      */
+    @Synchronized
     fun notifyUsbTopologyChanged(attached: Boolean? = null) {
         val event = when (attached) {
             true -> "A:"
@@ -258,11 +289,15 @@ class UvcCameraController(private val context: Context) {
         }
         val sig = event + topologySignature()
         if (attached != false && pendingSurface == null) return
+        val now = SystemClock.elapsedRealtime()
         if (attached != false && sig == lastTopologySignature) {
+            if (now - lastTopologyEventMs < TOPOLOGY_DEBOUNCE_MS) return
+            lastTopologyEventMs = now
             UvcLog.d(TAG, "重复 USB 拓扑事件(sig=$sig)，忽略，避免误清权限封锁")
             return
         }
         lastTopologySignature = sig
+        lastTopologyEventMs = now
         lastDirectStartAt = 0
         camera2FailedOnce = false
         cam2HangCount = 0
@@ -271,6 +306,7 @@ class UvcCameraController(private val context: Context) {
         lastFatalMessage = null
         // 真正的拔插 = 新的设备实例：此前的「系统层打不开」封锁必须清零
         usbOpenBlocked = false
+        if (attached != null) directFusedReported = false
         if (attached == false) stopDirect()
         UvcLog.i(TAG, "USB 拓扑变化(sig=$sig)：失败锁/封锁已复位，允许立即重建链路")
         if (pendingSurface != null) tryOpen()
@@ -295,6 +331,7 @@ class UvcCameraController(private val context: Context) {
         staleAuthCount = 0
         directHardFailures = 0
         lastFatalMessage = null
+        directFusedReported = false
         lastTopologySignature = null
         lastDirectStartAt = 0
         tryOpen()
@@ -311,6 +348,7 @@ class UvcCameraController(private val context: Context) {
         staleAuthCount = 0
         directHardFailures = 0
         lastFatalMessage = null
+        directFusedReported = false
         cam2HangCount = 0
         camera2FailedOnce = false
         lastDirectStartAt = 0
@@ -342,10 +380,14 @@ class UvcCameraController(private val context: Context) {
         if (cameraId == null) {
             val usbName = findUsbVideoDeviceName()
             if (usbName != null) {
-                if (directHardFailures >= 2) {
-                    val detail = lastFatalMessage?.let { "：$it" } ?: ""
-                    UvcLog.w(TAG, "直连已熔断且 camera2 无外置摄像头，报告设备不支持")
-                    postState(UvcState.Error("此设备 ROM 未暴露外置摄像头，USB 直连也已熔断$detail"))
+                val fatalThreshold = fatalThresholdFor(lastFatalMessage.orEmpty())
+                if (directHardFailures >= fatalThreshold) {
+                    if (!directFusedReported) {
+                        directFusedReported = true
+                        val detail = lastFatalMessage?.let { "：$it" } ?: ""
+                        UvcLog.w(TAG, "直连已熔断且 camera2 无外置摄像头，报告设备不支持")
+                        postState(UvcState.Error("此设备 ROM 未暴露外置摄像头，USB 直连也已熔断$detail"))
+                    }
                     return
                 }
                 // USB 层已识别视频设备，但 camera2 未暴露 → 走用户态 UVC 直连
@@ -363,8 +405,11 @@ class UvcCameraController(private val context: Context) {
 
         // camera2 曾在此设备失败过 → 直接走直连
         if (camera2FailedOnce && findUsbVideoDeviceName() != null) {
-            if (directHardFailures >= 2) {
-                UvcLog.w(TAG, "直连已熔断（硬失败 $directHardFailures 次），停止自动重试")
+            if (directHardFailures >= fatalThresholdFor(lastFatalMessage.orEmpty())) {
+                if (!directFusedReported) {
+                    directFusedReported = true
+                    UvcLog.w(TAG, "直连已熔断（硬失败 $directHardFailures 次），停止自动重试")
+                }
                 return
             }
             if (usbOpenBlocked) return
@@ -628,9 +673,15 @@ class UvcCameraController(private val context: Context) {
             onStateChanged = { s ->
                 lastDirectState = s
                 if (s is UvcState.Error && isFatalDirectError(s.message)) {
-                    directHardFailures++
-                    lastFatalMessage = s.message
-                    UvcLog.e(TAG, "直连致命失败，累计 $directHardFailures 次（≥2 熔断）: ${s.message}")
+                    val fatalAt = SystemClock.elapsedRealtime()
+                    // 同一代际可能在几毫秒内连发多条错误，3s 内不重复计数
+                    if (fatalAt - lastFatalAt >= 3000L) {
+                        lastFatalAt = fatalAt
+                        directHardFailures++
+                        lastFatalMessage = s.message
+                        val threshold = fatalThresholdFor(s.message)
+                        UvcLog.e(TAG, "直连致命失败，累计 $directHardFailures 次（≥$threshold 熔断）: ${s.message}")
+                    }
                 }
                 if (s is UvcState.UsbPermissionBlocked) {
                     usbOpenBlocked = true
@@ -648,6 +699,8 @@ class UvcCameraController(private val context: Context) {
                     usbOpenBlocked = false
                     directHardFailures = 0
                     lastFatalMessage = null
+                    directFusedReported = false
+                    lastFatalAt = 0
                 }
                 postState(s)
             }

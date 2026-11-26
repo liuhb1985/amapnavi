@@ -65,6 +65,9 @@ private var uvcCameraFlowId = 0L
 /** 诊断结果缓存：applyUvcState 高频调用时避免主线程反复枚举 USB/Camera */
 private var uvcDiagCache: Pair<Long, String>? = null
 
+/** 状态文案去重：完全相同的状态不再重复刷新 UI、不再重复写日志 */
+private var lastUvcRenderedKey: String? = null
+
 private fun MainActivity.cachedUvcDiagnose(): String {
     val now = SystemClock.elapsedRealtime()
     uvcDiagCache?.let { (at, text) ->
@@ -199,6 +202,7 @@ internal fun MainActivity.expandUvc() {
 internal fun MainActivity.collapseUvc() {
     uvcBody.visibility = View.GONE
     btnUvcToggle.text = "展开"
+    lastUvcRenderedKey = null
     getSharedPreferences("user_settings", Context.MODE_PRIVATE)
         .edit().putBoolean(PREF_UVC_EXPANDED, false).apply()
     uvcController?.stop()
@@ -211,24 +215,29 @@ internal fun MainActivity.collapseUvc() {
 private fun MainActivity.applyUvcState(state: UvcState) {
     val hint = state.toHint()
     // 没出画面时把诊断摘要一起显示：车上看不到日志，靠这几行就能判断卡在哪一步
-    tvUvcStatus.text = if (state is UvcState.Streaming) {
-        hint
+    val diag = if (state is UvcState.Streaming) {
+        ""
     } else {
-        val diag = runCatching { cachedUvcDiagnose() }.getOrDefault("")
-        if (diag.isEmpty()) hint else "$hint\n---\n$diag"
+        runCatching { cachedUvcDiagnose() }.getOrDefault("")
     }
-    tvUvcBrief.text = when (state) {
+    val statusText = if (diag.isEmpty()) hint else "$hint\n---\n$diag"
+    val briefText = when (state) {
         is UvcState.Streaming -> "已连接"
         is UvcState.Opening, is UvcState.AwaitingUsbPermission -> "连接中"
         is UvcState.NoDevice -> "未检测"
         else -> "异常"
     }
+    // 完全相同的结果直接跳过：熔断后 retryRunnable 仍每 5s 触发，但不再刷 UI/日志
+    val key = state.javaClass.name + "|" + hint + "|" + statusText
+    if (key == lastUvcRenderedKey) return
+    lastUvcRenderedKey = key
+
+    tvUvcStatus.text = statusText
+    tvUvcBrief.text = briefText
     // 只在状态变化的关键节点写日志，避免刷屏
     when (state) {
         is UvcState.Streaming -> appendLogIfEnabled("采集卡: $hint")
-        is UvcState.Error -> appendLogIfEnabled(
-            "采集卡错误: $hint\n${runCatching { cachedUvcDiagnose() }.getOrDefault("")}"
-        )
+        is UvcState.Error -> appendLogIfEnabled("采集卡错误: $hint\n$diag")
         is UvcState.NoDevice -> appendLogIfEnabled("采集卡: 未检测到设备")
         is UvcState.UsbPermissionDenied, is UvcState.UsbPermissionBlocked ->
             appendLogIfEnabled("采集卡权限: $hint")

@@ -34,21 +34,30 @@ class UvcNativeStreamer(private val context: Context) {
     /** 每次 start/stop 递增，旧实例的异步回调全部作废 */
     private var generation = 0
 
+    /** listener 创建时绑定的代际与 monitor；回调时先校验，防止旧实例回调误伤新实例 */
+    private var listenerGeneration = 0
+    private var listenerMonitor: USBMonitor? = null
+
     private var streamInfo = "未协商"
     private var lastError: String? = null
+    private var lastErrorCode: Int? = null
+
+    private fun isStaleCallback(): Boolean =
+        !running || listenerGeneration != generation || monitor == null || monitor !== listenerMonitor
 
     private val listener = object : USBMonitor.OnDeviceConnectListener {
         override fun onAttach(dev: UsbDevice?) {
+            if (isStaleCallback()) return
             UvcLog.i(TAG, "Native USB 设备插入: ${dev?.deviceName}")
         }
 
         override fun onDettach(dev: UsbDevice?) {
-            if (dev == null) return
+            if (isStaleCallback() || dev == null) return
             if (device?.deviceId == dev.deviceId) {
                 val gen = generation
                 lastError = "设备已拔出"
                 post(UvcState.NoDevice(null))
-                mainHandler.post { if (gen == generation) stop() }
+                mainHandler.post { if (gen == generation && running) stop() }
             }
         }
 
@@ -57,15 +66,18 @@ class UvcNativeStreamer(private val context: Context) {
             block: USBMonitor.UsbControlBlock?,
             openNew: Boolean
         ) {
+            if (isStaleCallback()) return
             // 权限由 UsbPermissionBroker 统一申请；这里只记录，不重复 openDevice
             UvcLog.i(TAG, "Native USBMonitor onConnect: ${dev?.deviceName} openNew=$openNew")
         }
 
         override fun onDisconnect(dev: UsbDevice?, block: USBMonitor.UsbControlBlock?) {
+            if (isStaleCallback()) return
             UvcLog.i(TAG, "Native USBMonitor onDisconnect: ${dev?.deviceName}")
         }
 
         override fun onCancel(dev: UsbDevice?) {
+            if (isStaleCallback()) return
             UvcLog.w(TAG, "Native USBMonitor onCancel: ${dev?.deviceName}")
         }
     }
@@ -74,14 +86,17 @@ class UvcNativeStreamer(private val context: Context) {
     fun start(surfaceTexture: SurfaceTexture) {
         stop()
         generation++
+        listenerGeneration = generation
         running = true
         surfaceRef = surfaceTexture
         streamInfo = "未协商"
         lastError = null
+        lastErrorCode = null
 
         try {
             val m = USBMonitor(context, listener)
             monitor = m
+            listenerMonitor = m
             if (!m.isRegistered) m.register()
 
             val dev = m.deviceList.firstOrNull { isUvc(it) }
@@ -106,6 +121,7 @@ class UvcNativeStreamer(private val context: Context) {
     fun stop() {
         generation++
         running = false
+        listenerMonitor = null
         val cam = camera
         camera = null
         if (cam != null) {
@@ -229,8 +245,15 @@ class UvcNativeStreamer(private val context: Context) {
     }
 
     private fun fail(prefix: String, t: Throwable) {
-        lastError = "$prefix: ${UvcLog.describe(t)}"
-        UvcLog.e(TAG, "$prefix: ${UvcLog.describe(t)}")
+        val raw = UvcLog.describe(t)
+        val code = Regex("result=(-?\\d+)").find(raw)?.groupValues?.get(1)?.toIntOrNull()
+        lastErrorCode = code
+        val hint = when (code) {
+            -99 -> "（libusb 通用错误 -99：native open 阶段失败，常见于 ROM USB HAL、接口占用或设备描述符兼容问题）"
+            else -> ""
+        }
+        lastError = "$prefix: $raw$hint"
+        UvcLog.e(TAG, lastError!!)
         post(UvcState.Error(lastError!!))
     }
 
